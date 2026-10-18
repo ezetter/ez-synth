@@ -4,7 +4,8 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
-/** The sine waves every voice plays, as amplitudes scaled so that their sum peaks at 1:
+/** The sine waves every voice plays: those of all the oscillators that are on, each oscillator's scaled so that
+    its sum peaks at its level, added together harmonic by harmonic.
     value (t) = sum over k of cosines[k] * cos (2π k t) + sines[k] * sin (2π k t).
     The processor updates them on the audio thread, between blocks.
 */

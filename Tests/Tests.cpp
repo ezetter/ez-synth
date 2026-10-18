@@ -29,10 +29,20 @@ namespace
         return std::abs (value - expected) <= std::abs (expected) * proportion;
     }
 
-    void setNumPartials (SynthProcessor& synth, int count)
+    void setParameter (SynthProcessor& synth, const juce::String& id, float value)
     {
-        auto& parameter = *synth.parameters.getParameter (SynthProcessor::harmonicsId);
-        parameter.setValueNotifyingHost (parameter.convertTo0to1 ((float) count));
+        auto& parameter = *synth.parameters.getParameter (id);
+        parameter.setValueNotifyingHost (parameter.convertTo0to1 (value));
+    }
+
+    void setNumPartials (SynthProcessor& synth, int count, int oscillator = 0)
+    {
+        setParameter (synth, SynthProcessor::harmonicsId (oscillator), (float) count);
+    }
+
+    void setPreset (SynthProcessor& synth, int oscillator, waveform::Preset preset)
+    {
+        synth.setShape (oscillator, waveform::makePreset (preset), preset);
     }
 
     /** The amplitude of the sine wave at this frequency in a signal, from a Fourier transform with a Hann window. */
@@ -183,7 +193,7 @@ namespace
         const auto nine = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (amplitudeAt (nine, 9 * 440.0) / amplitudeAt (nine, 440.0), 1.0 / 9.0, 0.02), "asking for 9 sine waves adds up to the 9th harmonic");
 
-        synth.setShape (waveform::makePreset (waveform::Preset::square), waveform::Preset::square);
+        setPreset (synth, 0, waveform::Preset::square);
         setNumPartials (synth, 3);
         const auto square = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);   // A3, 220 Hz
         const auto squareFirst = amplitudeAt (square, 220.0);
@@ -222,7 +232,7 @@ namespace
                 midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
 
             if (block == 20)
-                synth.setShape (waveform::makePreset (waveform::Preset::square), waveform::Preset::square);
+                setPreset (synth, 0, waveform::Preset::square);
 
             synth.processBlock (buffer, midi);
             output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
@@ -238,6 +248,54 @@ namespace
         check (largestJump < 0.05f, "the note glides to the new wave without a click");
     }
 
+    void testOscillators()
+    {
+        std::cout << "Mixing oscillators" << std::endl;
+
+        SynthProcessor synth;
+        check (synth.isOn (0) && ! synth.isOn (1) && ! synth.isOn (2), "only the first oscillator is on to begin with");
+
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+            setPreset (synth, i, waveform::Preset::sine);
+
+        const auto fundamental = [&synth] { return amplitudeAt (slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45), 440.0); };
+        const auto one = fundamental();
+
+        setParameter (synth, SynthProcessor::onId (1), 1.0f);
+        setParameter (synth, SynthProcessor::levelId (1), 0.5f);
+        check (isNear (fundamental() / one, 1.5, 0.01), "a second oscillator at half level adds half as much again");
+
+        setParameter (synth, SynthProcessor::onId (2), 1.0f);
+        check (isNear (fundamental() / one, 2.5, 0.01), "a third at full level adds as much again as the first");
+
+        setParameter (synth, SynthProcessor::onId (2), 0.0f);
+        setParameter (synth, SynthProcessor::onId (1), 0.0f);
+        check (isNear (fundamental() / one, 1.0, 0.01), "switching them off leaves only the first");
+
+        // The second oscillator plays a square at half level, alongside the first's sine.
+        setPreset (synth, 1, waveform::Preset::square);
+        setParameter (synth, SynthProcessor::onId (1), 1.0f);
+        const auto mixed = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);   // A3, 220 Hz
+
+        const auto& square = synth.getDecomposition (1);
+        const auto squareScale = 0.5 / square.peaks[3];
+        const auto expectedFirst = 1.0 + squareScale * square.strongest[0].amplitude;
+        const auto expectedThird = squareScale * square.strongest[1].amplitude;
+        const auto mixedFirst = amplitudeAt (mixed, 220.0);
+        check (isNear (amplitudeAt (mixed, 660.0) / mixedFirst, expectedThird / expectedFirst, 0.02),
+               "a square in the second oscillator adds its 3rd harmonic to the first oscillator's sine");
+        check (amplitudeAt (mixed, 440.0) / mixedFirst < 1.0e-3, "...and no 2nd harmonic, as neither wave has one");
+
+        setNumPartials (synth, 1, 1);
+        const auto fewer = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);
+        check (amplitudeAt (fewer, 660.0) / amplitudeAt (fewer, 220.0) < 1.0e-3,
+               "each oscillator has its own number of harmonics");
+
+        setParameter (synth, SynthProcessor::onId (1), 0.0f);
+        setParameter (synth, SynthProcessor::levelId (0), 0.0f);
+        check (peakOf (play (synth, 69, 0.5, 0.8)) < 1.0e-6f, "an oscillator at zero level is silent");
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -248,8 +306,11 @@ namespace
         for (int i = 0; i < waveform::numPoints; ++i)
             drawn[(size_t) i] = i < waveform::numPoints / 8 ? 1.0f : -0.25f;
 
-        original.setShape (drawn);
-        setNumPartials (original, 7);
+        original.setShape (1, drawn);
+        setPreset (original, 2, waveform::Preset::triangle);
+        setNumPartials (original, 7, 1);
+        setParameter (original, SynthProcessor::onId (1), 1.0f);
+        setParameter (original, SynthProcessor::levelId (1), 0.4f);
 
         juce::MemoryBlock state;
         original.getStateInformation (state);
@@ -257,17 +318,30 @@ namespace
         SynthProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
 
-        check (restored.getShape() == drawn, "a drawn wave is restored");
-        check (! restored.getPreset().has_value(), "...and isn't taken for a preset");
-        check (restored.getNumPartials() == 7, "the number of harmonics is restored");
-
-        original.setShape (waveform::makePreset (waveform::Preset::triangle), waveform::Preset::triangle);
-        original.getStateInformation (state);
-        restored.setStateInformation (state.getData(), (int) state.getSize());
-        check (restored.getPreset() == waveform::Preset::triangle, "a preset is restored as that preset");
+        check (restored.getShape (1) == drawn, "a drawn wave is restored to its oscillator");
+        check (! restored.getPreset (1).has_value(), "...and isn't taken for a preset");
+        check (restored.getPreset (2) == waveform::Preset::triangle && restored.getPreset (0) == waveform::Preset::sawtooth,
+               "the other oscillators' presets are restored as those presets");
+        check (restored.getNumPartials (1) == 7 && restored.getNumPartials (0) == 3, "each oscillator's number of harmonics is restored");
+        check (restored.isOn (0) && restored.isOn (1) && ! restored.isOn (2), "which oscillators are on is restored");
+        check (isNear (restored.parameters.getRawParameterValue (SynthProcessor::levelId (1))->load(), 0.4, 1.0e-6),
+               "oscillator levels are restored");
 
         restored.setStateInformation ("not a saved state", 17);
-        check (restored.getPreset() == waveform::Preset::triangle, "a corrupt state is ignored");
+        check (restored.getPreset (2) == waveform::Preset::triangle, "a corrupt state is ignored");
+
+        // Before there were three oscillators, a save had one wave, with no oscillator number.
+        juce::XmlElement older ("EZSynth");
+        auto* wave = older.createNewChildElement ("WAVE");
+        const auto square = waveform::makePreset (waveform::Preset::square);
+        wave->setAttribute ("points", juce::MemoryBlock (square.data(), sizeof (square)).toBase64Encoding());
+        wave->setAttribute ("preset", "Square");
+        juce::AudioProcessor::copyXmlToBinary (older, state);
+
+        SynthProcessor upgraded;
+        upgraded.setStateInformation (state.getData(), (int) state.getSize());
+        check (upgraded.getPreset (0) == waveform::Preset::square && upgraded.getShape (0) == square,
+               "a save from before there were three oscillators loads into the first");
     }
 
     void saveSnapshots (const juce::File& folder)
@@ -304,11 +378,11 @@ namespace
         save ("1-sawtooth");
 
         hold (69);
-        synth.setShape (waveform::makePreset (waveform::Preset::square), waveform::Preset::square);
+        setPreset (synth, 0, waveform::Preset::square);
         setNumPartials (synth, 9);
         save ("2-square-9");
 
-        synth.setShape (waveform::makePreset (waveform::Preset::sine), waveform::Preset::sine);
+        setPreset (synth, 0, waveform::Preset::sine);
         setNumPartials (synth, 3);
         save ("3-sine");
 
@@ -323,12 +397,25 @@ namespace
         }
 
         hold (48);
-        synth.setShape (drawn);
+        synth.setShape (0, drawn);
         setNumPartials (synth, 5);
         save ("4-drawn-5");
 
-        editor->setSize (960, 640);
-        save ("5-smallest");
+        // All three on: a drawn wave, a square at 60% and a triangle at 35%, with the square being edited.
+        setPreset (synth, 2, waveform::Preset::triangle);
+        setParameter (synth, SynthProcessor::onId (1), 1.0f);
+        setParameter (synth, SynthProcessor::onId (2), 1.0f);
+        setParameter (synth, SynthProcessor::levelId (1), 0.6f);
+        setParameter (synth, SynthProcessor::levelId (2), 0.35f);
+        synth.editedOscillator = 1;
+        save ("6-three-oscillators");
+
+        setParameter (synth, SynthProcessor::onId (2), 0.0f);
+        synth.editedOscillator = 2;
+        save ("7-editing-an-oscillator-that-is-off");
+
+        editor->setSize (960, 700);
+        save ("8-smallest");
     }
 }
 
@@ -339,6 +426,7 @@ int main (int argc, char* argv[])
     testDecomposition();
     testPlaying();
     testChangingTheWaveMidNote();
+    testOscillators();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

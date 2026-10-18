@@ -3,14 +3,15 @@
 #include "HarmonicSelector.h"
 #include "Keyboard.h"
 #include "Legend.h"
+#include "OscillatorCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
 #include "WaveGrid.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The synth's window: preset waves, the grid to draw on, how many harmonics to play, a legend, the volume
-    knob and a piano keyboard.
+/** The synth's window: a card for each oscillator, preset waves, the grid to draw the chosen oscillator's wave
+    on, how many harmonics it plays, a legend, the volume knob and a piano keyboard.
 */
 class SynthEditor final : public juce::AudioProcessorEditor,
                           private juce::Timer
@@ -26,12 +27,27 @@ public:
     void refresh();
 
 private:
+    /** What the window shows depends on these. When any of them changes, it's all brought up to date. */
+    struct Shown
+    {
+        int shapeVersion = -1;
+        int editedOscillator = -1;
+        std::array<int, SynthProcessor::numOscillators> numPartials {};
+        std::array<bool, SynthProcessor::numOscillators> on {};
+
+        bool operator== (const Shown&) const = default;
+    };
+
     void timerCallback() override;
     void paintNote (juce::Graphics&) const;
+    void editOscillator (int);
+    std::vector<waveform::Partial> getPlayedPartials (int oscillator) const;
+    juce::String getWaveName (int oscillator) const;
 
     SynthProcessor& synthProcessor;
     SynthLookAndFeel lookAndFeel;
 
+    std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> cards;
     WaveGrid grid;
     Legend legend;
     HarmonicSelector harmonicSelector;
@@ -43,8 +59,7 @@ private:
     juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, harmonicsHint, volumePanel,
                          volumeCaption, volumeValue;
 
-    int shownShapeVersion = -1;
-    int shownNumPartials = -1;
+    Shown shown;
     int shownNote = -2;
     bool focusGiven = false;
 

@@ -24,6 +24,9 @@ public:
     /** The sine waves to show, strongest first. */
     void setPartials (std::vector<waveform::Partial>);
 
+    /** Says which oscillator's wave is shown, numbered from 1. One that's off is shown faintly. */
+    void setOscillator (int number, bool isOn);
+
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -43,6 +46,8 @@ private:
 
     waveform::Shape shape {};
     std::vector<waveform::Partial> partials;
+    int oscillatorNumber = 1;
+    bool on = true;
 
     // Where the mouse last drew: a point number, which can fall between points, and a value.
     std::optional<std::pair<double, float>> lastDrawn;

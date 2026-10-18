@@ -6,18 +6,42 @@ namespace
 {
     constexpr int numVoices = 16;
 
+    /** The waves the oscillators start with, so each sounds different when it's switched on. */
+    constexpr std::array<waveform::Preset, SynthProcessor::numOscillators> startingPresets {
+        waveform::Preset::sawtooth, waveform::Preset::square, waveform::Preset::sine
+    };
+
+    juce::AudioParameterFloatAttributes asPercentage()
+    {
+        return juce::AudioParameterFloatAttributes()
+            .withStringFromValueFunction ([] (float value, int) { return juce::String (juce::roundToInt (value * 100.0f)) + "%"; })
+            .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue() / 100.0f; });
+    }
+
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters()
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
         layout.add (std::make_unique<juce::AudioParameterFloat> (
             juce::ParameterID { SynthProcessor::volumeId, 1 }, "Volume", juce::NormalisableRange<float> (0.0f, 1.0f), 0.75f,
-            juce::AudioParameterFloatAttributes()
-                .withStringFromValueFunction ([] (float value, int) { return juce::String (juce::roundToInt (value * 100.0f)) + "%"; })
-                .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue() / 100.0f; })));
+            asPercentage()));
 
-        layout.add (std::make_unique<juce::AudioParameterInt> (
-            juce::ParameterID { SynthProcessor::harmonicsId, 1 }, "Harmonics", 1, waveform::maxPartials, waveform::defaultPartials));
+        // Only the first oscillator plays to begin with.
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+        {
+            const auto name = "Osc " + juce::String (i + 1);
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "osc" + juce::String (i + 1), name, " ",
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::onId (i), 1 }, name + " On", i == 0),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::levelId (i), 1 }, name + " Level",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f, asPercentage()),
+                std::make_unique<juce::AudioParameterInt> (
+                    juce::ParameterID { SynthProcessor::harmonicsId (i), 1 }, name + " Harmonics",
+                    1, waveform::maxPartials, waveform::defaultPartials)));
+        }
 
         return layout;
     }
@@ -29,19 +53,28 @@ namespace
     }
 }
 
+juce::String SynthProcessor::onId (int oscillator)          { return "osc" + juce::String (oscillator + 1) + "On"; }
+juce::String SynthProcessor::levelId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Level"; }
+juce::String SynthProcessor::harmonicsId (int oscillator)   { return "osc" + juce::String (oscillator + 1) + "Harmonics"; }
+
 SynthProcessor::SynthProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       parameters (*this, nullptr, "EZSynth", createParameters())
 {
     volume = parameters.getRawParameterValue (volumeId);
-    numPartials = parameters.getRawParameterValue (harmonicsId);
+
+    for (int i = 0; i < numOscillators; ++i)
+        oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
+                                             parameters.getRawParameterValue (levelId (i)),
+                                             parameters.getRawParameterValue (harmonicsId (i)) };
 
     for (int i = 0; i < numVoices; ++i)
         synth.addVoice (new HarmonicVoice (targets));
 
     synth.addSound (new HarmonicSound());
 
-    setShape (waveform::makePreset (waveform::Preset::sawtooth), waveform::Preset::sawtooth);
+    for (int i = 0; i < numOscillators; ++i)
+        setShape (i, waveform::makePreset (startingPresets[(size_t) i]), startingPresets[(size_t) i]);
 }
 
 const juce::String SynthProcessor::getName() const
@@ -74,19 +107,30 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         if (const auto message = metadata.getMessage(); message.isNoteOn())
             lastNote = message.getNoteNumber();
 
+    auto changed = false;
+
     if (sharedVersion.load() != playingVersion)
     {
         const juce::SpinLock::ScopedTryLockType lock (sharedLock);
 
         if (lock.isLocked())
         {
-            playingDecomposition = sharedDecomposition;
+            playingDecompositions = sharedDecompositions;
             playingVersion = sharedVersion.load();
-            playingNumPartials = -1;
+            changed = true;
         }
     }
 
-    if (getNumPartials() != playingNumPartials)
+    for (int i = 0; i < numOscillators; ++i)
+    {
+        if (const auto settings = readSettings (i); settings != playingSettings[(size_t) i])
+        {
+            playingSettings[(size_t) i] = settings;
+            changed = true;
+        }
+    }
+
+    if (changed)
         updateTargets();
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
@@ -95,43 +139,80 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     gain.applyGain (buffer, buffer.getNumSamples());
 }
 
+SynthProcessor::Settings SynthProcessor::readSettings (int oscillator) const noexcept
+{
+    const auto& oscillatorParameter = oscillatorParameters[(size_t) oscillator];
+    return { oscillatorParameter.on->load() >= 0.5f,
+             oscillatorParameter.level->load(),
+             juce::roundToInt (oscillatorParameter.numPartials->load()) };
+}
+
 void SynthProcessor::updateTargets()
 {
-    playingNumPartials = getNumPartials();
-
-    // Every wave is played at the same peak level, however many sine waves it has.
-    const auto used = playingDecomposition.getNumUsed (playingNumPartials);
-    const auto peak = playingDecomposition.peaks[(size_t) used];
-    const auto scale = peak > 1.0e-6f ? 1.0f / peak : 0.0f;
-
     targets.cosines.fill (0.0f);
     targets.sines.fill (0.0f);
 
-    // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ
-    for (int i = 0; i < used; ++i)
+    for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
-        const auto& partial = playingDecomposition.strongest[(size_t) i];
-        targets.cosines[(size_t) partial.harmonic] = scale * partial.amplitude * std::sin (partial.phase);
-        targets.sines[(size_t) partial.harmonic] = scale * partial.amplitude * std::cos (partial.phase);
+        const auto& settings = playingSettings[i];
+        const auto& decomposition = playingDecompositions[i];
+
+        if (! settings.on)
+            continue;
+
+        // Each oscillator's wave peaks at its level, however many sine waves it has.
+        const auto used = decomposition.getNumUsed (settings.numPartials);
+        const auto peak = decomposition.peaks[(size_t) used];
+        const auto scale = peak > 1.0e-6f ? settings.level / peak : 0.0f;
+
+        // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so the sine waves
+        // at each harmonic add up to one, and the voices play all the oscillators at once.
+        for (int j = 0; j < used; ++j)
+        {
+            const auto& partial = decomposition.strongest[(size_t) j];
+            targets.cosines[(size_t) partial.harmonic] += scale * partial.amplitude * std::sin (partial.phase);
+            targets.sines[(size_t) partial.harmonic] += scale * partial.amplitude * std::cos (partial.phase);
+        }
     }
 
     ++targets.version;
 }
 
-int SynthProcessor::getNumPartials() const noexcept
+const waveform::Shape& SynthProcessor::getShape (int oscillator) const noexcept
 {
-    return juce::roundToInt (numPartials->load());
+    return oscillators[(size_t) oscillator].shape;
 }
 
-void SynthProcessor::setShape (const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+const waveform::Decomposition& SynthProcessor::getDecomposition (int oscillator) const noexcept
 {
-    shape = newShape;
-    preset = fromPreset;
-    decomposition = waveform::decompose (shape);
+    return oscillators[(size_t) oscillator].decomposition;
+}
+
+std::optional<waveform::Preset> SynthProcessor::getPreset (int oscillator) const noexcept
+{
+    return oscillators[(size_t) oscillator].preset;
+}
+
+bool SynthProcessor::isOn (int oscillator) const noexcept
+{
+    return oscillatorParameters[(size_t) oscillator].on->load() >= 0.5f;
+}
+
+int SynthProcessor::getNumPartials (int oscillator) const noexcept
+{
+    return juce::roundToInt (oscillatorParameters[(size_t) oscillator].numPartials->load());
+}
+
+void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+{
+    auto& changed = oscillators[(size_t) oscillator];
+    changed.shape = newShape;
+    changed.preset = fromPreset;
+    changed.decomposition = waveform::decompose (newShape);
 
     {
         const juce::SpinLock::ScopedLockType lock (sharedLock);
-        sharedDecomposition = decomposition;
+        sharedDecompositions[(size_t) oscillator] = changed.decomposition;
         ++sharedVersion;
     }
 
@@ -142,10 +223,16 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = parameters.copyState();
 
-    juce::ValueTree wave ("WAVE");
-    wave.setProperty ("points", juce::MemoryBlock (shape.data(), sizeof (shape)).toBase64Encoding(), nullptr);
-    wave.setProperty ("preset", preset.has_value() ? waveform::getName (*preset) : juce::String(), nullptr);
-    state.appendChild (wave, nullptr);
+    for (int i = 0; i < numOscillators; ++i)
+    {
+        const auto& oscillator = oscillators[(size_t) i];
+
+        juce::ValueTree wave ("WAVE");
+        wave.setProperty ("oscillator", i, nullptr);
+        wave.setProperty ("points", juce::MemoryBlock (oscillator.shape.data(), sizeof (oscillator.shape)).toBase64Encoding(), nullptr);
+        wave.setProperty ("preset", oscillator.preset.has_value() ? waveform::getName (*oscillator.preset) : juce::String(), nullptr);
+        state.appendChild (wave, nullptr);
+    }
 
     if (const auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
@@ -159,21 +246,33 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
         return;
 
     auto state = juce::ValueTree::fromXml (*xml);
-    const auto wave = state.getChildWithName ("WAVE");
-    state.removeChild (wave, nullptr);
+    std::vector<juce::ValueTree> waves;
+
+    for (auto wave = state.getChildWithName ("WAVE"); wave.isValid(); wave = state.getChildWithName ("WAVE"))
+    {
+        waves.push_back (wave);
+        state.removeChild (wave, nullptr);
+    }
+
     parameters.replaceState (state);
 
-    juce::MemoryBlock points;
-
-    if (points.fromBase64Encoding (wave["points"].toString()) && points.getSize() == sizeof (waveform::Shape))
+    for (const auto& wave : waves)
     {
+        // Saves from before there were three oscillators have one wave, with no number.
+        const auto oscillator = (int) wave.getProperty ("oscillator", 0);
+        juce::MemoryBlock points;
+
+        if (oscillator < 0 || oscillator >= numOscillators
+            || ! points.fromBase64Encoding (wave["points"].toString()) || points.getSize() != sizeof (waveform::Shape))
+            continue;
+
         waveform::Shape restored {};
         std::memcpy (restored.data(), points.getData(), sizeof (restored));
 
         for (auto& value : restored)
             value = std::isfinite (value) ? juce::jlimit (-1.0f, 1.0f, value) : 0.0f;
 
-        setShape (restored, waveform::findPreset (wave["preset"].toString()));
+        setShape (oscillator, restored, waveform::findPreset (wave["preset"].toString()));
     }
 }
 

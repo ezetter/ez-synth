@@ -4,16 +4,22 @@
 #include "Waveform.h"
 
 HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
-    : attachment (parameter, [this] (float value)
-                  {
-                      selected = juce::roundToInt (value);
-                      repaint();
-                  })
 {
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
     setMouseClickGrabsKeyboardFocus (false);
     setTitle ("Number of harmonics");
-    attachment.sendInitialUpdate();
+    setParameter (parameter);
+}
+
+void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter)
+{
+    attachment = std::make_unique<juce::ParameterAttachment> (parameter, [this] (float value)
+    {
+        selected = juce::roundToInt (value);
+        repaint();
+    });
+
+    attachment->sendInitialUpdate();
 }
 
 void HarmonicSelector::setNumAvailable (int newNumAvailable)
@@ -87,7 +93,7 @@ void HarmonicSelector::paint (juce::Graphics& g)
 
 void HarmonicSelector::mouseDown (const juce::MouseEvent& e)
 {
-    attachment.beginGesture();
+    attachment->beginGesture();
     select (getNumberAt (e.position));
 }
 
@@ -99,7 +105,7 @@ void HarmonicSelector::mouseDrag (const juce::MouseEvent& e)
 
 void HarmonicSelector::mouseUp (const juce::MouseEvent&)
 {
-    attachment.endGesture();
+    attachment->endGesture();
 }
 
 void HarmonicSelector::mouseMove (const juce::MouseEvent& e)
@@ -115,7 +121,7 @@ void HarmonicSelector::mouseExit (const juce::MouseEvent&)
 void HarmonicSelector::select (int number)
 {
     if (number != selected)
-        attachment.setValueAsPartOfGesture ((float) number);
+        attachment->setValueAsPartOfGesture ((float) number);
 }
 
 void HarmonicSelector::setHovered (int number)

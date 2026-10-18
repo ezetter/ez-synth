@@ -10,6 +10,9 @@ class HarmonicSelector final : public juce::Component
 public:
     explicit HarmonicSelector (juce::RangedAudioParameter&);
 
+    /** Switches to setting another parameter, such as another oscillator's number of harmonics. */
+    void setParameter (juce::RangedAudioParameter&);
+
     /** How many harmonics the wave has. Buttons asking for more than that are lit only in outline. */
     void setNumAvailable (int);
 
@@ -26,7 +29,7 @@ private:
     void select (int number);
     void setHovered (int number);
 
-    juce::ParameterAttachment attachment;
+    std::unique_ptr<juce::ParameterAttachment> attachment;
     int selected = 1;
     int numAvailable = 0;
     int hovered = 0;

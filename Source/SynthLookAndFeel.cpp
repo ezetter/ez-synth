@@ -114,3 +114,25 @@ juce::Font SynthLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHei
 {
     return juce::FontOptions (juce::jmin (14.0f, (float) buttonHeight * 0.45f), juce::Font::bold);
 }
+
+void SynthLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
+                                         bool shouldDrawButtonAsHighlighted, bool)
+{
+    // A rounded track, with a knob that slides to the right when the switch is on.
+    const auto on = button.getToggleState();
+    const auto bounds = button.getLocalBounds().toFloat();
+    const auto track = bounds.withSizeKeepingCentre (bounds.getWidth() - 2.0f, juce::jmin (bounds.getHeight() - 2.0f, 20.0f));
+    const auto radius = track.getHeight() / 2.0f;
+
+    auto trackColour = on ? colours::accent : colours::outline.brighter (0.2f);
+
+    if (shouldDrawButtonAsHighlighted)
+        trackColour = trackColour.brighter (0.15f);
+
+    g.setColour (trackColour);
+    g.fillRoundedRectangle (track, radius);
+
+    const auto knobCentre = juce::Point<float> (on ? track.getRight() - radius : track.getX() + radius, track.getCentreY());
+    g.setColour (on ? colours::background : colours::text);
+    g.fillEllipse (juce::Rectangle<float> (radius * 1.5f, radius * 1.5f).withCentre (knobCentre));
+}

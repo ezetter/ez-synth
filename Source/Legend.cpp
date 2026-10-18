@@ -57,7 +57,7 @@ void Legend::paint (juce::Graphics& g)
     drawSwatch (g, row.removeFromLeft (swatchWidth), colours::sum, 2.5f);
     row.removeFromLeft (8.0f);
     g.setColour (colours::text);
-    g.drawText ("Sum of the sine waves: what you hear", row, juce::Justification::centredLeft, true);
+    g.drawText ("Sum: the wave this oscillator plays", row, juce::Justification::centredLeft, true);
 
     area.removeFromTop (6.0f);
     g.setColour (colours::outline);

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
-project(EZSynth VERSION 0.1.0)
+project(EZSynth VERSION 0.2.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -38,6 +38,7 @@ target_sources(EZSynth
         Source/HarmonicVoice.cpp
         Source/Keyboard.cpp
         Source/Legend.cpp
+        Source/OscillatorCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
         Source/SynthProcessor.cpp

@@ -9,6 +9,7 @@ namespace
 
     const juce::String degrees (juce::CharPointer_UTF8 ("\xc2\xb0"));
     const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+    const juce::String dot (juce::CharPointer_UTF8 ("\xc2\xb7"));
 }
 
 WaveGrid::WaveGrid()
@@ -27,6 +28,16 @@ void WaveGrid::setPartials (std::vector<waveform::Partial> newPartials)
 {
     partials = std::move (newPartials);
     repaint();
+}
+
+void WaveGrid::setOscillator (int number, bool isOn)
+{
+    if (number != oscillatorNumber || isOn != on)
+    {
+        oscillatorNumber = number;
+        on = isOn;
+        repaint();
+    }
 }
 
 juce::Rectangle<float> WaveGrid::getPlotArea() const
@@ -75,17 +86,19 @@ void WaveGrid::paint (juce::Graphics& g)
         g.reduceClipRegion (plot.toNearestInt());
 
         // The drawn wave is a broad, faint band, so you can see how closely the sum of the sine waves follows it.
+        // An oscillator that's off is drawn more faintly still.
+        const auto opacity = on ? 1.0f : 0.4f;
         const auto drawnCurve = makeShapeCurve();
-        g.setColour (colours::drawn.withAlpha (0.2f));
+        g.setColour (colours::drawn.withAlpha (0.2f * opacity));
         g.strokePath (drawnCurve, juce::PathStrokeType (10.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (colours::drawn.withAlpha (0.55f));
+        g.setColour (colours::drawn.withAlpha (0.55f * opacity));
         g.strokePath (drawnCurve, juce::PathStrokeType (1.2f));
 
         // The faintest sine waves are drawn last, so the strong ones can't hide them.
         for (auto i = (int) partials.size() - 1; i >= 0; --i)
         {
             const auto& partial = partials[(size_t) i];
-            g.setColour (colours::forPartial (i).withAlpha (0.9f));
+            g.setColour (colours::forPartial (i).withAlpha (0.9f * opacity));
             g.strokePath (makeCurve ([&partial] (double position) { return partial.valueAt (position); }),
                           juce::PathStrokeType (1.7f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
@@ -100,18 +113,29 @@ void WaveGrid::paint (juce::Graphics& g)
             return value;
         });
 
-        g.setColour (colours::sum.withAlpha (0.1f));
+        g.setColour (colours::sum.withAlpha (0.1f * opacity));
         g.strokePath (sumCurve, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (colours::sum);
+        g.setColour (colours::sum.withAlpha (opacity));
         g.strokePath (sumCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
     const auto header = bounds.reduced (16.0f, 0.0f).removeFromTop (34.0f);
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    g.drawText ("ONE WAVELENGTH", header, juce::Justification::centredLeft);
+    g.drawText ("OSC " + juce::String (oscillatorNumber) + "  " + dot + "  ONE WAVELENGTH", header,
+                juce::Justification::centredLeft);
     g.setFont (fonts::body (12.5f));
-    g.drawText ("Click and drag to draw a wave", header, juce::Justification::centredRight);
+
+    if (on)
+    {
+        g.drawText ("Click and drag to draw a wave", header, juce::Justification::centredRight);
+    }
+    else
+    {
+        g.setColour (colours::accent);
+        g.drawText ("Osc " + juce::String (oscillatorNumber) + " is off. Switch it on above to hear it.", header,
+                    juce::Justification::centredRight);
+    }
 }
 
 void WaveGrid::paintGrid (juce::Graphics& g, juce::Rectangle<float> plot) const
