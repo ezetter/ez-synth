@@ -1,6 +1,7 @@
 #include "HarmonicSliders.h"
 
 #include "HarmonicVoice.h"
+#include "Modulation.h"
 #include "SynthLookAndFeel.h"
 
 namespace
@@ -50,8 +51,8 @@ HarmonicSliders::HarmonicSliders()
         const auto harmonic = (int) i + 1;
 
         // Most harmonics are weak, so the low end of each slider gets more of its length.
-        juce::NormalisableRange<double> range (0.0, waveform::maxAmplitude);
-        range.setSkewForCentre (0.35);
+        const auto& amplitudes = modulation::amplitudeRange();
+        const juce::NormalisableRange<double> range (amplitudes.start, amplitudes.end, amplitudes.interval, amplitudes.skew);
 
         slider.setSliderStyle (juce::Slider::LinearHorizontal);
         slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
@@ -90,6 +91,12 @@ void HarmonicSliders::setHarmonics (std::vector<waveform::Partial> newHarmonics)
         resized();
 
     repaint();
+}
+
+void HarmonicSliders::setOscillator (int oscillator)
+{
+    for (size_t i = 0; i < sliders.size(); ++i)
+        modulatable::setTarget (sliders[i], modulation::harmonicTarget (oscillator, (int) i + 1));
 }
 
 void HarmonicSliders::setFundamental (std::optional<double> hertz)

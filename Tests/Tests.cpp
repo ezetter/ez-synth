@@ -1,6 +1,7 @@
-// Checks that waves break down into the right harmonics and that the synth plays them, then, if asked with
-// --snapshots <folder>, saves pictures of the window showing a few waves.
+// Checks that waves break down into the right harmonics, that the synth plays them, and that the LFOs move what
+// they're given to move. If asked with --snapshots <folder>, it also saves pictures of the window.
 
+#include "../Source/ModulationEditor.h"
 #include "../Source/SynthEditor.h"
 #include "../Source/SynthProcessor.h"
 #include "../Source/Waveform.h"
@@ -480,6 +481,220 @@ namespace
                "a cutoff too high for the sample rate is lowered to fit, rather than failing");
     }
 
+    void setLfo (SynthProcessor& synth, int lfo, float periodSeconds, bool once, waveform::Preset preset)
+    {
+        setParameter (synth, SynthProcessor::lfoPeriodId (lfo), periodSeconds);
+        setParameter (synth, SynthProcessor::lfoModeId (lfo), once ? 1.0f : 0.0f);
+        synth.setLfoShape (lfo, waveform::makePreset (preset), preset);
+    }
+
+    /** How loud a stretch of a signal is: its root mean square. */
+    double loudness (const std::vector<float>& signal, double fromSeconds, double toSeconds)
+    {
+        const auto stretch = slice (signal, fromSeconds, toSeconds);
+        auto sum = 0.0;
+
+        for (const auto sample : stretch)
+            sum += sample * sample;
+
+        return std::sqrt (sum / (double) stretch.size());
+    }
+
+    /** Plays notes starting at the given times and holds them until the end. Then it lets them go, and plays on
+        until they've faded, so the next test starts in silence.
+    */
+    std::vector<float> playNotes (SynthProcessor& synth, const std::vector<std::pair<double, int>>& notes, double totalSeconds)
+    {
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> output;
+        const auto totalSamples = (int) (totalSeconds * sampleRate);
+        const auto fadedSamples = totalSamples + (int) ((HarmonicVoice::releaseSeconds + 0.05) * sampleRate);
+
+        for (int start = 0; start < fadedSamples; start += blockSize)
+        {
+            juce::MidiBuffer midi;
+
+            for (const auto& [seconds, note] : notes)
+            {
+                if (const auto position = (int) (seconds * sampleRate) - start; position >= 0 && position < blockSize)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), position);
+
+                if (const auto position = totalSamples - start; position >= 0 && position < blockSize)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, note), position);
+            }
+
+            synth.processBlock (buffer, midi);
+
+            if (start < totalSamples)
+                output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        return output;
+    }
+
+    void testLfos()
+    {
+        std::cout << "LFOs" << std::endl;
+
+        // Every control an LFO can move is named, and has a key that finds it again. The parameters' keys are their IDs.
+        {
+            SynthProcessor synth;
+            auto keysWork = true, parametersFound = true;
+            juce::StringArray names;
+
+            for (int target = 0; target < modulation::numTargets; ++target)
+            {
+                keysWork = keysWork && modulation::findTarget (modulation::getKey (target)) == target;
+                parametersFound = parametersFound && (! modulation::isParameter (target)
+                                                      || synth.parameters.getParameter (modulation::getKey (target)) != nullptr);
+                names.addIfNotAlreadyThere (modulation::getName (target));
+            }
+
+            check (keysWork && names.size() == modulation::numTargets, "all " + juce::String (modulation::numTargets) + " controls an LFO can move have their own names");
+            check (parametersFound, "the controls that are parameters are found by their parameter IDs");
+        }
+
+        const auto lfoOn = [] (SynthProcessor& synth, int lfo) { return synth.isLfoOn (lfo); };
+
+        // A sine LFO with a half-second period swings the oscillator's level between nothing and full.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 0.5f, false, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::lfoOnId (0), 0.0f);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+        check (lfoOn (synth, 0), "giving an LFO a control to move switches it on");
+
+        // The sine rises to its peak a quarter of the way through its period, and falls to its trough at three quarters.
+        auto signal = play (synth, 69, 1.6, 2.0);
+        const auto peak = loudness (signal, 0.10, 0.15);
+        const auto trough = loudness (signal, 0.35, 0.40);
+        check (peak > 10.0 * trough, "a looping LFO swings an oscillator's level up and down");
+        check (isNear (loudness (signal, 1.10, 1.15), peak, 0.05), "...over and over, once each period");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, true });
+        signal = play (synth, 69, 1.6, 2.0);
+        check (loudness (signal, 0.35, 0.40) > 10.0 * loudness (signal, 0.10, 0.15), "inverted, it falls as the LFO rises");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.5f, false });
+        signal = play (synth, 69, 1.6, 2.0);
+        check (isNear (loudness (signal, 0.10, 0.15) / loudness (signal, 0.35, 0.40), 3.0, 0.1),
+               "a range of 50% swings a level set at 50% between 25% and 75%");
+
+        setParameter (synth, SynthProcessor::lfoOnId (0), 0.0f);
+        signal = play (synth, 69, 1.6, 2.0);
+        check (isNear (loudness (signal, 0.10, 0.15), loudness (signal, 0.35, 0.40), 0.01), "an LFO that's off moves nothing");
+        setParameter (synth, SynthProcessor::lfoOnId (0), 1.0f);
+
+        // Run once, a rising sawtooth over 0.2 seconds is an envelope that swells each note in, then holds.
+        setLfo (synth, 0, 0.2f, true, waveform::Preset::sawtooth);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+        signal = playNotes (synth, { { 0.0, 69 }, { 0.5, 76 } }, 1.0);   // A4, then E5 half a second later
+        const auto e5 = juce::MidiMessage::getMidiNoteInHertz (76);
+        const auto a4Held = amplitudeAt (slice (signal, 0.30, 0.45), 440.0);
+
+        check (amplitudeAt (slice (signal, 0.02, 0.06), 440.0) < 0.3 * a4Held,
+               "an LFO that runs once starts each note at the start of its wave");
+        check (isNear (amplitudeAt (slice (signal, 0.80, 0.95), 440.0), a4Held, 0.02), "...and holds its last value afterwards");
+        check (amplitudeAt (slice (signal, 0.52, 0.56), e5) < 0.3 * amplitudeAt (slice (signal, 0.80, 0.95), e5),
+               "a second note starts its own run from the start");
+        check (isNear (amplitudeAt (slice (signal, 0.52, 0.56), 440.0), a4Held, 0.02), "...without starting the first note's again");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
+        setParameter (synth, SynthProcessor::levelId (0), 1.0f);
+
+        // A square LFO switches between its two halves, so each half of its period can be measured on its own.
+        setLfo (synth, 1, 1.0f, false, waveform::Preset::square);
+
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 5);
+        synth.setAssignment (modulation::oscillatorHarmonicsTarget (0), { 1, 1.0f, false });
+        signal = play (synth, 69, 0.95, 1.3);
+        check (amplitudeAt (slice (signal, 0.1, 0.4), 3 * 440.0) / amplitudeAt (slice (signal, 0.1, 0.4), 440.0) > 0.25
+                 && amplitudeAt (slice (signal, 0.6, 0.9), 3 * 440.0) / amplitudeAt (slice (signal, 0.6, 0.9), 440.0) < 0.001,
+               "an LFO on the number of harmonics plays all 9, then just the 1st");
+        synth.setAssignment (modulation::oscillatorHarmonicsTarget (0), {});
+
+        setPreset (synth, 0, waveform::Preset::sine);
+        synth.setAssignment (modulation::harmonicTarget (0, 2), { 1, 1.0f, false });
+        signal = play (synth, 69, 0.95, 1.3);
+        const auto raisedTo = modulation::amplitudeRange().convertFrom0to1 (0.5f);
+        check (isNear (amplitudeAt (slice (signal, 0.1, 0.4), 880.0) / amplitudeAt (slice (signal, 0.1, 0.4), 440.0), raisedTo, 0.03)
+                 && amplitudeAt (slice (signal, 0.6, 0.9), 880.0) / amplitudeAt (slice (signal, 0.6, 0.9), 440.0) < 0.001,
+               "an LFO on a sine's 2nd harmonic raises it to " + juce::String (raisedTo, 2) + ", then takes it away");
+        synth.setAssignment (modulation::harmonicTarget (0, 2), {});
+
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 9);
+        setFilter (synth, SynthProcessor::lowPassIds, true, 1000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 1, 0.4f, false });
+        signal = play (synth, 69, 0.95, 1.3);
+        check (amplitudeAt (slice (signal, 0.1, 0.4), 2200.0) > 10.0 * amplitudeAt (slice (signal, 0.6, 0.9), 2200.0),
+               "an LFO on the low pass cutoff sweeps it up and down, letting the 5th harmonic through and then cutting it");
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
+        setFilter (synth, SynthProcessor::lowPassIds, false, 1000.0f);
+
+        setParameter (synth, SynthProcessor::levelId (0), 0.0f);
+        setParameter (synth, SynthProcessor::onId (1), 0.0f);
+        synth.setAssignment (modulation::oscillatorOnTarget (1), { 1, 1.0f, false });
+        signal = play (synth, 69, 0.95, 1.3);
+        check (loudness (signal, 0.1, 0.4) > 0.01 && loudness (signal, 0.6, 0.9) < 1.0e-4,
+               "an LFO on an oscillator's switch switches it on and off");
+
+        // Saving and loading the LFOs and what they move.
+        waveform::Shape drawn {};
+        drawn.fill (0.5f);
+        drawn[0] = -1.0f;
+        synth.setLfoShape (2, drawn);
+        setParameter (synth, SynthProcessor::lfoPeriodId (2), 7.5f);
+        setParameter (synth, SynthProcessor::lfoModeId (2), 1.0f);
+        synth.setAssignment (modulation::volumeTarget, { 2, 0.3f, true });
+
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+
+        check (restored.getLfoShape (2) == drawn && ! restored.getLfoPreset (2).has_value()
+                 && restored.getLfoPreset (1) == waveform::Preset::square,
+               "the LFOs' waves are restored");
+        check (isNear (restored.getLfoPeriod (2), 7.5, 1.0e-4) && restored.isLfoOnce (2) && ! restored.isLfoOnce (1),
+               "their periods, and whether they loop, are restored");
+        check (restored.getAssignment (modulation::volumeTarget) == modulation::Assignment { 2, 0.3f, true }
+                 && restored.getAssignment (modulation::oscillatorOnTarget (1)) == modulation::Assignment { 1, 1.0f, false },
+               "what each LFO moves, and how, is restored");
+
+        // Everything at once: 16 notes, three oscillators of 9 harmonics, both filters, and LFOs moving much of it.
+        SynthProcessor busy;
+
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+        {
+            setParameter (busy, SynthProcessor::onId (i), 1.0f);
+            setNumHarmonics (busy, 9, i);
+            busy.setAssignment (modulation::oscillatorLevelTarget (i), { i, 0.5f, false });
+            busy.setAssignment (modulation::harmonicTarget (i, 4), { (i + 1) % 3, 0.5f, false });
+        }
+
+        setFilter (busy, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
+        setFilter (busy, SynthProcessor::highPassIds, true, 100.0f);
+        busy.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.5f, false });
+        busy.setAssignment (modulation::filterCutoffTarget (modulation::highPass), { 1, 0.2f, true });
+        setParameter (busy, SynthProcessor::lfoModeId (2), 1.0f);
+
+        std::vector<std::pair<double, int>> chord;
+
+        for (int i = 0; i < 16; ++i)
+            chord.push_back ({ 0.0, 40 + 3 * i });
+
+        const auto started = juce::Time::getMillisecondCounterHiRes();
+        signal = playNotes (busy, chord, 2.0);
+        const auto seconds = (juce::Time::getMillisecondCounterHiRes() - started) / 1000.0;
+        check (std::all_of (signal.begin(), signal.end(), [] (float sample) { return std::isfinite (sample); }) && seconds < 0.5,
+               "playing 16 notes with everything on and moving takes " + juce::String (seconds * 1000.0 / 2.0, 1)
+                 + " ms a second of sound, under a quarter of the time it lasts");
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -606,18 +821,62 @@ namespace
         setParameter (synth, SynthProcessor::onId (2), 1.0f);
         setParameter (synth, SynthProcessor::levelId (1), 0.6f);
         setParameter (synth, SynthProcessor::levelId (2), 0.35f);
-        synth.editedOscillator = 1;
+        synth.editedSource = 1;
         setFilter (synth, SynthProcessor::lowPassIds, true, 1800.0f, 0.4f);
         setFilter (synth, SynthProcessor::highPassIds, true, 90.0f);
         save ("6-three-oscillators");
 
         setParameter (synth, SynthProcessor::onId (2), 0.0f);
-        synth.editedOscillator = 2;
+        synth.editedSource = 2;
         save ("7-editing-an-oscillator-that-is-off");
+
+        // LFO 1 swinging OSC 1's level and the low pass cutoff, and LFO 2 running once on the 3rd harmonic.
+        setParameter (synth, SynthProcessor::onId (2), 1.0f);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true });
+        synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
+        setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
+        synth.editedSource = SynthProcessor::numOscillators;
+
+        // Plays on a while, so the LFOs are partway through their periods.
+        for (int block = 0; block < 30; ++block)
+        {
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            juce::MidiBuffer midi;
+            synth.processBlock (buffer, midi);
+        }
+
+        synthEditor.showModulation();
+        save ("9-lfo");
+
+        synth.editedSource = 0;
+        synthEditor.refresh();
+        synthEditor.showModulation();
+        save ("10-modulated-controls");
+
+        // The editor that opens on a right-click, on its own.
+        {
+            SynthLookAndFeel lookAndFeel;
+            ModulationEditor modulationEditor (synth, modulation::oscillatorLevelTarget (0));
+            modulationEditor.setLookAndFeel (&lookAndFeel);
+
+            juce::Image image (juce::Image::ARGB, modulationEditor.getWidth() * 2, modulationEditor.getHeight() * 2, true);
+            juce::Graphics g (image);
+            g.addTransform (juce::AffineTransform::scale (2.0f));
+            g.fillAll (colours::panel.brighter (0.04f));
+            modulationEditor.paintEntireComponent (g, false);
+
+            const auto file = folder.getChildFile ("11-modulation-editor.png");
+            file.deleteFile();
+            juce::FileOutputStream stream (file);
+            juce::PNGImageFormat().writeImageToStream (image, stream);
+            modulationEditor.setLookAndFeel (nullptr);
+        }
 
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
-        editor->setSize (1060, 820);
+        synth.editedSource = 2;
+        editor->setSize (1180, 840);
         save ("8-smallest");
     }
 }
@@ -632,6 +891,7 @@ int main (int argc, char* argv[])
     testEditingHarmonics();
     testOscillators();
     testFilters();
+    testLfos();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

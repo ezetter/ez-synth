@@ -21,6 +21,9 @@ namespace colours
     /** The sum of the sine waves: the wave as played. */
     inline const juce::Colour sum { 0xffffffff };
 
+    /** Anything to do with the LFOs moving controls. */
+    inline const juce::Colour modulation { 0xff7ce3ff };
+
     /** Tells the harmonics apart, from the 1st up. */
     juce::Colour forPartial (int index);
 }
@@ -35,7 +38,9 @@ namespace fonts
     juce::Font body (float height = 13.0f);
 }
 
-/** Dark panels, rounded buttons and an arc-style knob. */
+/** Dark panels, rounded buttons and an arc-style knob. A control an LFO is moving shows where it's been moved to,
+    in the modulation colour.
+*/
 class SynthLookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
@@ -52,6 +57,8 @@ public:
     /** Draws horizontal sliders as a thin track, filled up to a round thumb in the slider's track colour. */
     void drawLinearSlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos,
                            float minSliderPos, float maxSliderPos, juce::Slider::SliderStyle, juce::Slider&) override;
+
+    void drawCallOutBoxBackground (juce::CallOutBox&, juce::Graphics&, const juce::Path&, juce::Image&) override;
 
     /** Draws toggle buttons as on/off switches. */
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&,

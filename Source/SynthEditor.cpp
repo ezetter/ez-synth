@@ -1,5 +1,7 @@
 #include "SynthEditor.h"
 
+#include "ModulationEditor.h"
+
 namespace
 {
     const juce::String dot (juce::CharPointer_UTF8 ("\xc2\xb7"));
@@ -8,36 +10,42 @@ namespace
 SynthEditor::SynthEditor (SynthProcessor& p)
     : AudioProcessorEditor (p),
       synthProcessor (p),
+      lfoPanel (p),
       filterPanel (p.parameters),
-      harmonicSelector (*p.parameters.getParameter (SynthProcessor::harmonicsId (p.editedOscillator))),
+      harmonicSelector (*p.parameters.getParameter (SynthProcessor::harmonicsId (0))),
       volumeAttachment (p.parameters, SynthProcessor::volumeId, volumeKnob),
       keyboard (p.keyboardState)
 {
     setLookAndFeel (&lookAndFeel);
 
-    for (size_t i = 0; i < cards.size(); ++i)
+    for (size_t i = 0; i < oscillatorCards.size(); ++i)
     {
-        auto& card = cards[i];
+        auto& card = oscillatorCards[i];
         card = std::make_unique<OscillatorCard> ((int) i, p.parameters);
-        card->onSelect = [this, i] { editOscillator ((int) i); };
+        card->onSelect = [this, i] { editSource ((int) i); };
         addAndMakeVisible (*card);
     }
 
-    grid.onDraw = [this] (const waveform::Shape& shape)
+    for (size_t i = 0; i < lfoCards.size(); ++i)
     {
-        synthProcessor.setShape (synthProcessor.editedOscillator, shape);
-        refresh();
-    };
+        auto& card = lfoCards[i];
+        card = std::make_unique<LfoCard> ((int) i, p.parameters);
+        card->onSelect = [this, i] { editSource (SynthProcessor::numOscillators + (int) i); };
+        addAndMakeVisible (*card);
+    }
+
+    grid.onDraw = [this] (const waveform::Shape& shape) { setEditedWave (shape, std::nullopt); };
 
     harmonicSliders.onAmplitudeChange = [this] (int harmonic, float amplitude)
     {
-        synthProcessor.setHarmonicAmplitude (synthProcessor.editedOscillator, harmonic, amplitude);
+        synthProcessor.setHarmonicAmplitude (synthProcessor.editedSource, harmonic, amplitude);
         refresh();
     };
 
     addAndMakeVisible (grid);
-    addAndMakeVisible (harmonicSliders);
-    addAndMakeVisible (harmonicSelector);
+    addChildComponent (harmonicSliders);
+    addChildComponent (harmonicSelector);
+    addChildComponent (lfoPanel);
 
     for (size_t i = 0; i < presetButtons.size(); ++i)
     {
@@ -46,11 +54,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         button.setButtonText (waveform::getName (preset));
         button.setMouseClickGrabsKeyboardFocus (false);
         button.setWantsKeyboardFocus (false);
-        button.onClick = [this, preset]
-        {
-            synthProcessor.setShape (synthProcessor.editedOscillator, waveform::makePreset (preset), preset);
-            refresh();
-        };
+        button.onClick = [this, preset] { setEditedWave (waveform::makePreset (preset), preset); };
         addAndMakeVisible (button);
     }
 
@@ -62,14 +66,15 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     volumeKnob.setWantsKeyboardFocus (false);
     volumeKnob.setTitle ("Volume");
     volumeKnob.onValueChange = [this] { repaint (volumeValue); };
+    modulatable::setTarget (volumeKnob, modulation::volumeTarget);
     addAndMakeVisible (volumeKnob);
 
     addAndMakeVisible (filterPanel);
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
-    setResizeLimits (1060, 820, 1900, 1300);
-    setSize (1200, 860);
+    setResizeLimits (1180, 840, 2000, 1300);
+    setSize (1320, 880);
 
     refresh();
     startTimerHz (30);
@@ -100,10 +105,13 @@ void SynthEditor::paint (juce::Graphics& g)
         g.drawRoundedRectangle (panel.toFloat().reduced (0.5f), 10.0f, 1.0f);
     }
 
-    const auto edited = synthProcessor.editedOscillator;
+    const auto edited = synthProcessor.editedSource;
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
+
+    if (! SynthProcessor::isLfo (edited))
+        g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
+
     g.drawText ("VOLUME", volumeCaption, juce::Justification::centred);
 
     g.setColour (colours::text);
@@ -155,14 +163,18 @@ void SynthEditor::resized()
 
     area.removeFromTop (12);
 
-    constexpr auto cardGap = 12;
-    auto cardRow = area.removeFromTop (84);
-    const auto cardWidth = (cardRow.getWidth() - cardGap * (SynthProcessor::numOscillators - 1)) / SynthProcessor::numOscillators;
+    // The oscillators, then the LFOs, with a wider gap between the two.
+    constexpr auto cardGap = 10;
+    constexpr auto groupGap = 24;
+    auto cardRow = area.removeFromTop (108);
+    const auto cardWidth = (cardRow.getWidth() - groupGap - cardGap * (SynthProcessor::numSources - 2)) / SynthProcessor::numSources;
 
-    for (auto& card : cards)
+    for (int i = 0; i < SynthProcessor::numSources; ++i)
     {
-        card->setBounds (cardRow.removeFromLeft (cardWidth));
-        cardRow.removeFromLeft (cardGap);
+        SourceCard& card = SynthProcessor::isLfo (i) ? static_cast<SourceCard&> (*lfoCards[(size_t) (i - SynthProcessor::numOscillators)])
+                                                     : *oscillatorCards[(size_t) i];
+        card.setBounds (cardRow.removeFromLeft (cardWidth));
+        cardRow.removeFromLeft (i == SynthProcessor::numOscillators - 1 ? groupGap : cardGap);
     }
 
     area.removeFromTop (14);
@@ -179,7 +191,8 @@ void SynthEditor::resized()
 
     area.removeFromBottom (14);
 
-    // The right-hand column has the chosen oscillator's harmonics, with the filters below them.
+    // The right-hand column has the chosen oscillator's harmonics, or what the chosen LFO moves, with the filters
+    // below.
     auto column = area.removeFromRight (380);
     filterPanel.setBounds (column.removeFromBottom (FilterPanel::preferredHeight));
     column.removeFromBottom (12);
@@ -188,6 +201,7 @@ void SynthEditor::resized()
     grid.setBounds (area);
 
     auto side = sidePanel.reduced (16, 14);
+    lfoPanel.setBounds (side);
     harmonicsCaption = side.removeFromTop (18);
     side.removeFromTop (8);
     harmonicSelector.setBounds (side.removeFromTop (34));
@@ -195,9 +209,21 @@ void SynthEditor::resized()
     harmonicSliders.setBounds (side);
 }
 
-void SynthEditor::editOscillator (int oscillator)
+void SynthEditor::editSource (int source)
 {
-    synthProcessor.editedOscillator = oscillator;
+    synthProcessor.editedSource = source;
+    refresh();
+}
+
+void SynthEditor::setEditedWave (const waveform::Shape& shape, std::optional<waveform::Preset> preset)
+{
+    const auto edited = synthProcessor.editedSource;
+
+    if (SynthProcessor::isLfo (edited))
+        synthProcessor.setLfoShape (edited - SynthProcessor::numOscillators, shape, preset);
+    else
+        synthProcessor.setShape (edited, shape, preset);
+
     refresh();
 }
 
@@ -208,9 +234,8 @@ std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) 
     return { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
 }
 
-juce::String SynthEditor::getWaveName (int oscillator) const
+juce::String SynthEditor::getWaveName (std::optional<waveform::Preset> preset)
 {
-    const auto preset = synthProcessor.getPreset (oscillator);
     return preset.has_value() ? waveform::getName (*preset) : juce::String ("Custom");
 }
 
@@ -218,48 +243,97 @@ void SynthEditor::refresh()
 {
     Shown now;
     now.shapeVersion = synthProcessor.getShapeVersion();
-    now.editedOscillator = synthProcessor.editedOscillator;
+    now.modulationVersion = synthProcessor.getModulationVersion();
+    now.editedSource = synthProcessor.editedSource;
 
-    for (size_t i = 0; i < cards.size(); ++i)
+    for (int i = 0; i < SynthProcessor::numOscillators; ++i)
     {
-        now.numHarmonics[i] = synthProcessor.getNumHarmonics ((int) i);
-        now.on[i] = synthProcessor.isOn ((int) i);
+        now.numHarmonics[(size_t) i] = synthProcessor.getNumHarmonics (i);
+        now.on[(size_t) i] = synthProcessor.isOn (i);
     }
+
+    for (int i = 0; i < SynthProcessor::numLfos; ++i)
+        now.on[(size_t) (SynthProcessor::numOscillators + i)] = synthProcessor.isLfoOn (i);
+
+    const auto edited = now.editedSource;
+    const auto editingLfo = SynthProcessor::isLfo (edited);
+    const auto lfo = edited - SynthProcessor::numOscillators;
 
     if (now != shown)
     {
-        const auto edited = now.editedOscillator;
-
-        for (size_t i = 0; i < cards.size(); ++i)
+        for (size_t i = 0; i < oscillatorCards.size(); ++i)
         {
-            cards[i]->setWave (getPlayedHarmonics ((int) i), getWaveName ((int) i));
-            cards[i]->setSelected ((int) i == edited);
+            oscillatorCards[i]->setWave (getPlayedHarmonics ((int) i), getWaveName (synthProcessor.getPreset ((int) i)));
+            oscillatorCards[i]->setSelected ((int) i == edited);
         }
 
-        if (edited != shown.editedOscillator)
-            harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)));
+        for (size_t i = 0; i < lfoCards.size(); ++i)
+        {
+            lfoCards[i]->setWave (synthProcessor.getLfoShape ((int) i), getWaveName (synthProcessor.getLfoPreset ((int) i)));
+            lfoCards[i]->setSelected ((int) i == lfo);
+        }
 
-        if (edited != shown.editedOscillator || now.shapeVersion != shown.shapeVersion)
-            grid.setShape (synthProcessor.getShape (edited));
-
-        const auto harmonics = getPlayedHarmonics (edited);
-        grid.setPartials (harmonics);
-        grid.setOscillator (edited + 1, now.on[(size_t) edited]);
-        harmonicSliders.setHarmonics (harmonics);
-
-        std::array<bool, waveform::maxHarmonics> silent {};
-
-        for (const auto& harmonic : synthProcessor.getDecomposition (edited).harmonics)
-            silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
-
-        harmonicSelector.setSilentHarmonics (silent);
+        const auto preset = editingLfo ? synthProcessor.getLfoPreset (lfo) : synthProcessor.getPreset (edited);
 
         for (size_t i = 0; i < presetButtons.size(); ++i)
-            presetButtons[i].setToggleState (synthProcessor.getPreset (edited) == waveform::allPresets[i],
-                                             juce::dontSendNotification);
+            presetButtons[i].setToggleState (preset == waveform::allPresets[i], juce::dontSendNotification);
 
-        repaint (harmonicsCaption);
+        harmonicSelector.setVisible (! editingLfo);
+        harmonicSliders.setVisible (! editingLfo);
+        lfoPanel.setVisible (editingLfo);
+
+        if (editingLfo)
+        {
+            grid.setShape (synthProcessor.getLfoShape (lfo));
+            grid.setPartials ({});
+            lfoPanel.setLfo (lfo);
+        }
+        else
+        {
+            if (edited != shown.editedSource)
+            {
+                harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)));
+                modulatable::setTarget (harmonicSelector, modulation::oscillatorHarmonicsTarget (edited));
+                harmonicSliders.setOscillator (edited);
+            }
+
+            const auto harmonics = getPlayedHarmonics (edited);
+            grid.setShape (synthProcessor.getShape (edited));
+            grid.setPartials (harmonics);
+            grid.setOscillator (edited + 1, now.on[(size_t) edited]);
+            harmonicSliders.setHarmonics (harmonics);
+
+            std::array<bool, waveform::maxHarmonics> silent {};
+
+            for (const auto& harmonic : synthProcessor.getDecomposition (edited).harmonics)
+                silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
+
+            harmonicSelector.setSilentHarmonics (silent);
+        }
+
+        repaint (sidePanel);
         shown = now;
+
+        // Controls may now set other targets, such as the harmonic sliders when another oscillator is chosen.
+        showModulation();
+    }
+
+    // An LFO's period and where it has got to change all the time, so they're shown on every refresh.
+    if (editingLfo)
+    {
+        grid.setLfo (lfo + 1, synthProcessor.isLfoOn (lfo), synthProcessor.getLfoPeriod (lfo));
+
+        if (const auto progress = synthProcessor.getLfoProgress (lfo))
+        {
+            // One that runs once stays at the end of its period once it's got there.
+            const auto once = synthProcessor.isLfoOnce (lfo);
+            const auto position = once ? std::min (*progress, 1.0) : *progress - std::floor (*progress);
+            grid.setPlayhead ((float) position, synthProcessor.getLfoValue (lfo));
+        }
+        else
+        {
+            grid.setPlayhead (std::nullopt);
+        }
     }
 
     if (const auto note = synthProcessor.getLastNote(); note != shownNote)
@@ -270,9 +344,56 @@ void SynthEditor::refresh()
     }
 }
 
+void SynthEditor::showModulation()
+{
+    // Where each LFO's wave is now, for those that are moving anything.
+    std::array<std::optional<float>, SynthProcessor::numLfos> lfoValues;
+
+    for (int i = 0; i < SynthProcessor::numLfos; ++i)
+        if (synthProcessor.isLfoOn (i) && synthProcessor.getLfoProgress (i).has_value())
+            lfoValues[(size_t) i] = synthProcessor.getLfoValue (i);
+
+    // Controls that are hidden, such as the harmonic sliders while an LFO is shown, are left alone.
+    std::function<void (juce::Component&, bool)> show = [&] (juce::Component& component, bool parentVisible)
+    {
+        const auto visible = parentVisible && component.isVisible();
+
+        if (const auto target = modulatable::getTarget (component))
+        {
+            const auto& assignment = synthProcessor.getAssignment (*target);
+            std::optional<float> livePosition;
+
+            if (assignment.isActive() && visible)
+                if (const auto lfoValue = lfoValues[(size_t) assignment.lfo])
+                    livePosition = assignment.apply (synthProcessor.getPosition (*target), *lfoValue);
+
+            modulatable::setLivePosition (component, livePosition);
+        }
+
+        for (auto* child : component.getChildren())
+            show (*child, visible);
+    };
+
+    // The window itself counts as visible, as it is to whoever's looking at it, even before a host shows it.
+    for (auto* child : getChildren())
+        show (*child, true);
+}
+
+void SynthEditor::showModulationEditor (juce::Component& control)
+{
+    const auto target = modulatable::getTarget (control);
+
+    if (! target.has_value())
+        return;
+
+    juce::CallOutBox::launchAsynchronously (std::make_unique<ModulationEditor> (synthProcessor, *target),
+                                            getLocalArea (&control, control.getLocalBounds()), this);
+}
+
 void SynthEditor::timerCallback()
 {
     refresh();
+    showModulation();
 
     // In the standalone app the computer keyboard plays the piano straight away.
     if (! focusGiven && isShowing() && synthProcessor.wrapperType == juce::AudioProcessor::wrapperType_Standalone)

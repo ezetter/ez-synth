@@ -3,17 +3,20 @@
 #include "SynthLookAndFeel.h"
 
 FilterPanel::Filter::Filter (juce::AudioProcessorValueTreeState& parameters, const SynthProcessor::FilterIds& ids,
-                             const juce::String& filterName)
+                             int filterNumber, const juce::String& filterName)
     : name (filterName),
       onAttachment (parameters, ids.on, onSwitch),
       cutoffAttachment (parameters, ids.cutoff, cutoff),
       resonanceAttachment (parameters, ids.resonance, resonance)
 {
+    modulatable::setTarget (onSwitch, modulation::filterOnTarget (filterNumber));
+    modulatable::setTarget (cutoff, modulation::filterCutoffTarget (filterNumber));
+    modulatable::setTarget (resonance, modulation::filterResonanceTarget (filterNumber));
 }
 
 FilterPanel::FilterPanel (juce::AudioProcessorValueTreeState& parameters)
-    : lowPass (parameters, SynthProcessor::lowPassIds, "Low pass"),
-      highPass (parameters, SynthProcessor::highPassIds, "High pass")
+    : lowPass (parameters, SynthProcessor::lowPassIds, modulation::lowPass, "Low pass"),
+      highPass (parameters, SynthProcessor::highPassIds, modulation::highPass, "High pass")
 {
     setUp (lowPass, parameters, SynthProcessor::lowPassIds);
     setUp (highPass, parameters, SynthProcessor::highPassIds);

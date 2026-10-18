@@ -64,10 +64,36 @@ void WaveGrid::updateValueRange()
 
 void WaveGrid::setOscillator (int number, bool isOn)
 {
-    if (number != oscillatorNumber || isOn != on)
+    if (number != sourceNumber || isOn != on || lfoPeriod.has_value())
     {
-        oscillatorNumber = number;
+        sourceNumber = number;
         on = isOn;
+        lfoPeriod.reset();
+        playhead.reset();
+        repaint();
+    }
+}
+
+void WaveGrid::setLfo (int number, bool isOn, double periodSeconds)
+{
+    if (number != sourceNumber || isOn != on || lfoPeriod != periodSeconds)
+    {
+        sourceNumber = number;
+        on = isOn;
+        lfoPeriod = periodSeconds;
+        repaint();
+    }
+}
+
+void WaveGrid::setPlayhead (std::optional<float> position, float value)
+{
+    const auto changed = position.has_value() != playhead.has_value()
+                      || (position.has_value() && ! juce::approximatelyEqual (*position, *playhead));
+
+    if (changed)
+    {
+        playhead = position;
+        playheadValue = value;
         repaint();
     }
 }
@@ -126,35 +152,65 @@ void WaveGrid::paint (juce::Graphics& g)
         g.setColour (colours::drawn.withAlpha (0.55f * opacity));
         g.strokePath (drawnCurve, juce::PathStrokeType (1.2f));
 
-        // The faintest sine waves are drawn last, so the strong ones can't hide them.
-        for (auto i = (int) partials.size() - 1; i >= 0; --i)
+        // An LFO plays its wave just as it's drawn, with a line showing where it's got to.
+        if (lfoPeriod.has_value())
         {
-            const auto& partial = partials[(size_t) i];
-            g.setColour (colours::forPartial (i).withAlpha (0.9f * opacity));
-            g.strokePath (makeCurve ([&partial] (double position) { return partial.valueAt (position); }),
-                          juce::PathStrokeType (1.7f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.setColour (colours::sum.withAlpha (opacity));
+            g.strokePath (drawnCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            if (playhead.has_value())
+            {
+                const auto x = toX (*playhead);
+                const auto y = toY (playheadValue);
+                g.setColour (colours::modulation.withAlpha (0.8f * opacity));
+                g.drawVerticalLine (juce::roundToInt (x), plot.getY(), plot.getBottom());
+                g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ x, y }));
+            }
         }
-
-        const auto sumCurve = makeCurve ([this] (double position)
+        else
         {
-            auto value = 0.0f;
-
-            for (const auto& partial : partials)
-                value += partial.valueAt (position);
-
-            return value;
-        });
-
-        g.setColour (colours::sum.withAlpha (0.1f * opacity));
-        g.strokePath (sumCurve, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (colours::sum.withAlpha (opacity));
-        g.strokePath (sumCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            paintHarmonics (g, opacity);
+        }
     }
 
+    paintHeader (g, bounds);
+}
+
+void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
+{
+    // The faintest sine waves are drawn last, so the strong ones can't hide them.
+    for (auto i = (int) partials.size() - 1; i >= 0; --i)
+    {
+        const auto& partial = partials[(size_t) i];
+        g.setColour (colours::forPartial (i).withAlpha (0.9f * opacity));
+        g.strokePath (makeCurve ([&partial] (double position) { return partial.valueAt (position); }),
+                      juce::PathStrokeType (1.7f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    const auto sumCurve = makeCurve ([this] (double position)
+    {
+        auto value = 0.0f;
+
+        for (const auto& partial : partials)
+            value += partial.valueAt (position);
+
+        return value;
+    });
+
+    g.setColour (colours::sum.withAlpha (0.1f * opacity));
+    g.strokePath (sumCurve, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    g.setColour (colours::sum.withAlpha (opacity));
+    g.strokePath (sumCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
+void WaveGrid::paintHeader (juce::Graphics& g, juce::Rectangle<float> bounds) const
+{
     const auto header = bounds.reduced (16.0f, 0.0f).removeFromTop (34.0f);
+    const auto name = (lfoPeriod.has_value() ? "LFO " : "OSC ") + juce::String (sourceNumber);
+
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    g.drawText ("OSC " + juce::String (oscillatorNumber) + "  " + dot + "  ONE WAVELENGTH", header,
+    g.drawText (name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH"), header,
                 juce::Justification::centredLeft);
     g.setFont (fonts::body (12.5f));
 
@@ -165,8 +221,9 @@ void WaveGrid::paint (juce::Graphics& g)
     else
     {
         g.setColour (colours::accent);
-        g.drawText ("Osc " + juce::String (oscillatorNumber) + " is off. Switch it on above to hear it.", header,
-                    juce::Justification::centredRight);
+        g.drawText (name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO")
+                        + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
+                    header, juce::Justification::centredRight);
     }
 }
 
@@ -216,8 +273,17 @@ void WaveGrid::paintGrid (juce::Graphics& g, juce::Rectangle<float> plot) const
                     juce::Justification::centredRight);
     }
 
+    // An oscillator's wavelength is marked in degrees, and an LFO's period in time.
+    const auto formatTime = [] (double seconds)
+    {
+        if (seconds <= 0.0)
+            return juce::String ("0");
+
+        return seconds < 1.0 ? juce::String (juce::roundToInt (seconds * 1000.0)) + " ms" : juce::String (seconds, 2) + " s";
+    };
+
     for (int i = 0; i <= 4; ++i)
-        g.drawText (juce::String (i * 90) + degrees,
+        g.drawText (lfoPeriod.has_value() ? formatTime (*lfoPeriod * i / 4.0) : juce::String (i * 90) + degrees,
                     juce::Rectangle<float> (48.0f, 16.0f).withCentre ({ toX (i / 4.0), plot.getBottom() + 15.0f }),
                     juce::Justification::centred);
 }

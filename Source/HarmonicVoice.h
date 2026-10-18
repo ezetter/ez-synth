@@ -1,21 +1,9 @@
 #pragma once
 
-#include "Waveform.h"
+#include "FilterStage.h"
+#include "Patch.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
-
-/** The sine waves every voice plays: those of all the oscillators that are on, each oscillator's scaled so that
-    its sum peaks at its level, added together harmonic by harmonic.
-    value (t) = sum over k of cosines[k] * cos (2π k t) + sines[k] * sin (2π k t).
-    The processor updates them on the audio thread, between blocks.
-*/
-struct HarmonicTargets
-{
-    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
-
-    /** Goes up whenever the amplitudes change. */
-    int version = 0;
-};
 
 struct HarmonicSound final : public juce::SynthesiserSound
 {
@@ -23,15 +11,18 @@ struct HarmonicSound final : public juce::SynthesiserSound
     bool appliesToChannel (int) override   { return true; }
 };
 
-/** Plays a note as a sum of sine waves at the note's harmonics.
+/** Plays a note: the sine waves at the harmonics of every oscillator that's on, added together, then through the
+    note's own high pass and low pass filters.
 
-    When the wave changes during a note, the voice glides to the new one over a few milliseconds rather than
-    clicking. Harmonics that would be too high to play without aliasing are faded out.
+    Every few milliseconds the voice works out where the LFOs have moved the controls, and glides there, so
+    changes to the waves, the controls and the LFOs never click. Each voice runs the LFOs for itself, so one that
+    runs once starts afresh with each note, like an envelope. Harmonics too high to play without aliasing are faded
+    out.
 */
 class HarmonicVoice final : public juce::SynthesiserVoice
 {
 public:
-    explicit HarmonicVoice (const HarmonicTargets&);
+    explicit HarmonicVoice (const Patch&);
 
     bool canPlaySound (juce::SynthesiserSound*) override;
     void startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition) override;
@@ -52,17 +43,33 @@ public:
     /** Harmonics this high or higher aren't played. */
     static constexpr double highestFrequency = 19000.0;
 
+    /** How many samples the voice plays before working out the LFOs again. */
+    static constexpr int controlInterval = 64;
+
 private:
-    void glideToTargets();
+    /** Where the voice is heading: its harmonics, its filters and its loudness, with the LFOs applied. */
+    struct Targets
+    {
+        std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
+        std::array<Patch::Filter, modulation::numFilters> filters {};
+        float gain = 0.0f;
+    };
+
+    Targets getTargets (int startSample) const;
+    void renderChunk (juce::AudioBuffer<float>&, int startSample, int numSamples);
     void updateFrequency();
 
-    const HarmonicTargets& targets;
-    int targetsVersion = -1;
+    const Patch& patch;
 
-    // The amplitudes being played, by harmonic, and how much each moves per sample while gliding to the targets.
-    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {}, cosineSteps {}, sineSteps {};
-    int glideSamplesLeft = 0;
+    // The amplitudes being played, by harmonic, gliding towards the targets.
+    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
 
+    std::array<FilterStage, modulation::numFilters> filters { FilterStage (juce::dsp::StateVariableTPTFilterType::lowpass),
+                                                              FilterStage (juce::dsp::StateVariableTPTFilterType::highpass) };
+    juce::SmoothedValue<float> gain;
+
+    bool startingNote = false;
+    juce::int64 samplesSinceNoteOn = 0;
     double phase = 0.0;   // how far through the wave's cycle the voice is, from 0 to 1
     double frequency = 440.0;
     int noteNumber = 69;

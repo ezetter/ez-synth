@@ -1,24 +1,33 @@
 #pragma once
 
-#include "FilterStage.h"
 #include "HarmonicVoice.h"
+#include "Modulation.h"
+#include "Patch.h"
 #include "Waveform.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth. Up to three oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
-    each note. Their sounds are added together, then go through a high pass and a low pass filter.
+    each note. Their sounds are added together, then go through a high pass and a low pass filter. Up to three LFOs,
+    each with a drawn wave of its own, can move any of the controls.
 */
 class SynthProcessor final : public juce::AudioProcessor
 {
 public:
     SynthProcessor();
 
-    static constexpr int numOscillators = 3;
+    static constexpr int numOscillators = modulation::numOscillators;
+    static constexpr int numLfos = modulation::numLfos;
+
+    /** The oscillators and LFOs, numbered with the oscillators first, are the sources of the sound and its movement.
+        The editor shows one of them at a time.
+    */
+    static constexpr int numSources = numOscillators + numLfos;
+    static constexpr bool isLfo (int source)   { return source >= numOscillators; }
 
     static constexpr auto volumeId = "volume";
 
-    /** The IDs of each oscillator's parameters: whether it plays, how loud, and with how many sine waves. */
+    /** The IDs of each oscillator's parameters: whether it plays, how loud, and with how many harmonics. */
     static juce::String onId (int oscillator);
     static juce::String levelId (int oscillator);
     static juce::String harmonicsId (int oscillator);
@@ -33,6 +42,11 @@ public:
 
     static constexpr FilterIds lowPassIds { "lowPassOn", "lowPassCutoff", "lowPassResonance" };
     static constexpr FilterIds highPassIds { "highPassOn", "highPassCutoff", "highPassResonance" };
+
+    /** The IDs of each LFO's parameters: whether it's on, its period in seconds, and whether it loops or runs once. */
+    static juce::String lfoOnId (int lfo);
+    static juce::String lfoPeriodId (int lfo);
+    static juce::String lfoModeId (int lfo);
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -58,7 +72,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     //==============================================================================
-    // The oscillators' waves. These are for the message thread.
+    // The oscillators' waves. These, and everything below, are for the message thread.
 
     const waveform::Shape& getShape (int oscillator) const noexcept;
     const waveform::Decomposition& getDecomposition (int oscillator) const noexcept;
@@ -71,7 +85,7 @@ public:
     /** Raises or lowers one harmonic of an oscillator's wave, numbered from 1, leaving the others as they are. */
     void setHarmonicAmplitude (int oscillator, int harmonic, float amplitude);
 
-    /** Goes up whenever any oscillator's wave changes, so the editor can tell when to redraw. */
+    /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 
     bool isOn (int oscillator) const noexcept;
@@ -79,22 +93,51 @@ public:
     /** How many harmonics the oscillator plays its wave with, from the 1st up. */
     int getNumHarmonics (int oscillator) const noexcept;
 
+    //==============================================================================
+    // The LFOs. An LFO plays its wave just as it's drawn, rather than rebuilt from harmonics.
+
+    const waveform::Shape& getLfoShape (int lfo) const noexcept;
+    std::optional<waveform::Preset> getLfoPreset (int lfo) const noexcept;
+    void setLfoShape (int lfo, const waveform::Shape&, std::optional<waveform::Preset> fromPreset = std::nullopt);
+
+    bool isLfoOn (int lfo) const noexcept;
+    float getLfoPeriod (int lfo) const noexcept;
+    bool isLfoOnce (int lfo) const noexcept;
+
+    /** How far through its periods an LFO is, as last played. One that runs once counts from the last key pressed,
+        and has no progress before any key has been.
+    */
+    std::optional<double> getLfoProgress (int lfo) const noexcept;
+
+    /** Where the LFO's wave is now, from -1 to 1. */
+    float getLfoValue (int lfo) const;
+
+    //==============================================================================
+    // What the LFOs move.
+
+    const modulation::Assignment& getAssignment (int target) const noexcept;
+
+    /** Has an LFO move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
+    void setAssignment (int target, const modulation::Assignment&);
+
+    /** Goes up whenever an assignment changes. */
+    int getModulationVersion() const noexcept   { return modulationVersion; }
+
+    /** Where a control is set, from 0 to 1 along its travel, before any LFO moves it. */
+    float getPosition (int target) const;
+
+    //==============================================================================
     /** The note most recently started, or -1 if none has been. */
     int getLastNote() const noexcept   { return lastNote.load(); }
 
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
 
-    /** The oscillator shown on the editor's grid. It's kept here so it's still shown when the editor reopens. */
-    int editedOscillator = 0;
+    /** The oscillator or LFO shown on the editor's grid. It's kept here so it's still shown when the editor reopens. */
+    int editedSource = 0;
 
 private:
     juce::AudioProcessorEditor* createEditor() override;
-    void updateTargets();
-    void applyFilters (juce::AudioBuffer<float>&);
-
-    /** Sets an oscillator's wave, remembering the phase of each harmonic it has. */
-    void replaceShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset>);
 
     struct Oscillator
     {
@@ -106,23 +149,19 @@ private:
         std::array<float, waveform::maxHarmonics> phases {};
     };
 
-    /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
-        this, in case the save is corrupt.
-    */
-    static constexpr float maxValue = 32.0f;
-
-    /** What an oscillator's parameters were set to, as the audio thread last read them. */
-    struct Settings
+    struct Lfo
     {
-        bool on = false;
-        float level = 0.0f;
-        int numHarmonics = 0;
+        waveform::Shape shape {};
+        std::optional<waveform::Preset> preset;
+    };
 
-        // Any change at all, however small, means the targets need working out again.
-        bool operator== (const Settings& other) const noexcept
-        {
-            return on == other.on && juce::exactlyEqual (level, other.level) && numHarmonics == other.numHarmonics;
-        }
+    /** What the message thread hands to the audio thread: everything the voices need that isn't a parameter. */
+    struct Shared
+    {
+        std::array<waveform::Decomposition, numOscillators> decompositions;
+        std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {};
+        std::array<waveform::Shape, numLfos> lfoShapes {};
+        modulation::Assignments assignments;
     };
 
     struct OscillatorParameters
@@ -139,29 +178,56 @@ private:
         std::atomic<float>* resonance = nullptr;
     };
 
-    Settings readSettings (int oscillator) const noexcept;
+    struct LfoParameters
+    {
+        std::atomic<float>* on = nullptr;
+        std::atomic<float>* period = nullptr;
+        std::atomic<float>* mode = nullptr;
+    };
+
+    /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
+        this, in case the save is corrupt.
+    */
+    static constexpr float maxValue = 32.0f;
+
+    /** Sets an oscillator's wave, remembering the phase of each harmonic it has. */
+    void replaceShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset>);
+
+    /** Hands the waves and assignments to the audio thread. */
+    void share();
+
+    /** On the audio thread: takes what the message thread shared, if it's changed, and reads the parameters. */
+    void updatePatch();
 
     std::array<Oscillator, numOscillators> oscillators;
+    std::array<Lfo, numLfos> lfos;
+    modulation::Assignments assignments;
     int shapeVersion = 0;
+    int modulationVersion = 0;
 
-    // The decompositions passed to the audio thread. The audio thread only ever tries the lock, so it never waits.
+    // The audio thread only ever tries the lock, so it never waits.
     juce::SpinLock sharedLock;
-    std::array<waveform::Decomposition, numOscillators> sharedDecompositions;
+    Shared shared;
     std::atomic<int> sharedVersion { 0 };
 
-    // The audio thread's own copies, and the settings the voices' targets were worked out from.
-    std::array<waveform::Decomposition, numOscillators> playingDecompositions;
-    std::array<Settings, numOscillators> playingSettings;
-    int playingVersion = -1;
-    HarmonicTargets targets;
+    // The audio thread's own copies. The sample rate is kept from prepareToPlay, as not every host sets the one
+    // getSampleRate() returns.
+    double playingSampleRate = 44100.0;
+    Shared received;
+    int receivedVersion = -1;
+    Patch patch;
 
     std::array<OscillatorParameters, numOscillators> oscillatorParameters;
+    std::array<FilterParameters, modulation::numFilters> filterParameters;
+    std::array<LfoParameters, numLfos> lfoParameters;
     std::atomic<float>* volume = nullptr;
-    juce::SmoothedValue<float> gain;
 
-    FilterStage highPass { juce::dsp::StateVariableTPTFilterType::highpass };
-    FilterStage lowPass { juce::dsp::StateVariableTPTFilterType::lowpass };
-    FilterParameters highPassParameters, lowPassParameters;
+    // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
+    // for the editor to show.
+    std::array<double, numLfos> lfoPhases {};
+    std::array<std::atomic<double>, numLfos> lfoProgress {};
+    juce::int64 samplesPlayed = 0;
+    juce::int64 lastNoteOnSample = -1;
 
     juce::Synthesiser synth;
     std::atomic<int> lastNote { -1 };

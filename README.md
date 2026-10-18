@@ -3,16 +3,17 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note, through a low pass and a high pass filter.
+each note, through a low pass and a high pass filter. Three LFOs, each with a drawn wave of its own, can move
+almost any control as their waves rise and fall, over and over or once with each note, like an envelope.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
 
 ## Using it
 
-- **Choose an oscillator.** The three cards across the top are the oscillators. Click one to show its wave
-  on the grid. The presets, the drawing, the harmonic buttons and the harmonic sliders all work on that
-  oscillator, and its card is outlined. Only OSC 1 is on to begin with. The others start as a square and a sine, so each sounds
-  different once switched on.
+- **Choose an oscillator or LFO.** The six cards across the top are the three oscillators, then the three
+  LFOs. Click one to show its wave on the grid; its card is outlined. The presets and the drawing work on
+  whichever is shown. Only OSC 1 is on to begin with. The others start as a square and a sine, so each
+  sounds different once switched on.
 - **Switch oscillators on and off** with the switch on each card. Every oscillator that's on plays every
   note, added together. You can still edit one that's off: its wave is drawn faintly, and the grid says it's
   off.
@@ -46,8 +47,31 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   wheel bends two semitones either way.
 - **Volume** is the knob left of the keys. Double-click it to reset it.
 
-Each oscillator's wave, switch, level and number of harmonics, and the filters' settings, are saved with your
-DAW project. Everything except the waves can be automated, as can the volume.
+### LFOs
+
+- **An LFO is an oscillator too slow to hear**, whose wave moves controls instead. Its card has a switch, a
+  **Period** dial for how long one cycle takes, from 0.1 to 10 seconds, and **Loop** and **Once**. Click
+  the card to draw its wave on the grid, or pick a preset for it. An LFO follows its drawing exactly, rather
+  than rebuilding it from harmonics, so a square LFO switches cleanly between its two values. The grid marks
+  the LFO's period in time, and a line shows where the LFO has got to.
+- **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each
+  time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
+  rises from −1 to +1 and holds there, for instance, to swell each note in.
+- **Give an LFO something to move** by right-clicking, or Control-clicking, almost any control: the volume,
+  an oscillator's switch or level, the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff
+  or resonance. A small window opens, where you pick the LFO, the **range** and the **polarity**:
+  - The LFO's wave decides where the control goes. At 0 the control is where you set it, and at +1 and −1
+    it's at either end of its range. A range of 50% swings it a quarter of its travel either side of where
+    it's set. It never goes past the ends of its travel.
+  - **Normal** polarity raises the control as the LFO rises. **Inverted** lowers it.
+  - Choose **None** to stop the LFO moving it.
+- **See the LFOs at work.** A control an LFO is moving shows where it's been moved to, in light blue, as a
+  dot and a stretch from where it's set. An LFO's card lists everything it moves, with each one's range and
+  polarity. Click one to change it, or its cross to stop the LFO moving it.
+- An LFO that's switched off moves nothing. Giving one something to move switches it on.
+
+Everything is saved with your DAW project: each oscillator's and LFO's wave and settings, the filters, and
+what the LFOs move. Everything except the waves and what the LFOs move can be automated, as can the volume.
 
 ## Building
 
@@ -76,7 +100,8 @@ Apple's validator, run `auval -v aumu Ezs1 Ezsy`.
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
-together at their levels, that the filters cut and boost each harmonic by as much as theory says, that high notes leave out harmonics too high to play cleanly, that changing the
+together at their levels, that the filters cut and boost each harmonic by as much as theory says, that LFOs
+move each kind of control by the range and in the direction they're set to, looping or once per note, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -93,23 +118,38 @@ save pictures of the window showing several waves.
   scale, as a square's do, the oscillator turns them down to fit. As every oscillator plays the same note, the oscillators' sine waves at each harmonic add up to a
   single sine wave, so a voice plays all three oscillators for little more than the cost of one. Harmonics
   fade out between 16 and 19 kHz, so high notes don't alias. When a wave, level, switch or number of
-  harmonics changes during a note, the voice glides to the new sound over 10 ms rather than clicking. Notes
+  harmonics changes during a note, the voice glides to the new sound, most of the way in 5 ms and all of it
+  in about 20, rather than clicking. Notes
   start in 8 ms and fade out over 250 ms when let go.
-- **Filtering.** The oscillators' sound goes through a high pass filter, then a low pass filter
-  (`Source/FilterStage.cpp`). Both are JUCE's state variable filters, 12 dB an octave. Switching a filter
-  fades it in or out over 20 ms, and its cutoff and resonance glide over 30 ms, so nothing clicks. A
-  filter that's switched out is skipped entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at
-  low sample rates, are lowered to 45% of the sample rate.
+- **Filtering.** Each note goes through its own high pass filter, then low pass filter
+  (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Both are
+  JUCE's state variable filters, 12 dB an octave. Switching a filter fades it in or out over 20 ms, and its
+  cutoff and resonance glide over 10 ms, so nothing clicks. A filter that's switched out is skipped
+  entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at low sample rates, are lowered to 45% of
+  the sample rate.
+- **Modulation.** Every 64 samples, each note works out where the LFOs are and where they've moved its
+  controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at the start of the
+  block; one that runs once counts from the note's start. A control's position along its travel, from 0 to
+  1, moves by its range times half the LFO's value. Cutoffs travel by octave, and harmonic sliders give weak
+  harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
+  then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
+  shows the same positions for the latest note.
 - **Between the threads.** The window analyses the drawing on the message thread. The analysis reaches the
   audio thread through a lock that the audio thread only ever tries, so audio never waits on drawing.
 
 | File | What's in it |
 | --- | --- |
 | `Source/Waveform.*` | The drawn shape, the presets and the Fourier analysis |
-| `Source/HarmonicVoice.*` | A voice playing a note as a sum of sine waves |
+| `Source/HarmonicVoice.*` | A voice playing a note: its harmonics, filters and LFOs |
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
-| `Source/OscillatorCard.*` | An oscillator's switch, wave picture and level dial |
+| `Source/SourceCard.*` | The oscillators' and LFOs' cards |
+| `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
+| `Source/Patch.h` | Everything the notes need to play a block |
+| `Source/ModulatableControls.*` | Dials, sliders and switches that open the LFO editor on a right-click |
+| `Source/ModulationEditor.*` | The window for choosing an LFO, its range and its polarity |
+| `Source/LfoPanel.*` | The list of what an LFO moves |
+| `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |
 | `Source/FilterStage.*` | A low or high pass filter that switches and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on |

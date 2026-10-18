@@ -10,6 +10,17 @@ float FilterStage::resonanceToQ (float resonance)
     return juce::MathConstants<float>::sqrt2 / 2.0f * std::pow (2.0f, 3.5f * juce::jlimit (0.0f, 1.0f, resonance));
 }
 
+float FilterStage::cutoffToPosition (float cutoff)
+{
+    return std::log2 (juce::jlimit (lowestCutoff, highestCutoff, cutoff) / lowestCutoff)
+         / std::log2 (highestCutoff / lowestCutoff);
+}
+
+float FilterStage::positionToCutoff (float position)
+{
+    return lowestCutoff * std::pow (highestCutoff / lowestCutoff, juce::jlimit (0.0f, 1.0f, position));
+}
+
 float FilterStage::limitCutoff (float newCutoff) const
 {
     return juce::jlimit (lowestCutoff, std::min (highestCutoff, (float) (0.45 * sampleRate)), newCutoff);
@@ -20,10 +31,16 @@ void FilterStage::prepare (const juce::dsp::ProcessSpec& spec, bool on, float ne
     sampleRate = spec.sampleRate;
     filter.prepare (spec);
 
-    cutoff.reset (sampleRate, 0.03);
-    q.reset (sampleRate, 0.03);
+    // Quick enough to follow an LFO, slow enough not to click.
+    cutoff.reset (sampleRate, 0.01);
+    q.reset (sampleRate, 0.01);
     mix.reset (sampleRate, 0.02);
 
+    jumpTo (on, newCutoff, resonance);
+}
+
+void FilterStage::jumpTo (bool on, float newCutoff, float resonance)
+{
     cutoff.setCurrentAndTargetValue (limitCutoff (newCutoff));
     q.setCurrentAndTargetValue (resonanceToQ (resonance));
     mix.setCurrentAndTargetValue (on ? 1.0f : 0.0f);

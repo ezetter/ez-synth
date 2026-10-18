@@ -11,6 +11,13 @@ namespace
         waveform::Preset::sawtooth, waveform::Preset::square, waveform::Preset::sine
     };
 
+    /** The waves and periods the LFOs start with. */
+    constexpr std::array<waveform::Preset, SynthProcessor::numLfos> startingLfoPresets {
+        waveform::Preset::sine, waveform::Preset::triangle, waveform::Preset::sawtooth
+    };
+
+    constexpr std::array<float, SynthProcessor::numLfos> startingPeriods { 1.0f, 2.0f, 4.0f };
+
     juce::AudioParameterFloatAttributes asPercentage()
     {
         return juce::AudioParameterFloatAttributes()
@@ -27,14 +34,9 @@ namespace
         return juce::String (hertz / 1000.0f, hertz < 10000.0f ? 2 : 1) + " kHz";
     }
 
-    /** Cutoffs are spread evenly by octave, as pitch is heard, from 20 Hz to 20 kHz. */
-    juce::NormalisableRange<float> cutoffRange()
+    juce::String formatPeriod (float seconds)
     {
-        const auto octaves = std::log2 (FilterStage::highestCutoff / FilterStage::lowestCutoff);
-
-        return { FilterStage::lowestCutoff, FilterStage::highestCutoff,
-                 [octaves] (float start, float, float proportion) { return start * std::pow (2.0f, proportion * octaves); },
-                 [octaves] (float start, float, float hertz) { return std::log2 (hertz / start) / octaves; } };
+        return juce::String (seconds, seconds < 1.0f ? 2 : 1) + " s";
     }
 
     std::unique_ptr<juce::AudioProcessorParameterGroup> createFilterParameters (const juce::String& groupId,
@@ -42,11 +44,16 @@ namespace
                                                                                 const juce::String& name,
                                                                                 float defaultCutoff)
     {
+        // Cutoffs are spread evenly by octave, as pitch is heard.
+        const juce::NormalisableRange<float> cutoffRange (FilterStage::lowestCutoff, FilterStage::highestCutoff,
+                                                          [] (float, float, float position) { return FilterStage::positionToCutoff (position); },
+                                                          [] (float, float, float hertz) { return FilterStage::cutoffToPosition (hertz); });
+
         return std::make_unique<juce::AudioProcessorParameterGroup> (
             groupId, name, " ",
             std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids.on, 1 }, name + " On", false),
             std::make_unique<juce::AudioParameterFloat> (
-                juce::ParameterID { ids.cutoff, 1 }, name + " Cutoff", cutoffRange(), defaultCutoff,
+                juce::ParameterID { ids.cutoff, 1 }, name + " Cutoff", cutoffRange, defaultCutoff,
                 juce::AudioParameterFloatAttributes()
                     .withStringFromValueFunction ([] (float value, int) { return formatFrequency (value); })
                     .withValueFromStringFunction ([] (const juce::String& text)
@@ -88,19 +95,42 @@ namespace
         layout.add (createFilterParameters ("highPass", SynthProcessor::highPassIds, "High Pass", 250.0f));
         layout.add (createFilterParameters ("lowPass", SynthProcessor::lowPassIds, "Low Pass", 1000.0f));
 
-        return layout;
-    }
+        // The LFOs start on, as they do nothing until a control is assigned to one.
+        const juce::NormalisableRange<float> periodRange (modulation::shortestPeriod, modulation::longestPeriod,
+                                                          [] (float, float, float position) { return modulation::positionToPeriod (position); },
+                                                          [] (float, float, float seconds) { return modulation::periodToPosition (seconds); });
 
-    /** The volume knob follows a square law, which sounds more even over its turn than a straight line does. */
-    float volumeToGain (float volume)
-    {
-        return volume * volume;
+        for (int i = 0; i < SynthProcessor::numLfos; ++i)
+        {
+            const auto name = "LFO " + juce::String (i + 1);
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "lfo" + juce::String (i + 1), name, " ",
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoOnId (i), 1 }, name + " On", true),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::lfoPeriodId (i), 1 }, name + " Period", periodRange,
+                    startingPeriods[(size_t) i],
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float value, int) { return formatPeriod (value); })
+                        .withValueFromStringFunction ([] (const juce::String& text)
+                        {
+                            return text.retainCharacters ("0123456789.").getFloatValue();
+                        })),
+                std::make_unique<juce::AudioParameterChoice> (
+                    juce::ParameterID { SynthProcessor::lfoModeId (i), 1 }, name + " Mode",
+                    juce::StringArray { "Loop", "Once" }, 0)));
+        }
+
+        return layout;
     }
 }
 
-juce::String SynthProcessor::onId (int oscillator)          { return "osc" + juce::String (oscillator + 1) + "On"; }
-juce::String SynthProcessor::levelId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Level"; }
-juce::String SynthProcessor::harmonicsId (int oscillator)   { return "osc" + juce::String (oscillator + 1) + "Harmonics"; }
+juce::String SynthProcessor::onId (int oscillator)          { return modulation::getKey (modulation::oscillatorOnTarget (oscillator)); }
+juce::String SynthProcessor::levelId (int oscillator)       { return modulation::getKey (modulation::oscillatorLevelTarget (oscillator)); }
+juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation::getKey (modulation::oscillatorHarmonicsTarget (oscillator)); }
+juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
+juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
+juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
 
 SynthProcessor::SynthProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
@@ -108,23 +138,34 @@ SynthProcessor::SynthProcessor()
 {
     volume = parameters.getRawParameterValue (volumeId);
 
-    for (auto [filterParameters, ids] : { std::pair (&highPassParameters, highPassIds), std::pair (&lowPassParameters, lowPassIds) })
-        *filterParameters = { parameters.getRawParameterValue (ids.on),
-                              parameters.getRawParameterValue (ids.cutoff),
-                              parameters.getRawParameterValue (ids.resonance) };
-
     for (int i = 0; i < numOscillators; ++i)
         oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
                                              parameters.getRawParameterValue (levelId (i)),
                                              parameters.getRawParameterValue (harmonicsId (i)) };
 
+    for (auto [filter, ids] : { std::pair (modulation::lowPass, lowPassIds), std::pair (modulation::highPass, highPassIds) })
+        filterParameters[(size_t) filter] = { parameters.getRawParameterValue (ids.on),
+                                              parameters.getRawParameterValue (ids.cutoff),
+                                              parameters.getRawParameterValue (ids.resonance) };
+
+    for (int i = 0; i < numLfos; ++i)
+        lfoParameters[(size_t) i] = { parameters.getRawParameterValue (lfoOnId (i)),
+                                      parameters.getRawParameterValue (lfoPeriodId (i)),
+                                      parameters.getRawParameterValue (lfoModeId (i)) };
+
+    for (auto& progress : lfoProgress)
+        progress = -1.0;
+
     for (int i = 0; i < numVoices; ++i)
-        synth.addVoice (new HarmonicVoice (targets));
+        synth.addVoice (new HarmonicVoice (patch));
 
     synth.addSound (new HarmonicSound());
 
     for (int i = 0; i < numOscillators; ++i)
         setShape (i, waveform::makePreset (startingPresets[(size_t) i]), startingPresets[(size_t) i]);
+
+    for (int i = 0; i < numLfos; ++i)
+        setLfoShape (i, waveform::makePreset (startingLfoPresets[(size_t) i]), startingLfoPresets[(size_t) i]);
 }
 
 const juce::String SynthProcessor::getName() const
@@ -138,18 +179,13 @@ bool SynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
 }
 
-void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void SynthProcessor::prepareToPlay (double sampleRate, int)
 {
+    playingSampleRate = sampleRate;
     synth.setCurrentPlaybackSampleRate (sampleRate);
-    gain.reset (sampleRate, 0.05);
-    gain.setCurrentAndTargetValue (volumeToGain (volume->load()));
 
-    const juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) samplesPerBlock,
-                                        (juce::uint32) juce::jmax (1, getTotalNumOutputChannels()) };
-
-    for (auto [filter, filterParameters] : { std::pair (&highPass, &highPassParameters), std::pair (&lowPass, &lowPassParameters) })
-        filter->prepare (spec, filterParameters->on->load() >= 0.5f, filterParameters->cutoff->load(),
-                         filterParameters->resonance->load());
+    // The looping LFOs start their periods afresh whenever playing starts.
+    lfoPhases.fill (0.0);
 }
 
 void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -157,126 +193,110 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
+    const auto numSamples = buffer.getNumSamples();
+
     // Adds the notes played on the on-screen keyboard, and lights its keys for notes played from elsewhere.
-    keyboardState.processNextMidiBuffer (midi, 0, buffer.getNumSamples(), true);
+    keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
 
     for (const auto metadata : midi)
+    {
         if (const auto message = metadata.getMessage(); message.isNoteOn())
+        {
             lastNote = message.getNoteNumber();
-
-    auto changed = false;
-
-    if (sharedVersion.load() != playingVersion)
-    {
-        const juce::SpinLock::ScopedTryLockType lock (sharedLock);
-
-        if (lock.isLocked())
-        {
-            playingDecompositions = sharedDecompositions;
-            playingVersion = sharedVersion.load();
-            changed = true;
+            lastNoteOnSample = samplesPlayed + metadata.samplePosition;
         }
     }
 
-    for (int i = 0; i < numOscillators; ++i)
+    updatePatch();
+    synth.renderNextBlock (buffer, midi, 0, numSamples);
+
+    for (size_t i = 0; i < lfoPhases.size(); ++i)
     {
-        if (const auto settings = readSettings (i); settings != playingSettings[(size_t) i])
-        {
-            playingSettings[(size_t) i] = settings;
-            changed = true;
-        }
+        const auto& lfo = patch.lfos[i];
+        lfoPhases[i] += numSamples / lfo.periodSamples;
+        lfoPhases[i] -= std::floor (lfoPhases[i]);
+
+        if (! lfo.once)
+            lfoProgress[i] = lfoPhases[i];
+        else if (lastNoteOnSample >= 0)
+            lfoProgress[i] = (double) (samplesPlayed + numSamples - lastNoteOnSample) / lfo.periodSamples;
+        else
+            lfoProgress[i] = -1.0;
     }
 
-    if (changed)
-        updateTargets();
-
-    synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
-    applyFilters (buffer);
-
-    gain.setTargetValue (volumeToGain (volume->load()));
-    gain.applyGain (buffer, buffer.getNumSamples());
+    samplesPlayed += numSamples;
 }
 
-void SynthProcessor::applyFilters (juce::AudioBuffer<float>& buffer)
+void SynthProcessor::updatePatch()
 {
-    for (auto [filter, filterParameters] : { std::pair (&highPass, &highPassParameters), std::pair (&lowPass, &lowPassParameters) })
-        filter->setTargets (filterParameters->on->load() >= 0.5f, filterParameters->cutoff->load(),
-                            filterParameters->resonance->load());
-
-    const auto highPassActive = highPass.isActive();
-    const auto lowPassActive = lowPass.isActive();
-
-    // A filter that's out starts afresh when it's switched back in.
-    if (! highPassActive)
-        highPass.reset();
-
-    if (! lowPassActive)
-        lowPass.reset();
-
-    if (! highPassActive && ! lowPassActive)
-        return;
-
-    const auto numChannels = juce::jmin (buffer.getNumChannels(), juce::jmax (1, getTotalNumOutputChannels()));
-
-    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    if (sharedVersion.load() != receivedVersion)
     {
-        highPass.advance();
-        lowPass.advance();
+        auto taken = false;
 
-        for (int channel = 0; channel < numChannels; ++channel)
         {
-            auto sample = buffer.getSample (channel, i);
+            const juce::SpinLock::ScopedTryLockType lock (sharedLock);
 
-            if (highPassActive)
-                sample = highPass.process (channel, sample);
+            if (lock.isLocked())
+            {
+                received = shared;
+                receivedVersion = sharedVersion.load();
+                taken = true;
+            }
+        }
 
-            if (lowPassActive)
-                sample = lowPass.process (channel, sample);
+        if (taken)
+        {
+            for (size_t i = 0; i < (size_t) numOscillators; ++i)
+            {
+                auto& oscillator = patch.oscillators[i];
+                const auto& decomposition = received.decompositions[i];
 
-            buffer.setSample (channel, i, sample);
+                for (size_t k = 0; k < (size_t) waveform::maxHarmonics; ++k)
+                {
+                    // A harmonic the wave hasn't got, if an LFO raises it, comes in at the phase it last had.
+                    const auto& harmonic = decomposition.harmonics[k];
+                    const auto phase = harmonic.amplitude > 0.0f ? harmonic.phase : received.phases[i][k];
+                    oscillator.amplitudes[k] = harmonic.amplitude;
+                    oscillator.phaseSines[k] = std::sin (phase);
+                    oscillator.phaseCosines[k] = std::cos (phase);
+                }
+
+                oscillator.peaks = decomposition.peaks;
+            }
+
+            for (size_t i = 0; i < (size_t) numLfos; ++i)
+                patch.lfos[i].shape = received.lfoShapes[i];
+
+            patch.assignments = received.assignments;
         }
     }
-}
-
-SynthProcessor::Settings SynthProcessor::readSettings (int oscillator) const noexcept
-{
-    const auto& oscillatorParameter = oscillatorParameters[(size_t) oscillator];
-    return { oscillatorParameter.on->load() >= 0.5f,
-             oscillatorParameter.level->load(),
-             juce::roundToInt (oscillatorParameter.numHarmonics->load()) };
-}
-
-void SynthProcessor::updateTargets()
-{
-    targets.cosines.fill (0.0f);
-    targets.sines.fill (0.0f);
 
     for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
-        const auto& settings = playingSettings[i];
-        const auto& decomposition = playingDecompositions[i];
-
-        if (! settings.on)
-            continue;
-
-        // An oscillator plays its wave at its level. A wave whose harmonics add up to more than full scale is
-        // turned down to fit, so it can't swamp the others.
-        const auto numHarmonics = juce::jlimit (1, waveform::maxHarmonics, settings.numHarmonics);
-        const auto scale = settings.level / std::max (1.0f, decomposition.peaks[(size_t) numHarmonics]);
-
-        // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so the sine waves
-        // at each harmonic add up to one, and the voices play all the oscillators at once.
-        for (int j = 0; j < numHarmonics; ++j)
-        {
-            const auto& partial = decomposition.harmonics[(size_t) j];
-            targets.cosines[(size_t) partial.harmonic] += scale * partial.amplitude * std::sin (partial.phase);
-            targets.sines[(size_t) partial.harmonic] += scale * partial.amplitude * std::cos (partial.phase);
-        }
+        const auto& source = oscillatorParameters[i];
+        auto& oscillator = patch.oscillators[i];
+        oscillator.on = source.on->load() >= 0.5f;
+        oscillator.level = source.level->load();
+        oscillator.numHarmonics = juce::jlimit (1, waveform::maxHarmonics, juce::roundToInt (source.numHarmonics->load()));
     }
 
-    ++targets.version;
+    for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
+        patch.filters[i] = { filterParameters[i].on->load() >= 0.5f, filterParameters[i].cutoff->load(),
+                             filterParameters[i].resonance->load() };
+
+    patch.volume = volume->load();
+
+    for (size_t i = 0; i < (size_t) numLfos; ++i)
+    {
+        auto& lfo = patch.lfos[i];
+        lfo.on = lfoParameters[i].on->load() >= 0.5f;
+        lfo.once = lfoParameters[i].mode->load() >= 0.5f;
+        lfo.periodSamples = std::max (1.0, lfoParameters[i].period->load() * playingSampleRate);
+        lfo.phase = lfoPhases[i];
+    }
 }
 
+//==============================================================================
 const waveform::Shape& SynthProcessor::getShape (int oscillator) const noexcept
 {
     return oscillators[(size_t) oscillator].shape;
@@ -320,12 +340,7 @@ void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newSha
         if (harmonic.amplitude > 0.0f)
             changed.phases[(size_t) harmonic.harmonic - 1] = harmonic.phase;
 
-    {
-        const juce::SpinLock::ScopedLockType lock (sharedLock);
-        sharedDecompositions[(size_t) oscillator] = changed.decomposition;
-        ++sharedVersion;
-    }
-
+    share();
     ++shapeVersion;
 }
 
@@ -344,19 +359,130 @@ void SynthProcessor::setHarmonicAmplitude (int oscillator, int harmonic, float a
     replaceShape (oscillator, shape, std::nullopt);
 }
 
+//==============================================================================
+const waveform::Shape& SynthProcessor::getLfoShape (int lfo) const noexcept
+{
+    return lfos[(size_t) lfo].shape;
+}
+
+std::optional<waveform::Preset> SynthProcessor::getLfoPreset (int lfo) const noexcept
+{
+    return lfos[(size_t) lfo].preset;
+}
+
+void SynthProcessor::setLfoShape (int lfo, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+{
+    lfos[(size_t) lfo] = { newShape, fromPreset };
+    share();
+    ++shapeVersion;
+}
+
+bool SynthProcessor::isLfoOn (int lfo) const noexcept
+{
+    return lfoParameters[(size_t) lfo].on->load() >= 0.5f;
+}
+
+float SynthProcessor::getLfoPeriod (int lfo) const noexcept
+{
+    return lfoParameters[(size_t) lfo].period->load();
+}
+
+bool SynthProcessor::isLfoOnce (int lfo) const noexcept
+{
+    return lfoParameters[(size_t) lfo].mode->load() >= 0.5f;
+}
+
+std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
+{
+    const auto progress = lfoProgress[(size_t) lfo].load();
+    return progress >= 0.0 ? std::optional (progress) : std::nullopt;
+}
+
+float SynthProcessor::getLfoValue (int lfo) const
+{
+    return modulation::lfoValue (getLfoShape (lfo), getLfoProgress (lfo).value_or (0.0), isLfoOnce (lfo));
+}
+
+//==============================================================================
+const modulation::Assignment& SynthProcessor::getAssignment (int target) const noexcept
+{
+    return assignments[(size_t) target];
+}
+
+void SynthProcessor::setAssignment (int target, const modulation::Assignment& assignment)
+{
+    assignments[(size_t) target] = assignment;
+
+    // An LFO that's been given something to move is meant to be heard.
+    if (assignment.isActive() && ! isLfoOn (assignment.lfo))
+    {
+        auto& lfoOn = *parameters.getParameter (lfoOnId (assignment.lfo));
+        lfoOn.setValueNotifyingHost (1.0f);
+    }
+
+    share();
+    ++modulationVersion;
+}
+
+float SynthProcessor::getPosition (int target) const
+{
+    if (modulation::isParameter (target))
+        return parameters.getParameter (modulation::getKey (target))->getValue();
+
+    const auto info = modulation::describe (target);
+    const auto& harmonic = getDecomposition (info.oscillator).harmonics[(size_t) info.harmonic - 1];
+    return modulation::amplitudeRange().convertTo0to1 (harmonic.amplitude);
+}
+
+void SynthProcessor::share()
+{
+    const juce::SpinLock::ScopedLockType lock (sharedLock);
+
+    for (size_t i = 0; i < (size_t) numOscillators; ++i)
+    {
+        shared.decompositions[i] = oscillators[i].decomposition;
+        shared.phases[i] = oscillators[i].phases;
+    }
+
+    for (size_t i = 0; i < (size_t) numLfos; ++i)
+        shared.lfoShapes[i] = lfos[i].shape;
+
+    shared.assignments = assignments;
+    ++sharedVersion;
+}
+
+//==============================================================================
 void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = parameters.copyState();
 
-    for (int i = 0; i < numOscillators; ++i)
+    const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
+                                   std::optional<waveform::Preset> preset)
     {
-        const auto& oscillator = oscillators[(size_t) i];
-
         juce::ValueTree wave ("WAVE");
-        wave.setProperty ("oscillator", i, nullptr);
-        wave.setProperty ("points", juce::MemoryBlock (oscillator.shape.data(), sizeof (oscillator.shape)).toBase64Encoding(), nullptr);
-        wave.setProperty ("preset", oscillator.preset.has_value() ? waveform::getName (*oscillator.preset) : juce::String(), nullptr);
+        wave.setProperty (source, index, nullptr);
+        wave.setProperty ("points", juce::MemoryBlock (shape.data(), sizeof (shape)).toBase64Encoding(), nullptr);
+        wave.setProperty ("preset", preset.has_value() ? waveform::getName (*preset) : juce::String(), nullptr);
         state.appendChild (wave, nullptr);
+    };
+
+    for (int i = 0; i < numOscillators; ++i)
+        addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset);
+
+    for (int i = 0; i < numLfos; ++i)
+        addWave ("lfo", i, lfos[(size_t) i].shape, lfos[(size_t) i].preset);
+
+    for (int target = 0; target < modulation::numTargets; ++target)
+    {
+        if (const auto& assignment = assignments[(size_t) target]; assignment.isActive())
+        {
+            juce::ValueTree modulationTree ("MODULATION");
+            modulationTree.setProperty ("target", modulation::getKey (target), nullptr);
+            modulationTree.setProperty ("lfo", assignment.lfo, nullptr);
+            modulationTree.setProperty ("range", assignment.range, nullptr);
+            modulationTree.setProperty ("inverted", assignment.inverted, nullptr);
+            state.appendChild (modulationTree, nullptr);
+        }
     }
 
     if (const auto xml = state.createXml())
@@ -371,24 +497,27 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
         return;
 
     auto state = juce::ValueTree::fromXml (*xml);
-    std::vector<juce::ValueTree> waves;
+    std::vector<juce::ValueTree> waves, modulations;
 
-    for (auto wave = state.getChildWithName ("WAVE"); wave.isValid(); wave = state.getChildWithName ("WAVE"))
+    for (auto child = state.getChildWithName ("WAVE"); child.isValid(); child = state.getChildWithName ("WAVE"))
     {
-        waves.push_back (wave);
-        state.removeChild (wave, nullptr);
+        waves.push_back (child);
+        state.removeChild (child, nullptr);
+    }
+
+    for (auto child = state.getChildWithName ("MODULATION"); child.isValid(); child = state.getChildWithName ("MODULATION"))
+    {
+        modulations.push_back (child);
+        state.removeChild (child, nullptr);
     }
 
     parameters.replaceState (state);
 
     for (const auto& wave : waves)
     {
-        // Saves from before there were three oscillators have one wave, with no number.
-        const auto oscillator = (int) wave.getProperty ("oscillator", 0);
         juce::MemoryBlock points;
 
-        if (oscillator < 0 || oscillator >= numOscillators
-            || ! points.fromBase64Encoding (wave["points"].toString()) || points.getSize() != sizeof (waveform::Shape))
+        if (! points.fromBase64Encoding (wave["points"].toString()) || points.getSize() != sizeof (waveform::Shape))
             continue;
 
         waveform::Shape restored {};
@@ -397,8 +526,40 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
         for (auto& value : restored)
             value = std::isfinite (value) ? juce::jlimit (-maxValue, maxValue, value) : 0.0f;
 
-        setShape (oscillator, restored, waveform::findPreset (wave["preset"].toString()));
+        const auto preset = waveform::findPreset (wave["preset"].toString());
+
+        if (wave.hasProperty ("lfo"))
+        {
+            if (const auto lfo = (int) wave["lfo"]; lfo >= 0 && lfo < numLfos)
+            {
+                // Drawing keeps an LFO's wave between -1 and 1, as that's as far as it moves a control.
+                for (auto& value : restored)
+                    value = juce::jlimit (-1.0f, 1.0f, value);
+
+                setLfoShape (lfo, restored, preset);
+            }
+        }
+        else if (const auto oscillator = (int) wave.getProperty ("oscillator", 0); oscillator >= 0 && oscillator < numOscillators)
+        {
+            // Saves from before there were three oscillators have one wave, with no number.
+            setShape (oscillator, restored, preset);
+        }
     }
+
+    assignments = {};
+
+    for (const auto& modulationTree : modulations)
+    {
+        const auto target = modulation::findTarget (modulationTree["target"].toString());
+        const auto lfo = (int) modulationTree["lfo"];
+
+        if (target.has_value() && lfo >= 0 && lfo < numLfos)
+            assignments[(size_t) *target] = { lfo, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
+                                               (bool) modulationTree["inverted"] };
+    }
+
+    share();
+    ++modulationVersion;
 }
 
 juce::AudioProcessorEditor* SynthProcessor::createEditor()

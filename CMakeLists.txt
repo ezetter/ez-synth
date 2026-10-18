@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
-project(EZSynth VERSION 0.3.0)
+project(EZSynth VERSION 0.4.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,13 +34,18 @@ juce_add_plugin(EZSynth
 
 target_sources(EZSynth
     PRIVATE
+        Source/ChoiceButtons.cpp
         Source/FilterPanel.cpp
         Source/FilterStage.cpp
         Source/HarmonicSelector.cpp
         Source/HarmonicSliders.cpp
         Source/HarmonicVoice.cpp
         Source/Keyboard.cpp
-        Source/OscillatorCard.cpp
+        Source/LfoPanel.cpp
+        Source/ModulatableControls.cpp
+        Source/Modulation.cpp
+        Source/ModulationEditor.cpp
+        Source/SourceCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
         Source/SynthProcessor.cpp

@@ -1,5 +1,7 @@
 #include "HarmonicSelector.h"
 
+#include "Modulation.h"
+#include "ModulatableControls.h"
 #include "SynthLookAndFeel.h"
 
 HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
@@ -84,6 +86,14 @@ void HarmonicSelector::paint (juce::Graphics& g)
             g.drawRoundedRectangle (area.reduced (1.0f), 4.0f, 2.0f);
         }
 
+        // The number an LFO has moved the count to.
+        if (const auto livePosition = modulatable::getLivePosition (*this);
+            livePosition.has_value() && number == modulation::positionToHarmonics (*livePosition))
+        {
+            g.setColour (colours::modulation);
+            g.drawRoundedRectangle (area.reduced (1.0f), 4.0f, 2.5f);
+        }
+
         g.setColour (lit ? colours::background : (number <= selected ? colour : colours::dimText));
         g.setFont (juce::FontOptions (14.0f, juce::Font::bold));
         g.drawText (juce::String (number), area, juce::Justification::centred);
@@ -92,19 +102,31 @@ void HarmonicSelector::paint (juce::Graphics& g)
 
 void HarmonicSelector::mouseDown (const juce::MouseEvent& e)
 {
+    alternateClick = e.mods.isPopupMenu();
+
+    if (alternateClick)
+    {
+        modulatable::requestEditor (*this);
+        return;
+    }
+
     attachment->beginGesture();
     select (getNumberAt (e.position));
 }
 
 void HarmonicSelector::mouseDrag (const juce::MouseEvent& e)
 {
+    if (alternateClick)
+        return;
+
     select (getNumberAt (e.position));
     setHovered (getNumberAt (e.position));
 }
 
 void HarmonicSelector::mouseUp (const juce::MouseEvent&)
 {
-    attachment->endGesture();
+    if (! alternateClick)
+        attachment->endGesture();
 }
 
 void HarmonicSelector::mouseMove (const juce::MouseEvent& e)

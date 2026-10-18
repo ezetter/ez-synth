@@ -4,17 +4,21 @@
 #include "HarmonicSelector.h"
 #include "HarmonicSliders.h"
 #include "Keyboard.h"
-#include "OscillatorCard.h"
+#include "LfoPanel.h"
+#include "ModulatableControls.h"
+#include "SourceCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
 #include "WaveGrid.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The synth's window: a card for each oscillator, preset waves, the grid to draw the chosen oscillator's wave
-    on, how many harmonics it plays with a slider for each, the filters, the volume knob and a piano keyboard.
+/** The synth's window: a card for each oscillator and LFO, preset waves, the grid to draw the chosen one's wave on,
+    the harmonics of the chosen oscillator or the controls the chosen LFO moves, the filters, the volume knob and a
+    piano keyboard. Right-clicking a control opens the editor for which LFO moves it.
 */
 class SynthEditor final : public juce::AudioProcessorEditor,
+                          public ModulationHandler,
                           private juce::Timer
 {
 public:
@@ -27,34 +31,43 @@ public:
     /** Brings the window up to date with the synth. It does this itself many times a second. */
     void refresh();
 
+    /** Shows where the LFOs have moved the controls they move. This too happens many times a second. */
+    void showModulation();
+
+    void showModulationEditor (juce::Component& control) override;
+
 private:
     /** What the window shows depends on these. When any of them changes, it's all brought up to date. */
     struct Shown
     {
         int shapeVersion = -1;
-        int editedOscillator = -1;
+        int modulationVersion = -1;
+        int editedSource = -1;
         std::array<int, SynthProcessor::numOscillators> numHarmonics {};
-        std::array<bool, SynthProcessor::numOscillators> on {};
+        std::array<bool, SynthProcessor::numSources> on {};
 
         bool operator== (const Shown&) const = default;
     };
 
     void timerCallback() override;
     void paintNote (juce::Graphics&) const;
-    void editOscillator (int);
+    void editSource (int);
+    void setEditedWave (const waveform::Shape&, std::optional<waveform::Preset>);
     std::vector<waveform::Partial> getPlayedHarmonics (int oscillator) const;
-    juce::String getWaveName (int oscillator) const;
+    static juce::String getWaveName (std::optional<waveform::Preset>);
 
     SynthProcessor& synthProcessor;
     SynthLookAndFeel lookAndFeel;
 
-    std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> cards;
+    std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> oscillatorCards;
+    std::array<std::unique_ptr<LfoCard>, SynthProcessor::numLfos> lfoCards;
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
+    LfoPanel lfoPanel;
     FilterPanel filterPanel;
     HarmonicSelector harmonicSelector;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
-    juce::Slider volumeKnob;
+    ModulatableSlider volumeKnob;
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;
     Keyboard keyboard;
 

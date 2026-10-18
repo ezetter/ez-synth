@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ModulatableControls.h"
 #include "Waveform.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -22,6 +23,9 @@ public:
     /** The harmonics the oscillator plays, from the 1st up. */
     void setHarmonics (std::vector<waveform::Partial>);
 
+    /** Says which oscillator's harmonics the sliders set, so an LFO can be assigned to each. */
+    void setOscillator (int oscillator);
+
     /** The pitch of the last note played, which is the frequency of the first harmonic. */
     void setFundamental (std::optional<double> hertz);
 
@@ -38,7 +42,7 @@ private:
     /** Where each part goes. A row is split into its colour, number, slider, amplitude and frequency. */
     Layout getLayout() const;
 
-    std::array<juce::Slider, waveform::maxHarmonics> sliders;
+    std::array<ModulatableSlider, waveform::maxHarmonics> sliders;
     std::vector<waveform::Partial> harmonics;
     std::optional<double> fundamental;
 

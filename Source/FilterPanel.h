@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ModulatableControls.h"
 #include "SynthProcessor.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -21,13 +22,14 @@ public:
 private:
     struct Filter
     {
-        Filter (juce::AudioProcessorValueTreeState&, const SynthProcessor::FilterIds&, const juce::String& filterName);
+        Filter (juce::AudioProcessorValueTreeState&, const SynthProcessor::FilterIds&, int filterNumber,
+                const juce::String& filterName);
 
         bool isOn() const   { return onSwitch.getToggleState(); }
 
         juce::String name;
-        juce::ToggleButton onSwitch;
-        juce::Slider cutoff, resonance;
+        ModulatableToggle onSwitch;
+        ModulatableSlider cutoff, resonance;
         juce::AudioProcessorValueTreeState::ButtonAttachment onAttachment;
         juce::AudioProcessorValueTreeState::SliderAttachment cutoffAttachment, resonanceAttachment;
 

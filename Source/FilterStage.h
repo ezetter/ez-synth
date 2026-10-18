@@ -18,8 +18,17 @@ public:
     */
     static float resonanceToQ (float resonance);
 
+    /** Where a cutoff sits along its dial, from 0 to 1, and back. Cutoffs are spread evenly by octave, as pitch is
+        heard.
+    */
+    static float cutoffToPosition (float cutoff);
+    static float positionToCutoff (float position);
+
     /** Gets ready to play, starting with these settings rather than gliding to them. */
     void prepare (const juce::dsp::ProcessSpec&, bool on, float cutoff, float resonance);
+
+    /** Goes straight to these settings, forgetting the sound so far, as when a voice starts a new note. */
+    void jumpTo (bool on, float cutoff, float resonance);
 
     /** Sets the settings to glide to. Cutoffs too near the Nyquist frequency are lowered, as the filter can't
         work there.

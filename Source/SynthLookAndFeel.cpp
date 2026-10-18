@@ -1,5 +1,7 @@
 #include "SynthLookAndFeel.h"
 
+#include "ModulatableControls.h"
+
 namespace colours
 {
     juce::Colour forPartial (int index)
@@ -74,6 +76,20 @@ void SynthLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wi
         g.strokePath (value, trackStroke);
     }
 
+    // Where an LFO has moved the dial to: a faint arc from where it's set, and a dot.
+    if (const auto livePosition = modulatable::getLivePosition (slider))
+    {
+        const auto liveAngle = startAngle + *livePosition * (endAngle - startAngle);
+        juce::Path swing;
+        swing.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f, std::min (angle, liveAngle),
+                             std::max (angle, liveAngle), true);
+        g.setColour (colours::modulation.withAlpha (0.45f));
+        g.strokePath (swing, trackStroke);
+        g.setColour (colours::modulation);
+        g.fillEllipse (juce::Rectangle<float> (trackWidth * 1.7f, trackWidth * 1.7f)
+                           .withCentre (centre.getPointOnCircumference (arcRadius, liveAngle)));
+    }
+
     const auto knobRadius = radius * 0.7f;
     const auto knob = juce::Rectangle<float> (knobRadius * 2.0f, knobRadius * 2.0f).withCentre (centre);
 
@@ -133,9 +149,37 @@ void SynthLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int wi
     g.setColour (slider.findColour (juce::Slider::trackColourId));
     g.fillRoundedRectangle (track.withRight (sliderPos), 2.0f);
 
+    // Where an LFO has moved the slider to: a faint stretch from where it's set, and a dot.
+    if (const auto livePosition = modulatable::getLivePosition (slider))
+    {
+        const auto liveX = bounds.getX() + *livePosition * bounds.getWidth();
+        g.setColour (colours::modulation.withAlpha (0.45f));
+        g.fillRoundedRectangle (track.withLeft (std::min (sliderPos, liveX)).withRight (std::max (sliderPos, liveX)), 2.0f);
+        g.setColour (colours::modulation);
+        g.fillEllipse (juce::Rectangle<float> (8.0f, 8.0f).withCentre ({ liveX, bounds.getCentreY() }));
+    }
+
     const auto thumb = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ sliderPos, bounds.getCentreY() });
     g.setColour (slider.isMouseOverOrDragging() ? colours::text : colours::text.darker (0.15f));
     g.fillEllipse (thumb);
+}
+
+void SynthLookAndFeel::drawCallOutBoxBackground (juce::CallOutBox&, juce::Graphics& g, const juce::Path& path,
+                                                 juce::Image& cachedShadow)
+{
+    if (cachedShadow.isNull())
+    {
+        cachedShadow = { juce::Image::ARGB, 1 + juce::roundToInt (path.getBounds().getRight()),
+                         1 + juce::roundToInt (path.getBounds().getBottom()), true };
+        juce::Graphics shadowGraphics (cachedShadow);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 14, { 0, 4 }).drawForPath (shadowGraphics, path);
+    }
+
+    g.drawImageAt (cachedShadow, 0, 0);
+    g.setColour (colours::panel.brighter (0.04f));
+    g.fillPath (path);
+    g.setColour (colours::modulation.withAlpha (0.6f));
+    g.strokePath (path, juce::PathStrokeType (1.5f));
 }
 
 void SynthLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
@@ -158,4 +202,14 @@ void SynthLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const auto knobCentre = juce::Point<float> (on ? track.getRight() - radius : track.getX() + radius, track.getCentreY());
     g.setColour (on ? colours::background : colours::text);
     g.fillEllipse (juce::Rectangle<float> (radius * 1.5f, radius * 1.5f).withCentre (knobCentre));
+
+    // A switch an LFO is flicking is ringed, with a dot on the side the LFO has put it.
+    if (const auto livePosition = modulatable::getLivePosition (button))
+    {
+        const auto liveOn = *livePosition >= 0.5f;
+        g.setColour (colours::modulation);
+        g.drawRoundedRectangle (track.expanded (1.0f), radius + 1.0f, 1.5f);
+        g.fillEllipse (juce::Rectangle<float> (radius * 0.7f, radius * 0.7f)
+                           .withCentre ({ liveOn ? track.getRight() - radius : track.getX() + radius, track.getCentreY() }));
+    }
 }

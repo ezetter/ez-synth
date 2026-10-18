@@ -123,6 +123,15 @@ namespace waveform
         return result;
     }
 
+    float valueAt (const Shape& shape, double position) noexcept
+    {
+        const auto point = juce::jlimit (0.0, 1.0, position) * numPoints;
+        const auto before = std::min ((int) point, numPoints - 1);
+        const auto after = (before + 1) % numPoints;   // the wave repeats, so the last point leads back to the first
+        const auto proportion = (float) (point - before);
+        return shape[(size_t) before] + proportion * (shape[(size_t) after] - shape[(size_t) before]);
+    }
+
     void addHarmonic (Shape& shape, int harmonic, float amplitude, float phase)
     {
         for (int i = 0; i < numPoints; ++i)

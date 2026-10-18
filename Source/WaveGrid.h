@@ -8,8 +8,9 @@
 #include <optional>
 #include <vector>
 
-/** The grid a wave is drawn on, one wavelength wide. It shows the drawn wave, the sine waves it breaks down
-    into, and their sum, which is what the synth plays.
+/** The grid a wave is drawn on, one cycle wide. For an oscillator it shows the drawn wave, the sine waves it
+    breaks down into, and their sum, which is what the synth plays. For an LFO, which plays its wave just as it's
+    drawn, it shows the wave and where the LFO has got to.
 */
 class WaveGrid final : public juce::Component
 {
@@ -27,6 +28,14 @@ public:
     /** Says which oscillator's wave is shown, numbered from 1. One that's off is shown faintly. */
     void setOscillator (int number, bool isOn);
 
+    /** Says which LFO's wave is shown, numbered from 1, and how long its period is. */
+    void setLfo (int number, bool isOn, double periodSeconds);
+
+    /** Where the LFO shown is in its period, from 0 to 1, and its value there, or nothing to hide the line marking
+        it.
+    */
+    void setPlayhead (std::optional<float> position, float value = 0.0f);
+
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -41,6 +50,8 @@ private:
 
     void updateValueRange();
     void paintGrid (juce::Graphics&, juce::Rectangle<float> plot) const;
+    void paintHarmonics (juce::Graphics&, float opacity) const;
+    void paintHeader (juce::Graphics&, juce::Rectangle<float> bounds) const;
     juce::Path makeCurve (const std::function<float (double position)>& valueAt) const;
     juce::Path makeShapeCurve() const;
     void drawTo (juce::Point<float>);
@@ -48,8 +59,11 @@ private:
     waveform::Shape shape {};
     std::vector<waveform::Partial> partials;
     float valueRange = 1.35f;   // how far above and below zero the grid shows
-    int oscillatorNumber = 1;
+    int sourceNumber = 1;
     bool on = true;
+    std::optional<double> lfoPeriod;   // the period of the LFO shown, or nothing for an oscillator
+    std::optional<float> playhead;
+    float playheadValue = 0.0f;
 
     // Where the mouse last drew: a point number, which can fall between points, and a value.
     std::optional<std::pair<double, float>> lastDrawn;

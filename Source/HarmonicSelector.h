@@ -5,7 +5,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** A row of buttons, 1 to 9, for how many harmonics to play the wave with, from the 1st up. Each lit button is
-    coloured like its harmonic.
+    coloured like its harmonic. A right-click or Control-click asks for an LFO to move the number instead.
 */
 class HarmonicSelector final : public juce::Component
 {
@@ -35,6 +35,7 @@ private:
     int selected = 1;
     std::array<bool, waveform::maxHarmonics> silent {};
     int hovered = 0;
+    bool alternateClick = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicSelector)
 };

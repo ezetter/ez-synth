@@ -7,8 +7,10 @@ namespace
     /** How loud a note is at full velocity, leaving headroom for chords. */
     constexpr float fullLevel = 0.3f;
 
-    /** How long a playing note takes to glide to a changed wave. */
-    constexpr double glideSeconds = 0.01;
+    /** How quickly a playing note follows changes to its harmonics: it covers about two thirds of the way in this
+        time, and nearly all of it in four times as long.
+    */
+    constexpr double glideSeconds = 0.005;
 
     /** How much of a harmonic at this frequency to play. At low sample rates the fade starts lower, to stay clear
         of the Nyquist frequency.
@@ -28,8 +30,8 @@ namespace
     }
 }
 
-HarmonicVoice::HarmonicVoice (const HarmonicTargets& targetsToPlay)
-    : targets (targetsToPlay)
+HarmonicVoice::HarmonicVoice (const Patch& patchToPlay)
+    : patch (patchToPlay)
 {
     envelope.setParameters ({ 0.008f, 0.05f, 1.0f, releaseSeconds });
 }
@@ -43,8 +45,14 @@ void HarmonicVoice::setCurrentPlaybackSampleRate (double newRate)
 {
     SynthesiserVoice::setCurrentPlaybackSampleRate (newRate);
 
-    if (newRate > 0.0)
-        envelope.setSampleRate (newRate);
+    if (newRate <= 0.0)
+        return;
+
+    envelope.setSampleRate (newRate);
+    gain.reset (newRate, 0.02);
+
+    for (auto& filter : filters)
+        filter.prepare ({ newRate, (juce::uint32) controlInterval, 1 }, false, 1000.0f, 0.0f);
 }
 
 void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition)
@@ -55,12 +63,10 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
 
     phase = 0.0;
     level = fullLevel * (0.3f + 0.7f * velocity);
+    samplesSinceNoteOn = 0;
 
-    // A new note starts on the current wave, with nothing to glide from.
-    cosines = targets.cosines;
-    sines = targets.sines;
-    glideSamplesLeft = 0;
-    targetsVersion = targets.version;
+    // The first chunk sets the harmonics, filters and loudness outright, with nothing to glide from.
+    startingNote = true;
 
     envelope.noteOn();
 }
@@ -91,59 +97,168 @@ void HarmonicVoice::updateFrequency()
     frequency = 440.0 * std::pow (2.0, (noteNumber - 69 + bend) / 12.0);
 }
 
-void HarmonicVoice::glideToTargets()
+HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 {
-    const auto glideSamples = juce::jmax (1, juce::roundToInt (glideSeconds * getSampleRate()));
+    using namespace modulation;
 
-    for (size_t k = 1; k < cosines.size(); ++k)
+    // A looping LFO carries on from where it was at the start of the block. One that runs once started with the note.
+    std::array<float, numLfos> lfoValues {};
+
+    for (size_t i = 0; i < lfoValues.size(); ++i)
     {
-        cosineSteps[k] = (targets.cosines[k] - cosines[k]) / (float) glideSamples;
-        sineSteps[k] = (targets.sines[k] - sines[k]) / (float) glideSamples;
+        const auto& lfo = patch.lfos[i];
+        const auto periodsGone = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
+                                          : lfo.phase + startSample / lfo.periodSamples;
+        lfoValues[i] = lfoValue (lfo.shape, periodsGone, lfo.once);
     }
 
-    glideSamplesLeft = glideSamples;
-    targetsVersion = targets.version;
+    // Moves a control's position, from 0 to 1, by the LFO assigned to it, if there is one and it's on.
+    const auto modulate = [this, &lfoValues] (int target, float position)
+    {
+        const auto& assignment = patch.assignments[(size_t) target];
+
+        if (! assignment.isActive() || ! patch.lfos[(size_t) assignment.lfo].on)
+            return position;
+
+        return assignment.apply (position, lfoValues[(size_t) assignment.lfo]);
+    };
+
+    Targets targets;
+
+    for (int i = 0; i < numOscillators; ++i)
+    {
+        const auto& oscillator = patch.oscillators[(size_t) i];
+
+        if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
+            continue;
+
+        const auto oscillatorLevel = modulate (oscillatorLevelTarget (i), oscillator.level);
+        const auto numHarmonics = positionToHarmonics (modulate (oscillatorHarmonicsTarget (i),
+                                                                 harmonicsToPosition (oscillator.numHarmonics)));
+
+        // A wave whose harmonics add up to more than full scale is turned down to fit, so it can't swamp the others.
+        // An LFO moving a harmonic doesn't change how far, so the wave doesn't pump.
+        const auto scale = oscillatorLevel / std::max (1.0f, oscillator.peaks[(size_t) numHarmonics]);
+
+        for (int harmonic = 1; harmonic <= numHarmonics; ++harmonic)
+        {
+            const auto index = (size_t) harmonic - 1;
+            const auto target = harmonicTarget (i, harmonic);
+            auto amplitude = oscillator.amplitudes[index];
+
+            if (patch.assignments[(size_t) target].isActive())
+                amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
+
+            // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so their sine waves
+            // at each harmonic add up to one.
+            targets.cosines[(size_t) harmonic] += scale * amplitude * oscillator.phaseSines[index];
+            targets.sines[(size_t) harmonic] += scale * amplitude * oscillator.phaseCosines[index];
+        }
+    }
+
+    for (int i = 0; i < numFilters; ++i)
+    {
+        const auto& filter = patch.filters[(size_t) i];
+        targets.filters[(size_t) i] = { modulate (filterOnTarget (i), filter.on ? 1.0f : 0.0f) >= 0.5f,
+                                        FilterStage::positionToCutoff (modulate (filterCutoffTarget (i),
+                                                                                 FilterStage::cutoffToPosition (filter.cutoff))),
+                                        modulate (filterResonanceTarget (i), filter.resonance) };
+    }
+
+    targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch.volume));
+    return targets;
 }
 
 void HarmonicVoice::renderNextBlock (juce::AudioBuffer<float>& output, int startSample, int numSamples)
 {
-    if (! isVoiceActive())
-        return;
+    while (numSamples > 0 && isVoiceActive())
+    {
+        const auto chunkSize = std::min (numSamples, controlInterval);
+        renderChunk (output, startSample, chunkSize);
+        startSample += chunkSize;
+        numSamples -= chunkSize;
+    }
+}
 
-    if (targets.version != targetsVersion)
-        glideToTargets();
-
+void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSample, int numSamples)
+{
+    const auto targets = getTargets (startSample);
     const auto sampleRate = getSampleRate();
-    const auto cyclesPerSample = frequency / sampleRate;
+
+    if (startingNote)
+    {
+        cosines = targets.cosines;
+        sines = targets.sines;
+        gain.setCurrentAndTargetValue (targets.gain);
+
+        for (size_t i = 0; i < filters.size(); ++i)
+            filters[i].jumpTo (targets.filters[i].on, targets.filters[i].cutoff, targets.filters[i].resonance);
+
+        startingNote = false;
+    }
+
+    gain.setTargetValue (targets.gain);
+
+    for (size_t i = 0; i < filters.size(); ++i)
+        filters[i].setTargets (targets.filters[i].on, targets.filters[i].cutoff, targets.filters[i].resonance);
+
+    // Each chunk moves the harmonics its share of the way to their targets, so they follow smoothly however the
+    // targets move.
+    const auto glideSamples = std::max ((double) numSamples, glideSeconds * sampleRate);
+    std::array<float, waveform::maxHarmonics + 1> cosineSteps {}, sineSteps {};
+
+    for (size_t k = 1; k < cosines.size(); ++k)
+    {
+        // Gliding this way never quite arrives, so a harmonic that's nearly there is put there, and one fading out
+        // stops being worked out once it's gone.
+        if (std::abs (targets.cosines[k] - cosines[k]) < 1.0e-6f && std::abs (targets.sines[k] - sines[k]) < 1.0e-6f)
+        {
+            cosines[k] = targets.cosines[k];
+            sines[k] = targets.sines[k];
+            continue;
+        }
+
+        cosineSteps[k] = (float) ((targets.cosines[k] - cosines[k]) / glideSamples);
+        sineSteps[k] = (float) ((targets.sines[k] - sines[k]) / glideSamples);
+    }
 
     // Each harmonic is a point going round a circle, turned by a fixed angle every sample, which is much cheaper
-    // than calling sin() every sample. The points are placed afresh from the phase each block, so rounding errors
+    // than calling sin() every sample. The points are placed afresh from the phase each chunk, so rounding errors
     // can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
-    std::array<int, waveform::maxHarmonics> harmonics {};
+    const auto cyclesPerSample = frequency / sampleRate;
+    std::array<size_t, waveform::maxHarmonics> harmonics {};
     std::array<double, waveform::maxHarmonics> x {}, y {}, turnX {}, turnY {};
-    std::array<float, waveform::maxHarmonics> gains {};
+    std::array<float, waveform::maxHarmonics> bandLimits {};
     size_t numHarmonics = 0;
 
-    for (int k = 1; k <= waveform::maxHarmonics; ++k)
+    for (size_t k = 1; k < cosines.size(); ++k)
     {
-        const auto index = (size_t) k;
-        const auto playing = cosines[index] != 0.0f || sines[index] != 0.0f;
-        const auto gliding = glideSamplesLeft > 0 && (cosineSteps[index] != 0.0f || sineSteps[index] != 0.0f);
-
-        if (! playing && ! gliding)
+        if (cosines[k] == 0.0f && sines[k] == 0.0f && cosineSteps[k] == 0.0f && sineSteps[k] == 0.0f)
             continue;
 
-        const auto angle = twoPi * k * phase;
-        const auto turn = twoPi * k * cyclesPerSample;
+        const auto angle = twoPi * (double) k * phase;
+        const auto turn = twoPi * (double) k * cyclesPerSample;
 
         harmonics[numHarmonics] = k;
         x[numHarmonics] = std::cos (angle);
         y[numHarmonics] = std::sin (angle);
         turnX[numHarmonics] = std::cos (turn);
         turnY[numHarmonics] = std::sin (turn);
-        gains[numHarmonics] = bandLimitGain (k * frequency, sampleRate);
+        bandLimits[numHarmonics] = bandLimitGain ((double) k * frequency, sampleRate);
         ++numHarmonics;
     }
+
+    auto& lowPass = filters[(size_t) modulation::lowPass];
+    auto& highPass = filters[(size_t) modulation::highPass];
+    const auto lowPassActive = lowPass.isActive();
+    const auto highPassActive = highPass.isActive();
+
+    // A filter that's out starts afresh when it's switched back in.
+    if (! lowPassActive)
+        lowPass.reset();
+
+    if (! highPassActive)
+        highPass.reset();
 
     for (int s = 0; s < numSamples; ++s)
     {
@@ -151,33 +266,30 @@ void HarmonicVoice::renderNextBlock (juce::AudioBuffer<float>& output, int start
 
         for (size_t i = 0; i < numHarmonics; ++i)
         {
-            const auto k = (size_t) harmonics[i];
-            value += gains[i] * (cosines[k] * (float) x[i] + sines[k] * (float) y[i]);
+            const auto k = harmonics[i];
+            value += bandLimits[i] * (cosines[k] * (float) x[i] + sines[k] * (float) y[i]);
 
             const auto nextX = x[i] * turnX[i] - y[i] * turnY[i];
             y[i] = x[i] * turnY[i] + y[i] * turnX[i];
             x[i] = nextX;
+
+            cosines[k] += cosineSteps[k];
+            sines[k] += sineSteps[k];
         }
 
-        if (glideSamplesLeft > 0)
+        if (highPassActive)
         {
-            if (--glideSamplesLeft == 0)
-            {
-                cosines = targets.cosines;
-                sines = targets.sines;
-            }
-            else
-            {
-                for (size_t i = 0; i < numHarmonics; ++i)
-                {
-                    const auto k = (size_t) harmonics[i];
-                    cosines[k] += cosineSteps[k];
-                    sines[k] += sineSteps[k];
-                }
-            }
+            highPass.advance();
+            value = highPass.process (0, value);
         }
 
-        const auto sample = value * level * envelope.getNextSample();
+        if (lowPassActive)
+        {
+            lowPass.advance();
+            value = lowPass.process (0, value);
+        }
+
+        const auto sample = value * level * gain.getNextValue() * envelope.getNextSample();
 
         for (int channel = 0; channel < output.getNumChannels(); ++channel)
             output.addSample (channel, startSample + s, sample);
@@ -191,4 +303,5 @@ void HarmonicVoice::renderNextBlock (juce::AudioBuffer<float>& output, int start
 
     phase += numSamples * cyclesPerSample;
     phase -= std::floor (phase);
+    samplesSinceNoteOn += numSamples;
 }
