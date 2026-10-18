@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EnvelopePanel.h"
 #include "FilterPanel.h"
 #include "HarmonicSelector.h"
 #include "HarmonicSliders.h"
@@ -14,8 +15,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth's window: a card for each oscillator and LFO, preset waves, the grid to draw the chosen one's wave on,
-    the harmonics of the chosen oscillator or the controls the chosen LFO moves, the filters, the volume knob and a
-    piano keyboard. Right-clicking a control opens the editor for which LFO moves it.
+    the harmonics of the chosen oscillator or the controls the chosen LFO moves, a row with the volume knob, the
+    envelopes and the filters, and a piano keyboard. Right-clicking a control opens the editor for which LFO or
+    envelope moves it.
 */
 class SynthEditor final : public juce::AudioProcessorEditor,
                           public ModulationHandler,
@@ -31,7 +33,7 @@ public:
     /** Brings the window up to date with the synth. It does this itself many times a second. */
     void refresh();
 
-    /** Shows where the LFOs have moved the controls they move. This too happens many times a second. */
+    /** Shows where the LFOs and envelopes have moved the controls they move. This too happens many times a second. */
     void showModulation();
 
     void showModulationEditor (juce::Component& control) override;
@@ -65,6 +67,7 @@ private:
     HarmonicSliders harmonicSliders;
     LfoPanel lfoPanel;
     FilterPanel filterPanel;
+    std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
     HarmonicSelector harmonicSelector;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     ModulatableSlider volumeKnob;

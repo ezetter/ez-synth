@@ -1,9 +1,10 @@
 #pragma once
 
+#include "Envelope.h"
 #include "Modulation.h"
 
-/** Everything the voices need to play a block: the oscillators, filters and volume as they're set, the LFOs, and
-    which controls the LFOs move. The processor fills it in on the audio thread before each block.
+/** Everything the voices need to play a block: the oscillators, filters and volume as they're set, the LFOs and
+    envelopes, and which controls they move. The processor fills it in on the audio thread before each block.
 */
 struct Patch
 {
@@ -45,6 +46,7 @@ struct Patch
     std::array<Filter, modulation::numFilters> filters;
     float volume = 0.75f;
     std::array<Lfo, modulation::numLfos> lfos;
+    std::array<EnvelopeSettings, modulation::numEnvelopes> envelopes;
     modulation::Assignments assignments;
 
     /** The volume knob follows a square law, which sounds more even over its turn than a straight line does. */

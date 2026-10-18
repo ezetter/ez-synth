@@ -8,6 +8,11 @@ namespace modulation
         const std::array<const char*, numFilters> filterNames { "Low pass", "High pass" };
     }
 
+    juce::String getSourceName (int source)
+    {
+        return isEnvelope (source) ? "Env " + juce::String (source - numLfos + 1) : "LFO " + juce::String (source + 1);
+    }
+
     TargetInfo describe (int target)
     {
         TargetInfo info;
@@ -87,6 +92,12 @@ namespace modulation
     bool isParameter (int target)
     {
         return describe (target).kind != Kind::harmonic;
+    }
+
+    bool isLoudness (int target)
+    {
+        const auto kind = describe (target).kind;
+        return kind == Kind::volume || kind == Kind::oscillatorOn || kind == Kind::oscillatorLevel;
     }
 
     const juce::NormalisableRange<float>& amplitudeRange()

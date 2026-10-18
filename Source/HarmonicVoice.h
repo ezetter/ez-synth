@@ -14,10 +14,10 @@ struct HarmonicSound final : public juce::SynthesiserSound
 /** Plays a note: the sine waves at the harmonics of every oscillator that's on, added together, then through the
     note's own high pass and low pass filters.
 
-    Every few milliseconds the voice works out where the LFOs have moved the controls, and glides there, so
-    changes to the waves, the controls and the LFOs never click. Each voice runs the LFOs for itself, so one that
-    runs once starts afresh with each note, like an envelope. Harmonics too high to play without aliasing are faded
-    out.
+    Every few milliseconds the voice works out where the LFOs and envelopes have moved the controls, and glides
+    there, so changes to the waves, the controls and the modulation never click. Each voice runs the envelopes, and
+    the LFOs that run once, for itself, so they start afresh with each note. An envelope moving how loud the note is
+    keeps the note sounding until its release is over. Harmonics too high to play without aliasing are faded out.
 */
 class HarmonicVoice final : public juce::SynthesiserVoice
 {
@@ -43,8 +43,14 @@ public:
     /** Harmonics this high or higher aren't played. */
     static constexpr double highestFrequency = 19000.0;
 
-    /** How many samples the voice plays before working out the LFOs again. */
+    /** How many samples the voice plays before working out the LFOs and envelopes again. */
     static constexpr int controlInterval = 64;
+
+    /** This note's run through an envelope, for the window to show. */
+    const EnvelopeRun& getEnvelopeRun (int index) const noexcept   { return envelopeRuns[(size_t) index]; }
+
+    /** How long ago the note started, so the window can show the newest note's envelopes. */
+    juce::int64 getSamplesSinceNoteOn() const noexcept   { return samplesSinceNoteOn; }
 
 private:
     /** Where the voice is heading: its harmonics, its filters and its loudness, with the LFOs applied. */
@@ -59,6 +65,10 @@ private:
     void renderChunk (juce::AudioBuffer<float>&, int startSample, int numSamples);
     void updateFrequency();
 
+    /** Whether any envelope that moves how loud the note is hasn't finished, so the note must keep sounding. */
+    bool isLoudnessEnvelopeRunning() const;
+    bool usesLoudnessEnvelope() const;
+
     const Patch& patch;
 
     // The amplitudes being played, by harmonic, gliding towards the targets.
@@ -68,14 +78,17 @@ private:
                                                               FilterStage (juce::dsp::StateVariableTPTFilterType::highpass) };
     juce::SmoothedValue<float> gain;
 
+    std::array<EnvelopeRun, modulation::numEnvelopes> envelopeRuns;
+
     bool startingNote = false;
+    bool waitingForEnvelopes = false;   // the key's been let go, but an envelope moving the loudness is still releasing
     juce::int64 samplesSinceNoteOn = 0;
     double phase = 0.0;   // how far through the wave's cycle the voice is, from 0 to 1
     double frequency = 440.0;
     int noteNumber = 69;
     int pitchWheel = 8192;
     float level = 0.0f;
-    juce::ADSR envelope;
+    juce::ADSR ownEnvelope;   // the voice's own, which keeps notes from clicking as they start and stop
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicVoice)
 };

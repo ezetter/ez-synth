@@ -8,8 +8,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth. Up to three oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
-    each note. Their sounds are added together, then go through a high pass and a low pass filter. Up to three LFOs,
-    each with a drawn wave of its own, can move any of the controls.
+    each note. Their sounds are added together, then go through a high pass and a low pass filter. Three LFOs, each
+    with a drawn wave of its own, and three envelopes, which run with each note, can move any of the controls.
 */
 class SynthProcessor final : public juce::AudioProcessor
 {
@@ -18,6 +18,7 @@ public:
 
     static constexpr int numOscillators = modulation::numOscillators;
     static constexpr int numLfos = modulation::numLfos;
+    static constexpr int numEnvelopes = modulation::numEnvelopes;
 
     /** The oscillators and LFOs, numbered with the oscillators first, are the sources of the sound and its movement.
         The editor shows one of them at a time.
@@ -48,6 +49,12 @@ public:
     static juce::String lfoPeriodId (int lfo);
     static juce::String lfoModeId (int lfo);
 
+    /** The IDs of each envelope's parameters: its attack, decay and release in seconds, and its sustain level. */
+    static juce::String attackId (int envelope);
+    static juce::String decayId (int envelope);
+    static juce::String sustainId (int envelope);
+    static juce::String releaseId (int envelope);
+
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -60,7 +67,7 @@ public:
     bool acceptsMidi() const override   { return true; }
     bool producesMidi() const override   { return false; }
     bool isMidiEffect() const override   { return false; }
-    double getTailLengthSeconds() const override   { return HarmonicVoice::releaseSeconds; }
+    double getTailLengthSeconds() const override;
 
     int getNumPrograms() override   { return 1; }
     int getCurrentProgram() override   { return 0; }
@@ -113,12 +120,33 @@ public:
     float getLfoValue (int lfo) const;
 
     //==============================================================================
-    // What the LFOs move.
+    // The envelopes, which run with each note.
+
+    EnvelopeSettings getEnvelopeSettings (int envelope) const noexcept;
+
+    /** Where the newest note is in an envelope. */
+    struct EnvelopeDisplay
+    {
+        EnvelopeRun::Stage stage = EnvelopeRun::Stage::idle;
+        float progress = 0.0f;   // how far through the stage, from 0 to 1
+        float level = 0.0f;
+    };
+
+    /** Where the newest note that's still sounding is in an envelope, or nothing if no note is. */
+    std::optional<EnvelopeDisplay> getEnvelopeDisplay (int envelope) const noexcept;
+
+    //==============================================================================
+    // What the LFOs and envelopes move.
 
     const modulation::Assignment& getAssignment (int target) const noexcept;
 
-    /** Has an LFO move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
+    /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
     void setAssignment (int target, const modulation::Assignment&);
+
+    /** An LFO's or envelope's value now, as the newest note has it, or nothing if it isn't moving anything: an
+        LFO that's off, or that runs once before any key has been pressed, or an envelope when no note is sounding.
+    */
+    std::optional<float> getSourceValue (int source) const;
 
     /** Goes up whenever an assignment changes. */
     int getModulationVersion() const noexcept   { return modulationVersion; }
@@ -185,6 +213,24 @@ private:
         std::atomic<float>* mode = nullptr;
     };
 
+    struct EnvelopeParameters
+    {
+        std::atomic<float>* attack = nullptr;
+        std::atomic<float>* decay = nullptr;
+        std::atomic<float>* sustain = nullptr;
+        std::atomic<float>* release = nullptr;
+    };
+
+    /** Where the newest note is in each envelope, for the window to show. */
+    struct SharedEnvelopeDisplay
+    {
+        std::atomic<int> stage { 0 };
+        std::atomic<float> progress { 0.0f };
+        std::atomic<float> level { 0.0f };
+    };
+
+    void shareEnvelopeDisplay();
+
     /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
         this, in case the save is corrupt.
     */
@@ -220,7 +266,12 @@ private:
     std::array<OscillatorParameters, numOscillators> oscillatorParameters;
     std::array<FilterParameters, modulation::numFilters> filterParameters;
     std::array<LfoParameters, numLfos> lfoParameters;
+    std::array<EnvelopeParameters, numEnvelopes> envelopeParameters;
     std::atomic<float>* volume = nullptr;
+
+    std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
+    std::atomic<bool> noteSounding { false };
+    std::vector<HarmonicVoice*> voices;
 
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
     // for the editor to show.

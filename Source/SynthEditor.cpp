@@ -69,12 +69,18 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     modulatable::setTarget (volumeKnob, modulation::volumeTarget);
     addAndMakeVisible (volumeKnob);
 
+    for (size_t i = 0; i < envelopePanels.size(); ++i)
+    {
+        envelopePanels[i] = std::make_unique<EnvelopePanel> (p, (int) i);
+        addAndMakeVisible (*envelopePanels[i]);
+    }
+
     addAndMakeVisible (filterPanel);
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
-    setResizeLimits (1180, 840, 2000, 1300);
-    setSize (1320, 880);
+    setResizeLimits (1240, 900, 2000, 1400);
+    setSize (1320, 960);
 
     refresh();
     startTimerHz (30);
@@ -179,24 +185,34 @@ void SynthEditor::resized()
 
     area.removeFromTop (14);
 
-    auto bottom = area.removeFromBottom (juce::jlimit (100, 150, getHeight() / 6));
-    volumePanel = bottom.removeFromLeft (120);
-    bottom.removeFromLeft (12);
-    keyboard.setBounds (bottom);
+    // Along the bottom, the keyboard, and above it the volume, the envelopes and the filters.
+    keyboard.setBounds (area.removeFromBottom (juce::jlimit (90, 130, getHeight() / 8)));
+    area.removeFromBottom (12);
 
-    auto volume = volumePanel.reduced (10, 8);
+    constexpr auto rowGap = 12;
+    auto controls = area.removeFromBottom (FilterPanel::preferredHeight);
+    volumePanel = controls.removeFromLeft (120);
+    controls.removeFromLeft (rowGap);
+    filterPanel.setBounds (controls.removeFromRight (380));
+    controls.removeFromRight (rowGap);
+
+    const auto envelopeWidth = (controls.getWidth() - rowGap * (SynthProcessor::numEnvelopes - 1)) / SynthProcessor::numEnvelopes;
+
+    for (auto& panel : envelopePanels)
+    {
+        panel->setBounds (controls.removeFromLeft (envelopeWidth));
+        controls.removeFromLeft (rowGap);
+    }
+
+    auto volume = volumePanel.reduced (10, 10);
     volumeCaption = volume.removeFromTop (16);
     volumeValue = volume.removeFromBottom (20);
     volumeKnob.setBounds (volume);
 
     area.removeFromBottom (14);
 
-    // The right-hand column has the chosen oscillator's harmonics, or what the chosen LFO moves, with the filters
-    // below.
-    auto column = area.removeFromRight (380);
-    filterPanel.setBounds (column.removeFromBottom (FilterPanel::preferredHeight));
-    column.removeFromBottom (12);
-    sidePanel = column;
+    // Beside the grid, the chosen oscillator's harmonics, or what the chosen LFO moves.
+    sidePanel = area.removeFromRight (380);
     area.removeFromRight (14);
     grid.setBounds (area);
 
@@ -336,6 +352,9 @@ void SynthEditor::refresh()
         }
     }
 
+    for (auto& panel : envelopePanels)
+        panel->refresh();
+
     if (const auto note = synthProcessor.getLastNote(); note != shownNote)
     {
         shownNote = note;
@@ -346,12 +365,11 @@ void SynthEditor::refresh()
 
 void SynthEditor::showModulation()
 {
-    // Where each LFO's wave is now, for those that are moving anything.
-    std::array<std::optional<float>, SynthProcessor::numLfos> lfoValues;
+    // Where each LFO and envelope is now, for those that are moving anything.
+    std::array<std::optional<float>, modulation::numSources> sourceValues;
 
-    for (int i = 0; i < SynthProcessor::numLfos; ++i)
-        if (synthProcessor.isLfoOn (i) && synthProcessor.getLfoProgress (i).has_value())
-            lfoValues[(size_t) i] = synthProcessor.getLfoValue (i);
+    for (int i = 0; i < modulation::numSources; ++i)
+        sourceValues[(size_t) i] = synthProcessor.getSourceValue (i);
 
     // Controls that are hidden, such as the harmonic sliders while an LFO is shown, are left alone.
     std::function<void (juce::Component&, bool)> show = [&] (juce::Component& component, bool parentVisible)
@@ -364,8 +382,8 @@ void SynthEditor::showModulation()
             std::optional<float> livePosition;
 
             if (assignment.isActive() && visible)
-                if (const auto lfoValue = lfoValues[(size_t) assignment.lfo])
-                    livePosition = assignment.apply (synthProcessor.getPosition (*target), *lfoValue);
+                if (const auto sourceValue = sourceValues[(size_t) assignment.source])
+                    livePosition = assignment.apply (synthProcessor.getPosition (*target), *sourceValue);
 
             modulatable::setLivePosition (component, livePosition);
         }

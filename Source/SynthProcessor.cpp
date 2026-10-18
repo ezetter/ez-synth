@@ -18,6 +18,15 @@ namespace
 
     constexpr std::array<float, SynthProcessor::numLfos> startingPeriods { 1.0f, 2.0f, 4.0f };
 
+    /** The envelopes start as three common shapes: a note that swells a little and settles, a pluck that dies
+        away, and a slow swell.
+    */
+    constexpr std::array<EnvelopeSettings, SynthProcessor::numEnvelopes> startingEnvelopes { {
+        { 0.01f, 0.3f, 0.7f, 0.5f },
+        { 0.0f, 0.8f, 0.0f, 0.3f },
+        { 2.0f, 1.0f, 1.0f, 2.0f }
+    } };
+
     juce::AudioParameterFloatAttributes asPercentage()
     {
         return juce::AudioParameterFloatAttributes()
@@ -37,6 +46,35 @@ namespace
     juce::String formatPeriod (float seconds)
     {
         return juce::String (seconds, seconds < 1.0f ? 2 : 1) + " s";
+    }
+
+    juce::String formatTime (float seconds)
+    {
+        // Compared once rounded, as a second comes back from its range as 999.99 ms.
+        if (const auto milliseconds = juce::roundToInt (seconds * 1000.0f); milliseconds < 1000)
+            return juce::String (milliseconds) + " ms";
+
+        return juce::String (seconds, seconds < 10.0f ? 2 : 1) + " s";
+    }
+
+    /** An envelope's attack, decay or release, from 0 to 20 seconds, with the first second taking half the dial, as
+        that's where most are set.
+    */
+    std::unique_ptr<juce::AudioParameterFloat> createTimeParameter (const juce::String& id, const juce::String& name,
+                                                                    float defaultSeconds)
+    {
+        juce::NormalisableRange<float> range (0.0f, modulation::longestStage);
+        range.setSkewForCentre (1.0f);
+
+        return std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID { id, 1 }, name, range, defaultSeconds,
+            juce::AudioParameterFloatAttributes()
+                .withStringFromValueFunction ([] (float value, int) { return formatTime (value); })
+                .withValueFromStringFunction ([] (const juce::String& text)
+                {
+                    const auto number = text.retainCharacters ("0123456789.").getFloatValue();
+                    return text.containsIgnoreCase ("ms") ? number / 1000.0f : number;
+                }));
     }
 
     std::unique_ptr<juce::AudioProcessorParameterGroup> createFilterParameters (const juce::String& groupId,
@@ -121,6 +159,21 @@ namespace
                     juce::StringArray { "Loop", "Once" }, 0)));
         }
 
+        for (int i = 0; i < SynthProcessor::numEnvelopes; ++i)
+        {
+            const auto name = "Env " + juce::String (i + 1);
+            const auto& starting = startingEnvelopes[(size_t) i];
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "env" + juce::String (i + 1), name, " ",
+                createTimeParameter (SynthProcessor::attackId (i), name + " Attack", starting.attack),
+                createTimeParameter (SynthProcessor::decayId (i), name + " Decay", starting.decay),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::sustainId (i), 1 }, name + " Sustain",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), starting.sustain, asPercentage()),
+                createTimeParameter (SynthProcessor::releaseId (i), name + " Release", starting.release)));
+        }
+
         return layout;
     }
 }
@@ -131,6 +184,10 @@ juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation:
 juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
+juce::String SynthProcessor::attackId (int envelope)        { return "env" + juce::String (envelope + 1) + "Attack"; }
+juce::String SynthProcessor::decayId (int envelope)         { return "env" + juce::String (envelope + 1) + "Decay"; }
+juce::String SynthProcessor::sustainId (int envelope)       { return "env" + juce::String (envelope + 1) + "Sustain"; }
+juce::String SynthProcessor::releaseId (int envelope)       { return "env" + juce::String (envelope + 1) + "Release"; }
 
 SynthProcessor::SynthProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
@@ -153,11 +210,17 @@ SynthProcessor::SynthProcessor()
                                       parameters.getRawParameterValue (lfoPeriodId (i)),
                                       parameters.getRawParameterValue (lfoModeId (i)) };
 
+    for (int i = 0; i < numEnvelopes; ++i)
+        envelopeParameters[(size_t) i] = { parameters.getRawParameterValue (attackId (i)),
+                                           parameters.getRawParameterValue (decayId (i)),
+                                           parameters.getRawParameterValue (sustainId (i)),
+                                           parameters.getRawParameterValue (releaseId (i)) };
+
     for (auto& progress : lfoProgress)
         progress = -1.0;
 
     for (int i = 0; i < numVoices; ++i)
-        synth.addVoice (new HarmonicVoice (patch));
+        voices.push_back (dynamic_cast<HarmonicVoice*> (synth.addVoice (new HarmonicVoice (patch))));
 
     synth.addSound (new HarmonicSound());
 
@@ -209,6 +272,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     updatePatch();
     synth.renderNextBlock (buffer, midi, 0, numSamples);
+    shareEnvelopeDisplay();
 
     for (size_t i = 0; i < lfoPhases.size(); ++i)
     {
@@ -225,6 +289,30 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     samplesPlayed += numSamples;
+}
+
+void SynthProcessor::shareEnvelopeDisplay()
+{
+    // The window shows where the newest note still sounding is in each envelope.
+    const HarmonicVoice* newest = nullptr;
+
+    for (const auto* voice : voices)
+        if (voice->isVoiceActive() && (newest == nullptr || voice->getSamplesSinceNoteOn() < newest->getSamplesSinceNoteOn()))
+            newest = voice;
+
+    noteSounding = newest != nullptr;
+
+    if (newest == nullptr)
+        return;
+
+    for (int i = 0; i < numEnvelopes; ++i)
+    {
+        const auto& run = newest->getEnvelopeRun (i);
+        auto& display = envelopeDisplays[(size_t) i];
+        display.stage = (int) run.getStage();
+        display.progress = run.getProgress (patch.envelopes[(size_t) i]);
+        display.level = run.getLevel();
+    }
 }
 
 void SynthProcessor::updatePatch()
@@ -285,6 +373,10 @@ void SynthProcessor::updatePatch()
                              filterParameters[i].resonance->load() };
 
     patch.volume = volume->load();
+
+    for (size_t i = 0; i < (size_t) numEnvelopes; ++i)
+        patch.envelopes[i] = { envelopeParameters[i].attack->load(), envelopeParameters[i].decay->load(),
+                               envelopeParameters[i].sustain->load(), envelopeParameters[i].release->load() };
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
@@ -404,6 +496,35 @@ float SynthProcessor::getLfoValue (int lfo) const
 }
 
 //==============================================================================
+EnvelopeSettings SynthProcessor::getEnvelopeSettings (int envelope) const noexcept
+{
+    const auto& source = envelopeParameters[(size_t) envelope];
+    return { source.attack->load(), source.decay->load(), source.sustain->load(), source.release->load() };
+}
+
+std::optional<SynthProcessor::EnvelopeDisplay> SynthProcessor::getEnvelopeDisplay (int envelope) const noexcept
+{
+    if (! noteSounding)
+        return std::nullopt;
+
+    const auto& display = envelopeDisplays[(size_t) envelope];
+    return EnvelopeDisplay { (EnvelopeRun::Stage) display.stage.load(), display.progress.load(), display.level.load() };
+}
+
+double SynthProcessor::getTailLengthSeconds() const
+{
+    // A note fades for as long as the longest release of any envelope moving how loud it is.
+    auto tail = (double) HarmonicVoice::releaseSeconds;
+
+    for (int target = 0; target < modulation::numTargets; ++target)
+        if (const auto& assignment = assignments[(size_t) target];
+            assignment.isActive() && modulation::isEnvelope (assignment.source) && modulation::isLoudness (target))
+            tail = std::max (tail, (double) getEnvelopeSettings (assignment.source - numLfos).release);
+
+    return tail;
+}
+
+//==============================================================================
 const modulation::Assignment& SynthProcessor::getAssignment (int target) const noexcept
 {
     return assignments[(size_t) target];
@@ -414,14 +535,30 @@ void SynthProcessor::setAssignment (int target, const modulation::Assignment& as
     assignments[(size_t) target] = assignment;
 
     // An LFO that's been given something to move is meant to be heard.
-    if (assignment.isActive() && ! isLfoOn (assignment.lfo))
+    if (assignment.isActive() && ! modulation::isEnvelope (assignment.source) && ! isLfoOn (assignment.source))
     {
-        auto& lfoOn = *parameters.getParameter (lfoOnId (assignment.lfo));
+        auto& lfoOn = *parameters.getParameter (lfoOnId (assignment.source));
         lfoOn.setValueNotifyingHost (1.0f);
     }
 
     share();
     ++modulationVersion;
+}
+
+std::optional<float> SynthProcessor::getSourceValue (int source) const
+{
+    if (modulation::isEnvelope (source))
+    {
+        if (const auto display = getEnvelopeDisplay (source - numLfos))
+            return display->level;
+
+        return std::nullopt;
+    }
+
+    if (isLfoOn (source) && getLfoProgress (source).has_value())
+        return getLfoValue (source);
+
+    return std::nullopt;
 }
 
 float SynthProcessor::getPosition (int target) const
@@ -478,7 +615,7 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
         {
             juce::ValueTree modulationTree ("MODULATION");
             modulationTree.setProperty ("target", modulation::getKey (target), nullptr);
-            modulationTree.setProperty ("lfo", assignment.lfo, nullptr);
+            modulationTree.setProperty ("source", modulation::getSourceName (assignment.source), nullptr);
             modulationTree.setProperty ("range", assignment.range, nullptr);
             modulationTree.setProperty ("inverted", assignment.inverted, nullptr);
             state.appendChild (modulationTree, nullptr);
@@ -551,10 +688,16 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
     for (const auto& modulationTree : modulations)
     {
         const auto target = modulation::findTarget (modulationTree["target"].toString());
-        const auto lfo = (int) modulationTree["lfo"];
 
-        if (target.has_value() && lfo >= 0 && lfo < numLfos)
-            assignments[(size_t) *target] = { lfo, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
+        // Saves from before there were envelopes number the LFO instead of naming the source.
+        auto source = modulationTree.hasProperty ("lfo") ? (int) modulationTree["lfo"] : -1;
+
+        for (int i = 0; i < modulation::numSources; ++i)
+            if (modulationTree["source"].toString() == modulation::getSourceName (i))
+                source = i;
+
+        if (target.has_value() && source >= 0 && source < modulation::numSources)
+            assignments[(size_t) *target] = { source, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
                                                (bool) modulationTree["inverted"] };
     }
 

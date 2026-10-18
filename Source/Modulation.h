@@ -6,18 +6,27 @@
 
 #include <optional>
 
-/** The controls the LFOs can move, and how each moves one. */
+/** The controls the LFOs and envelopes can move, and how each moves one. */
 namespace modulation
 {
     inline constexpr int numLfos = 3;
+    inline constexpr int numEnvelopes = 3;
     inline constexpr int numOscillators = 3;
+
+    /** What moves controls: the LFOs, then the envelopes, numbered in that order. */
+    inline constexpr int numSources = numLfos + numEnvelopes;
+    constexpr bool isEnvelope (int source)          { return source >= numLfos; }
+    constexpr int envelopeSource (int envelope)     { return numLfos + envelope; }
+
+    /** What a source is called, such as "LFO 2" or "Env 1". */
+    juce::String getSourceName (int source);
 
     /** The filters, in the order they're numbered: the low pass and the high pass. */
     inline constexpr int numFilters = 2;
     inline constexpr int lowPass = 0;
     inline constexpr int highPass = 1;
 
-    // Every control an LFO can move is a target, with a number.
+    // Every control an LFO or envelope can move is a target, with a number.
     inline constexpr int volumeTarget = 0;
     constexpr int oscillatorOnTarget (int oscillator)               { return 1 + oscillator; }
     constexpr int oscillatorLevelTarget (int oscillator)            { return 4 + oscillator; }
@@ -52,31 +61,38 @@ namespace modulation
     /** Whether a target is a plugin parameter, rather than one of a wave's harmonics. */
     bool isParameter (int target);
 
-    /** How an LFO moves a control. */
+    /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on
+        sounding until an envelope moving one of these has finished.
+    */
+    bool isLoudness (int target);
+
+    /** How an LFO or envelope moves a control. */
     struct Assignment
     {
-        /** The LFO that moves it, or -1 if none does. */
-        int lfo = -1;
+        /** The LFO or envelope that moves it, or -1 if nothing does. */
+        int source = -1;
 
-        /** How far the control swings, from one end to the other, as a proportion of its travel. It swings
-            evenly either side of where it's set.
+        /** How far the control moves, from one end of the source's values to the other, as a proportion of its
+            travel. An LFO, from -1 to 1, swings the control evenly either side of where it's set. An envelope, from
+            0 to 1, moves it one way from where it's set and back.
         */
         float range = 0.5f;
 
-        /** Whether the control falls as the LFO rises, rather than rising with it. */
+        /** Whether the control falls as the source rises, rather than rising with it. */
         bool inverted = false;
 
-        bool isActive() const noexcept   { return lfo >= 0; }
+        bool isActive() const noexcept   { return source >= 0; }
 
-        /** Where an LFO at a value from -1 to 1 moves a control set at a position from 0 to 1. */
-        float apply (float position, float lfoValue) const noexcept
+        /** Where the source at a value moves a control set at a position from 0 to 1. */
+        float apply (float position, float sourceValue) const noexcept
         {
-            return juce::jlimit (0.0f, 1.0f, position + (inverted ? -0.5f : 0.5f) * range * lfoValue);
+            const auto amount = isEnvelope (source) ? sourceValue : 0.5f * sourceValue;
+            return juce::jlimit (0.0f, 1.0f, position + (inverted ? -1.0f : 1.0f) * range * amount);
         }
 
         bool operator== (const Assignment& other) const noexcept
         {
-            return lfo == other.lfo && juce::exactlyEqual (range, other.range) && inverted == other.inverted;
+            return source == other.source && juce::exactlyEqual (range, other.range) && inverted == other.inverted;
         }
     };
 
@@ -96,6 +112,9 @@ namespace modulation
     float positionToPeriod (float position);
     inline constexpr float shortestPeriod = 0.1f;
     inline constexpr float longestPeriod = 10.0f;
+
+    /** The longest an envelope's attack, decay or release can take, in seconds. */
+    inline constexpr float longestStage = 20.0f;
 
     //==============================================================================
     /** Where an LFO is, given how far through its periods it's gone. A looping LFO repeats; one that runs once

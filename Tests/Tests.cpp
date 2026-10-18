@@ -695,6 +695,156 @@ namespace
                  + " ms a second of sound, under a quarter of the time it lasts");
     }
 
+    void setEnvelope (SynthProcessor& synth, int envelope, const EnvelopeSettings& settings)
+    {
+        setParameter (synth, SynthProcessor::attackId (envelope), settings.attack);
+        setParameter (synth, SynthProcessor::decayId (envelope), settings.decay);
+        setParameter (synth, SynthProcessor::sustainId (envelope), settings.sustain);
+        setParameter (synth, SynthProcessor::releaseId (envelope), settings.release);
+    }
+
+    void testEnvelopes()
+    {
+        std::cout << "Envelopes" << std::endl;
+
+        {
+            const EnvelopeSettings settings { 1.0f, 1.0f, 0.5f, 2.0f };
+            EnvelopeRun run;
+            std::vector<float> levels;
+
+            run.start();
+
+            for (const auto seconds : { 0.5, 0.5, 0.5, 0.5, 10.0 })
+            {
+                run.advance (settings, seconds);
+                levels.push_back (run.getLevel());
+            }
+
+            check (isNear (levels[0], 0.5, 1.0e-5) && isNear (levels[1], 1.0, 1.0e-5),
+                   "an attack of 1 second rises to the peak in 1 second");
+            check (isNear (levels[2], 0.75, 1.0e-5) && isNear (levels[3], 0.5, 1.0e-5),
+                   "a decay of 1 second falls to the sustain level in 1 second");
+            check (isNear (levels[4], 0.5, 1.0e-5) && run.getStage() == EnvelopeRun::Stage::sustain,
+                   "the sustain level holds for as long as the key is held");
+
+            run.release();
+            run.advance (settings, 1.0);
+            const auto halfReleased = run.getLevel();
+            run.advance (settings, 1.0);
+            check (isNear (halfReleased, 0.25, 1.0e-5) && run.getLevel() == 0.0f && run.isIdle(),
+                   "a release of 2 seconds falls from the sustain level to nothing in 2 seconds");
+
+            run.start();
+            run.advance (settings, 0.4);
+            run.release();
+            run.advance (settings, 1.0);
+            check (isNear (run.getLevel(), 0.2, 1.0e-5), "a key let go during the attack releases from where the attack got to");
+
+            run.start();
+            run.advance ({ 0.0f, 0.0f, 0.3f, 0.0f }, 0.0);
+            check (isNear (run.getLevel(), 0.3, 1.0e-5) && run.getStage() == EnvelopeRun::Stage::sustain,
+                   "an attack and decay of 0 go straight to the sustain level");
+
+            run.advance ({ 0.0f, 0.0f, 0.8f, 0.0f }, 0.01);
+            check (isNear (run.getLevel(), 0.8, 1.0e-5), "turning the sustain dial while a key is held moves the level");
+        }
+
+        // Env 1 shapes the loudness of OSC 1, whose level is turned down to 0, so the envelope is all of it.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.0f);
+        setEnvelope (synth, 0, { 0.2f, 0.2f, 0.5f, 0.4f });
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { modulation::envelopeSource (0), 1.0f, false });
+
+        auto signal = play (synth, 69, 1.0, 1.8);
+        const auto peak = loudness (signal, 0.19, 0.21);
+        check (isNear (loudness (signal, 0.09, 0.11) / peak, 0.5, 0.08), "an envelope's attack swells a note in");
+        check (isNear (loudness (signal, 0.6, 0.9) / peak, 0.5, 0.05), "...its decay falls to the sustain level, where it holds");
+        check (isNear (loudness (signal, 1.19, 1.21) / peak, 0.25, 0.1), "...and its release fades the note when the key is let go");
+        check (loudness (signal, 1.33, 1.36) > 0.01 * peak && loudness (signal, 1.5, 1.8) < 1.0e-5,
+               "a note goes on sounding through a long release on its loudness, and stops when it's over");
+        check (isNear (synth.getTailLengthSeconds(), 0.4, 1.0e-4), "hosts are told the note can sound for the length of that release");
+
+        // Each note runs its own envelope.
+        setEnvelope (synth, 0, { 0.4f, 0.0f, 1.0f, 0.1f });
+        signal = playNotes (synth, { { 0.0, 69 }, { 0.6, 76 } }, 1.2);
+        const auto e5 = juce::MidiMessage::getMidiNoteInHertz (76);
+        check (amplitudeAt (slice (signal, 0.62, 0.66), e5) < 0.3 * amplitudeAt (slice (signal, 1.05, 1.15), e5)
+                 && isNear (amplitudeAt (slice (signal, 0.62, 0.66), 440.0), amplitudeAt (slice (signal, 0.45, 0.55), 440.0), 0.02),
+               "each key starts its own envelope, leaving notes already held alone");
+
+        // While a key is held, the window shows where the newest note is in each envelope.
+        setEnvelope (synth, 0, { 0.0f, 0.1f, 0.5f, 0.4f });
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+            synth.processBlock (buffer, midi);
+        }
+
+        const auto display = synth.getEnvelopeDisplay (0);
+        check (display.has_value() && display->stage == EnvelopeRun::Stage::sustain && isNear (display->level, 0.5, 1.0e-4),
+               "the window can show where the newest note is in an envelope");
+
+        juce::MidiBuffer letGo;
+        letGo.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        synth.processBlock (buffer, letGo);
+
+        for (int block = 0; block < 60; ++block)
+        {
+            juce::MidiBuffer midi;
+            synth.processBlock (buffer, midi);
+        }
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
+        setParameter (synth, SynthProcessor::levelId (0), 1.0f);
+
+        // An envelope on anything else doesn't make a note last longer.
+        setEnvelope (synth, 1, { 0.0f, 0.0f, 1.0f, 5.0f });
+        setFilter (synth, SynthProcessor::lowPassIds, true, 2000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.5f, true });
+        signal = play (synth, 69, 0.5, 1.2);
+        check (loudness (signal, 0.9, 1.2) < 1.0e-5, "a long release on the filter's envelope doesn't keep a note sounding");
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
+        setFilter (synth, SynthProcessor::lowPassIds, false, 2000.0f);
+
+        // Inverted, an envelope moves a control down: the volume, set at 75%, down to 25%.
+        const auto plain = loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
+        setEnvelope (synth, 2, { 0.0f, 0.0f, 1.0f, 0.0f });
+        synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (2), 0.5f, true });
+        const auto lowered = loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
+        check (isNear (lowered / plain, Patch::volumeToGain (0.25f) / Patch::volumeToGain (0.75f), 0.02),
+               "an inverted envelope moves a control down from where it's set");
+
+        // Saving and loading.
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        const auto settings = restored.getEnvelopeSettings (1);
+        check (isNear (settings.release, 5.0, 1.0e-4) && isNear (settings.sustain, 1.0, 1.0e-4),
+               "the envelopes' settings are restored");
+        check (restored.getAssignment (modulation::volumeTarget) == modulation::Assignment { modulation::envelopeSource (2), 0.5f, true },
+               "what the envelopes move is restored");
+
+        juce::XmlElement older ("EZSynth");
+        auto* lfoModulation = older.createNewChildElement ("MODULATION");
+        lfoModulation->setAttribute ("target", "osc1Level");
+        lfoModulation->setAttribute ("lfo", 1);
+        lfoModulation->setAttribute ("range", 0.5);
+        juce::AudioProcessor::copyXmlToBinary (older, state);
+        SynthProcessor upgraded;
+        upgraded.setStateInformation (state.getData(), (int) state.getSize());
+        check (upgraded.getAssignment (modulation::oscillatorLevelTarget (0)).source == 1,
+               "a save from before there were envelopes still has its LFOs moving what they moved");
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -835,6 +985,8 @@ namespace
         synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
         synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true });
         synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
+        synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
+        synth.setAssignment (modulation::filterResonanceTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.6f, false });
         setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
         synth.editedSource = SynthProcessor::numOscillators;
 
@@ -876,7 +1028,7 @@ namespace
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
         synth.editedSource = 2;
-        editor->setSize (1180, 840);
+        editor->setSize (1240, 900);
         save ("8-smallest");
     }
 }
@@ -892,6 +1044,7 @@ int main (int argc, char* argv[])
     testOscillators();
     testFilters();
     testLfos();
+    testEnvelopes();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

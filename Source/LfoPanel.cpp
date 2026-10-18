@@ -70,7 +70,7 @@ void LfoPanel::refresh()
 
     for (int target = 0; target < modulation::numTargets; ++target)
     {
-        if (synthProcessor.getAssignment (target).lfo == lfo)
+        if (synthProcessor.getAssignment (target).source == lfo)
         {
             rows.push_back (std::make_unique<Row> (synthProcessor, target));
             addChildComponent (*rows.back());

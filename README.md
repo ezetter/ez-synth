@@ -3,8 +3,8 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note, through a low pass and a high pass filter. Three LFOs, each with a drawn wave of its own, can move
-almost any control as their waves rise and fall, over and over or once with each note, like an envelope.
+each note, through a low pass and a high pass filter. Three LFOs, each with a drawn wave of its own, and three
+envelopes, which run with each key pressed, can move almost any control.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
 
@@ -35,7 +35,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
   phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
-- **Filter the sound** with the Filters panel, below the harmonics. It shapes all the oscillators together.
+- **Filter the sound** with the Filters panel, at the right of the row above the keys. It shapes all the
+  oscillators together.
   The low pass filter cuts harmonics above its cutoff, and the high pass filter cuts those below. Each has
   a switch, a cutoff dial from 20 Hz to 20 kHz, and a resonance dial that makes the filter peak at its
   cutoff, boosting the harmonics there up to 8 times. Both start switched out, with cutoffs of 1 kHz and
@@ -45,7 +46,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. A MIDI
   keyboard works too. In the standalone app, choose it under *Options › Audio/MIDI Settings*. The pitch
   wheel bends two semitones either way.
-- **Volume** is the knob left of the keys. Double-click it to reset it.
+- **Volume** is the knob at the left of the row above the keys. Double-click it to reset it.
 
 ### LFOs
 
@@ -57,21 +58,48 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each
   time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
   rises from −1 to +1 and holds there, for instance, to swell each note in.
-- **Give an LFO something to move** by right-clicking, or Control-clicking, almost any control: the volume,
-  an oscillator's switch or level, the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff
-  or resonance. A small window opens, where you pick the LFO, the **range** and the **polarity**:
-  - The LFO's wave decides where the control goes. At 0 the control is where you set it, and at +1 and −1
-    it's at either end of its range. A range of 50% swings it a quarter of its travel either side of where
-    it's set. It never goes past the ends of its travel.
-  - **Normal** polarity raises the control as the LFO rises. **Inverted** lowers it.
-  - Choose **None** to stop the LFO moving it.
-- **See the LFOs at work.** A control an LFO is moving shows where it's been moved to, in light blue, as a
-  dot and a stretch from where it's set. An LFO's card lists everything it moves, with each one's range and
-  polarity. Click one to change it, or its cross to stop the LFO moving it.
 - An LFO that's switched off moves nothing. Giving one something to move switches it on.
 
-Everything is saved with your DAW project: each oscillator's and LFO's wave and settings, the filters, and
-what the LFOs move. Everything except the waves and what the LFOs move can be automated, as can the volume.
+### Envelopes
+
+- **The three envelopes**, Env 1 to Env 3, sit between the volume and the filters. Each runs separately for
+  every key pressed, with the usual four stages:
+  - **Attack**, 0 to 20 seconds: how long it takes to rise from nothing to its peak.
+  - **Decay**, 0 to 20 seconds: how long it then takes to fall to the sustain level.
+  - **Sustain**, 0 to 100%: the level it holds while the key stays down.
+  - **Release**, 0 to 20 seconds: how long it takes to fall to nothing once the key is let go, from wherever
+    it was.
+
+  Each stage is a straight line, and takes as long as it's set to. The picture above the dials shows the
+  envelope's shape, with a light blue dot marking where the newest note is in it. Its title line says what
+  it moves.
+- **An envelope moves a control one way from where it's set**, up by its range at the peak (or down, if
+  inverted), and back as it falls. To shape a note's loudness, for instance, turn an oscillator's level, or
+  the volume, down to 0 and give it an envelope with a range of 100%.
+- **An envelope on the loudness sets how long a note lasts.** While an envelope moves the volume, or an
+  oscillator's switch or level, a note goes on sounding until that envelope's release is over, however long.
+  Otherwise a note fades over a quarter of a second once its key is let go. An envelope on anything else,
+  such as a filter's cutoff, is cut off when the note ends.
+
+### Giving an LFO or envelope something to move
+
+- **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch or level, the
+  harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
+  where you pick what moves it, the **range** and the **polarity**:
+  - **Moved by** None, LFO 1 to 3, or Env 1 to 3. A control can be moved by one at a time.
+  - **Range** is how far the control moves, from one end of the source to the other, as a share of its
+    travel. An LFO's wave swings the control either side of where it's set: at 0 the control is where you
+    set it, and at +1 and −1 it's at either end of its range. An envelope moves it one way, by its whole
+    range at the peak. Nothing moves a control past the ends of its travel.
+  - **Normal** polarity raises the control as the LFO or envelope rises. **Inverted** lowers it.
+  - Choose **None** to stop it being moved.
+- **See them at work.** A control that's being moved shows where it's been moved to, in light blue, as a
+  dot and a stretch from where it's set, following the newest note. An LFO's card lists everything it
+  moves, with each one's range and polarity. Click one to change it, or its cross to stop the LFO moving it.
+
+Everything is saved with your DAW project: each oscillator's and LFO's wave and settings, the envelopes, the
+filters, and what the LFOs and envelopes move. Everything except the waves and what moves what can be
+automated.
 
 ## Building
 
@@ -113,7 +141,9 @@ and Logic use the Audio Unit; Cubase uses the VST3. To check the Audio Unit with
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
 together at their levels, that the filters cut and boost each harmonic by as much as theory says, that LFOs
-move each kind of control by the range and in the direction they're set to, looping or once per note, that high notes leave out harmonics too high to play cleanly, that changing the
+move each kind of control by the range and in the direction they're set to, looping or once per note, that
+envelopes run each stage for as long as it's set, separately for each note, and that a note lasts through
+the release of an envelope on its loudness, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -139,10 +169,11 @@ save pictures of the window showing several waves.
   cutoff and resonance glide over 10 ms, so nothing clicks. A filter that's switched out is skipped
   entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at low sample rates, are lowered to 45% of
   the sample rate.
-- **Modulation.** Every 64 samples, each note works out where the LFOs are and where they've moved its
-  controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at the start of the
-  block; one that runs once counts from the note's start. A control's position along its travel, from 0 to
-  1, moves by its range times half the LFO's value. Cutoffs travel by octave, and harmonic sliders give weak
+- **Modulation.** Every 64 samples, each note works out where the LFOs and its envelopes are, and where
+  they've moved its controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at
+  the start of the block; one that runs once, and each envelope (`Source/Envelope.cpp`), counts from the
+  note's start. A control's position along its travel, from 0 to 1, moves by its range times half an LFO's
+  value, or times an envelope's whole value. Cutoffs travel by octave, and harmonic sliders give weak
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
   then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
   shows the same positions for the latest note.
@@ -158,8 +189,10 @@ save pictures of the window showing several waves.
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block |
-| `Source/ModulatableControls.*` | Dials, sliders and switches that open the LFO editor on a right-click |
-| `Source/ModulationEditor.*` | The window for choosing an LFO, its range and its polarity |
+| `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
+| `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
+| `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
+| `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, its range and its polarity |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |

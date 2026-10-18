@@ -5,8 +5,8 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** Sets which LFO moves a control, how far, and which way. It opens next to the control when the control is
-    right-clicked or Control-clicked.
+/** Sets which LFO or envelope moves a control, how far, and which way. It opens next to the control when the
+    control is right-clicked or Control-clicked.
 */
 class ModulationEditor final : public juce::Component
 {
@@ -24,11 +24,11 @@ private:
     SynthProcessor& synthProcessor;
     const int target;
 
-    ChoiceButtons lfoChoice { { "None", "LFO 1", "LFO 2", "LFO 3" } };
+    ChoiceButtons sourceChoice { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" } };
     juce::Slider range;
     ChoiceButtons polarity { { "Normal", "Inverted" } };
 
-    juce::Rectangle<int> titleArea, lfoCaption, rangeCaption, rangeValue, polarityCaption, descriptionArea;
+    juce::Rectangle<int> titleArea, sourceCaption, rangeCaption, rangeValue, polarityCaption, descriptionArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationEditor)
 };

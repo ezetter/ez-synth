@@ -30,10 +30,19 @@ namespace
     }
 }
 
+namespace
+{
+    /** The voice's own envelope, which keeps notes from clicking as they start and stop. */
+    const juce::ADSR::Parameters normalEnvelope { 0.008f, 0.05f, 1.0f, HarmonicVoice::releaseSeconds };
+
+    /** Once an envelope moving the loudness has finished its release, the note has already faded, so it just stops. */
+    const juce::ADSR::Parameters afterLoudnessEnvelope { 0.008f, 0.05f, 1.0f, 0.03f };
+}
+
 HarmonicVoice::HarmonicVoice (const Patch& patchToPlay)
     : patch (patchToPlay)
 {
-    envelope.setParameters ({ 0.008f, 0.05f, 1.0f, releaseSeconds });
+    ownEnvelope.setParameters (normalEnvelope);
 }
 
 bool HarmonicVoice::canPlaySound (juce::SynthesiserSound* sound)
@@ -48,7 +57,7 @@ void HarmonicVoice::setCurrentPlaybackSampleRate (double newRate)
     if (newRate <= 0.0)
         return;
 
-    envelope.setSampleRate (newRate);
+    ownEnvelope.setSampleRate (newRate);
     gain.reset (newRate, 0.02);
 
     for (auto& filter : filters)
@@ -65,23 +74,60 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     level = fullLevel * (0.3f + 0.7f * velocity);
     samplesSinceNoteOn = 0;
 
+    for (auto& run : envelopeRuns)
+        run.start();
+
     // The first chunk sets the harmonics, filters and loudness outright, with nothing to glide from.
     startingNote = true;
+    waitingForEnvelopes = false;
 
-    envelope.noteOn();
+    ownEnvelope.setParameters (normalEnvelope);
+    ownEnvelope.noteOn();
 }
 
 void HarmonicVoice::stopNote (float, bool allowTailOff)
 {
     if (allowTailOff)
     {
-        envelope.noteOff();
+        for (auto& run : envelopeRuns)
+            run.release();
+
+        // An envelope moving the loudness decides how the note fades, so the note waits for it to finish.
+        if (usesLoudnessEnvelope())
+            waitingForEnvelopes = true;
+        else
+            ownEnvelope.noteOff();
     }
     else
     {
-        envelope.reset();
+        for (auto& run : envelopeRuns)
+            run.stop();
+
+        waitingForEnvelopes = false;
+        ownEnvelope.reset();
         clearCurrentNote();
     }
+}
+
+bool HarmonicVoice::usesLoudnessEnvelope() const
+{
+    for (int target = 0; target < modulation::numTargets; ++target)
+        if (const auto& assignment = patch.assignments[(size_t) target];
+            assignment.isActive() && modulation::isEnvelope (assignment.source) && modulation::isLoudness (target))
+            return true;
+
+    return false;
+}
+
+bool HarmonicVoice::isLoudnessEnvelopeRunning() const
+{
+    for (int target = 0; target < modulation::numTargets; ++target)
+        if (const auto& assignment = patch.assignments[(size_t) target];
+            assignment.isActive() && modulation::isEnvelope (assignment.source) && modulation::isLoudness (target)
+            && ! envelopeRuns[(size_t) (assignment.source - modulation::numLfos)].isIdle())
+            return true;
+
+    return false;
 }
 
 void HarmonicVoice::pitchWheelMoved (int newPitchWheelValue)
@@ -101,26 +147,31 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 {
     using namespace modulation;
 
-    // A looping LFO carries on from where it was at the start of the block. One that runs once started with the note.
-    std::array<float, numLfos> lfoValues {};
+    // A looping LFO carries on from where it was at the start of the block. One that runs once started with the note,
+    // as the envelopes did.
+    std::array<float, numSources> sourceValues {};
 
-    for (size_t i = 0; i < lfoValues.size(); ++i)
+    for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
         const auto& lfo = patch.lfos[i];
         const auto periodsGone = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
                                           : lfo.phase + startSample / lfo.periodSamples;
-        lfoValues[i] = lfoValue (lfo.shape, periodsGone, lfo.once);
+        sourceValues[i] = lfoValue (lfo.shape, periodsGone, lfo.once);
     }
 
-    // Moves a control's position, from 0 to 1, by the LFO assigned to it, if there is one and it's on.
-    const auto modulate = [this, &lfoValues] (int target, float position)
+    for (int i = 0; i < numEnvelopes; ++i)
+        sourceValues[(size_t) envelopeSource (i)] = envelopeRuns[(size_t) i].getLevel();
+
+    // Moves a control's position, from 0 to 1, by the LFO or envelope assigned to it, if there is one. An LFO that's
+    // switched off moves nothing.
+    const auto modulate = [this, &sourceValues] (int target, float position)
     {
         const auto& assignment = patch.assignments[(size_t) target];
 
-        if (! assignment.isActive() || ! patch.lfos[(size_t) assignment.lfo].on)
+        if (! assignment.isActive() || (! isEnvelope (assignment.source) && ! patch.lfos[(size_t) assignment.source].on))
             return position;
 
-        return assignment.apply (position, lfoValues[(size_t) assignment.lfo]);
+        return assignment.apply (position, sourceValues[(size_t) assignment.source]);
     };
 
     Targets targets;
@@ -182,8 +233,14 @@ void HarmonicVoice::renderNextBlock (juce::AudioBuffer<float>& output, int start
 
 void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSample, int numSamples)
 {
-    const auto targets = getTargets (startSample);
     const auto sampleRate = getSampleRate();
+
+    // An envelope stage that takes no time, such as an attack of 0, is over before the note's first sound.
+    if (startingNote)
+        for (size_t i = 0; i < envelopeRuns.size(); ++i)
+            envelopeRuns[i].advance (patch.envelopes[i], 0.0);
+
+    const auto targets = getTargets (startSample);
 
     if (startingNote)
     {
@@ -289,12 +346,12 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             value = lowPass.process (0, value);
         }
 
-        const auto sample = value * level * gain.getNextValue() * envelope.getNextSample();
+        const auto sample = value * level * gain.getNextValue() * ownEnvelope.getNextSample();
 
         for (int channel = 0; channel < output.getNumChannels(); ++channel)
             output.addSample (channel, startSample + s, sample);
 
-        if (! envelope.isActive())
+        if (! ownEnvelope.isActive())
         {
             clearCurrentNote();
             return;
@@ -304,4 +361,15 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     phase += numSamples * cyclesPerSample;
     phase -= std::floor (phase);
     samplesSinceNoteOn += numSamples;
+
+    for (size_t i = 0; i < envelopeRuns.size(); ++i)
+        envelopeRuns[i].advance (patch.envelopes[i], numSamples / sampleRate);
+
+    // Once every envelope moving the loudness has finished its release, the note ends.
+    if (waitingForEnvelopes && ! isLoudnessEnvelopeRunning())
+    {
+        waitingForEnvelopes = false;
+        ownEnvelope.setParameters (afterLoudnessEnvelope);
+        ownEnvelope.noteOff();
+    }
 }

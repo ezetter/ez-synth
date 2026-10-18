@@ -6,7 +6,7 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     : synthProcessor (processor),
       target (targetToEdit)
 {
-    lfoChoice.onChoose = [this] (int) { apply(); };
+    sourceChoice.onChoose = [this] (int) { apply(); };
     polarity.onChoose = [this] (int) { apply(); };
 
     range.setSliderStyle (juce::Slider::LinearHorizontal);
@@ -17,7 +17,7 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     range.setTitle ("Range");
     range.onValueChange = [this] { apply(); };
 
-    for (auto* control : std::initializer_list<juce::Component*> { &lfoChoice, &range, &polarity })
+    for (auto* control : std::initializer_list<juce::Component*> { &sourceChoice, &range, &polarity })
     {
         control->setMouseClickGrabsKeyboardFocus (false);
         control->setWantsKeyboardFocus (false);
@@ -25,17 +25,17 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     }
 
     showAssignment();
-    setSize (360, 196);
+    setSize (470, 200);
 }
 
 void ModulationEditor::showAssignment()
 {
     const auto& assignment = synthProcessor.getAssignment (target);
-    lfoChoice.setChosen (assignment.lfo + 1);
+    sourceChoice.setChosen (assignment.source + 1);
     range.setValue (assignment.range, juce::dontSendNotification);
     polarity.setChosen (assignment.inverted ? 1 : 0);
 
-    // Range and polarity mean nothing until there's an LFO.
+    // Range and polarity mean nothing until there's an LFO or envelope.
     range.setEnabled (assignment.isActive());
     polarity.setEnabled (assignment.isActive());
     polarity.setAlpha (assignment.isActive() ? 1.0f : 0.4f);
@@ -46,7 +46,7 @@ void ModulationEditor::showAssignment()
 void ModulationEditor::apply()
 {
     modulation::Assignment assignment;
-    assignment.lfo = lfoChoice.getChosen() - 1;
+    assignment.source = sourceChoice.getChosen() - 1;
     assignment.range = (float) range.getValue();
     assignment.inverted = polarity.getChosen() == 1;
     synthProcessor.setAssignment (target, assignment);
@@ -59,14 +59,22 @@ juce::String ModulationEditor::describe() const
     const auto control = modulation::getName (target).toLowerCase();
 
     if (! assignment.isActive())
-        return "Choose an LFO to move the " + control + " as the LFO's wave rises and falls.";
+        return "Choose an LFO to swing the " + control + " back and forth as its wave rises and falls, or an envelope "
+               "to move it each time a key is pressed.";
 
-    const auto lfo = "LFO " + juce::String (assignment.lfo + 1);
-    const auto swing = juce::String (juce::roundToInt (assignment.range * 50.0f)) + "%";
-    const auto timing = synthProcessor.isLfoOnce (assignment.lfo) ? ", once each time a key is pressed" : "";
+    const auto source = modulation::getSourceName (assignment.source);
+    const auto direction = juce::String (assignment.inverted ? "down" : "up");
 
-    return lfo + " swings the " + control + " up to " + swing + " of its travel either side of where it's set, "
-         + (assignment.inverted ? "falling" : "rising") + " as the LFO rises" + timing + ".";
+    if (modulation::isEnvelope (assignment.source))
+        return source + " moves the " + control + " " + direction + " by as much as "
+             + juce::String (juce::roundToInt (assignment.range * 100.0f)) + "% of its travel from where it's set, "
+             + "as the envelope rises, each time a key is pressed. It comes back as the envelope falls.";
+
+    const auto timing = synthProcessor.isLfoOnce (assignment.source) ? ", once each time a key is pressed" : "";
+
+    return source + " swings the " + control + " up to " + juce::String (juce::roundToInt (assignment.range * 50.0f))
+         + "% of its travel either side of where it's set, " + (assignment.inverted ? "falling" : "rising")
+         + " as the LFO rises" + timing + ".";
 }
 
 void ModulationEditor::resized()
@@ -75,11 +83,11 @@ void ModulationEditor::resized()
     titleArea = area.removeFromTop (18);
     area.removeFromTop (10);
 
-    constexpr auto captionWidth = 76;
+    constexpr auto captionWidth = 84;
 
     auto row = area.removeFromTop (26);
-    lfoCaption = row.removeFromLeft (captionWidth);
-    lfoChoice.setBounds (row);
+    sourceCaption = row.removeFromLeft (captionWidth);
+    sourceChoice.setBounds (row);
     area.removeFromTop (10);
 
     row = area.removeFromTop (22);
@@ -104,7 +112,7 @@ void ModulationEditor::paint (juce::Graphics& g)
 
     g.setColour (colours::dimText);
 
-    for (const auto& [caption, area] : { std::pair ("LFO", lfoCaption), std::pair ("RANGE", rangeCaption),
+    for (const auto& [caption, area] : { std::pair ("MOVED BY", sourceCaption), std::pair ("RANGE", rangeCaption),
                                          std::pair ("POLARITY", polarityCaption) })
         g.drawText (caption, area, juce::Justification::centredLeft);
 
