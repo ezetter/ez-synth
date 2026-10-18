@@ -7,6 +7,7 @@
 #include "Keyboard.h"
 #include "LfoPanel.h"
 #include "ModulatableControls.h"
+#include "PresetBar.h"
 #include "SourceCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
@@ -70,6 +71,7 @@ private:
     std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
     HarmonicSelector harmonicSelector;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
+    PresetBar presetBar;
     ModulatableSlider volumeKnob;
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;
     Keyboard keyboard;

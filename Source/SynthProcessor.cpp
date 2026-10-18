@@ -231,6 +231,22 @@ SynthProcessor::SynthProcessor()
 
     for (int i = 0; i < numLfos; ++i)
         setLfoShape (i, waveform::makePreset (startingLfoPresets[(size_t) i]), startingLfoPresets[(size_t) i]);
+
+    // Any change to a parameter, from the window or a host, means the sound is no longer the preset's.
+    for (auto* parameter : getParameters())
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (parameter))
+            parameters.addParameterListener (withId->paramID, this);
+
+    // Init is the sound as it starts, before anything's been edited.
+    presetEdited = false;
+    initState = createState();
+}
+
+SynthProcessor::~SynthProcessor()
+{
+    for (auto* parameter : getParameters())
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (parameter))
+            parameters.removeParameterListener (withId->paramID, this);
 }
 
 const juce::String SynthProcessor::getName() const
@@ -420,6 +436,8 @@ int SynthProcessor::getNumHarmonics (int oscillator) const noexcept
 
 void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
+    presetEdited = true;
+
     // A harmonic the new wave doesn't have will start like a sine, rising from zero, if it's raised.
     oscillators[(size_t) oscillator].phases.fill (0.0f);
     replaceShape (oscillator, newShape, fromPreset);
@@ -442,6 +460,8 @@ void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newSha
 
 void SynthProcessor::setHarmonicAmplitude (int oscillator, int harmonic, float amplitude)
 {
+    presetEdited = true;
+
     const auto& changed = oscillators[(size_t) oscillator];
     const auto& current = changed.decomposition.harmonics[(size_t) harmonic - 1];
     auto shape = changed.shape;
@@ -468,6 +488,8 @@ std::optional<waveform::Preset> SynthProcessor::getLfoPreset (int lfo) const noe
 
 void SynthProcessor::setLfoShape (int lfo, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
+    presetEdited = true;
+
     lfos[(size_t) lfo] = { newShape, fromPreset };
     share();
     ++shapeVersion;
@@ -536,6 +558,8 @@ const modulation::Assignment& SynthProcessor::getAssignment (int target) const n
 
 void SynthProcessor::setAssignment (int target, const modulation::Assignment& assignment)
 {
+    presetEdited = true;
+
     assignments[(size_t) target] = assignment;
 
     // An LFO that's been given something to move is meant to be heard.
@@ -556,6 +580,8 @@ const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target)
 
 void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
 {
+    presetEdited = true;
+
     velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
     share();
     ++modulationVersion;
@@ -611,7 +637,21 @@ void SynthProcessor::share()
 //==============================================================================
 void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    if (const auto xml = createState().createXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    if (const auto xml = getXmlFromBinary (data, sizeInBytes); xml != nullptr && xml->hasTagName (parameters.state.getType()))
+        loadState (juce::ValueTree::fromXml (*xml));
+}
+
+juce::ValueTree SynthProcessor::createState()
+{
     auto state = parameters.copyState();
+    state.setProperty ("presetName", presetName, nullptr);
+    state.setProperty ("presetEdited", presetEdited.load(), nullptr);
 
     const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
                                    std::optional<waveform::Preset> preset)
@@ -657,19 +697,16 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
     }
 
     state.appendChild (velocityTree, nullptr);
-
-    if (const auto xml = state.createXml())
-        copyXmlToBinary (*xml, destData);
+    return state;
 }
 
-void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
+void SynthProcessor::loadState (juce::ValueTree state)
 {
-    const auto xml = getXmlFromBinary (data, sizeInBytes);
+    const auto name = state.getProperty ("presetName", initPresetName).toString();
+    const auto edited = (bool) state.getProperty ("presetEdited", false);
+    state.removeProperty ("presetName", nullptr);
+    state.removeProperty ("presetEdited", nullptr);
 
-    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
-        return;
-
-    auto state = juce::ValueTree::fromXml (*xml);
     std::vector<juce::ValueTree> waves, modulations;
 
     for (auto child = state.getChildWithName ("WAVE"); child.isValid(); child = state.getChildWithName ("WAVE"))
@@ -753,6 +790,76 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
 
     share();
     ++modulationVersion;
+
+    // Loading changed everything, which on its own would count as editing the preset.
+    presetName = name;
+    presetEdited = edited;
+    ++presetVersion;
+}
+
+//==============================================================================
+juce::File SynthProcessor::getPresetFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("EZ Synth").getChildFile ("Presets");
+}
+
+juce::Array<juce::File> SynthProcessor::findPresets (const juce::File& folder)
+{
+    auto presets = folder.findChildFiles (juce::File::findFiles, false, juce::String ("*") + presetExtension);
+
+    std::sort (presets.begin(), presets.end(), [] (const juce::File& a, const juce::File& b)
+    {
+        return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+    });
+
+    return presets;
+}
+
+bool SynthProcessor::savePreset (const juce::File& file)
+{
+    const auto named = file.withFileExtension (presetExtension);
+
+    // The preset's name is its file's, so a preset renamed in Finder takes on the new name.
+    auto state = createState();
+    state.removeProperty ("presetName", nullptr);
+    state.removeProperty ("presetEdited", nullptr);
+
+    const auto xml = state.createXml();
+
+    if (xml == nullptr || ! named.getParentDirectory().createDirectory() || ! xml->writeTo (named))
+        return false;
+
+    presetName = named.getFileNameWithoutExtension();
+    presetFile = named;
+    presetEdited = false;
+    ++presetVersion;
+    return true;
+}
+
+bool SynthProcessor::loadPreset (const juce::File& file)
+{
+    const auto xml = juce::XmlDocument::parse (file);
+
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+        return false;
+
+    auto state = juce::ValueTree::fromXml (*xml);
+    state.setProperty ("presetName", file.getFileNameWithoutExtension(), nullptr);
+    state.setProperty ("presetEdited", false, nullptr);
+    loadState (state);
+    presetFile = file;
+    return true;
+}
+
+void SynthProcessor::loadInitPreset()
+{
+    loadState (initState);
+    presetFile = juce::File();
+}
+
+void SynthProcessor::parameterChanged (const juce::String&, float)
+{
+    presetEdited = true;
 }
 
 juce::AudioProcessorEditor* SynthProcessor::createEditor()

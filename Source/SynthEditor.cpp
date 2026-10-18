@@ -13,6 +13,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
       lfoPanel (p),
       filterPanel (p.parameters),
       harmonicSelector (*p.parameters.getParameter (SynthProcessor::harmonicsId (0))),
+      presetBar (p),
       volumeAttachment (p.parameters, SynthProcessor::volumeId, volumeKnob),
       keyboard (p.keyboardState)
 {
@@ -76,6 +77,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     }
 
     addAndMakeVisible (filterPanel);
+    addAndMakeVisible (presetBar);
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
@@ -166,6 +168,11 @@ void SynthEditor::resized()
         button.setBounds (presets.removeFromLeft (96));
         presets.removeFromLeft (8);
     }
+
+    // The sound's preset sits between the waves and the note being played.
+    presets.removeFromLeft (16);
+    presets.removeFromRight (16);
+    presetBar.setBounds (presets.withWidth (juce::jmin (presets.getWidth(), 420)).withX (presets.getRight() - juce::jmin (presets.getWidth(), 420)));
 
     area.removeFromTop (12);
 
@@ -354,6 +361,8 @@ void SynthEditor::refresh()
 
     for (auto& panel : envelopePanels)
         panel->refresh();
+
+    presetBar.refresh();
 
     if (const auto note = synthProcessor.getLastNote(); note != shownNote)
     {

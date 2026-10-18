@@ -50,6 +50,11 @@ SynthLookAndFeel::SynthLookAndFeel()
     setColour (juce::Slider::rotarySliderFillColourId, colours::accent);
     setColour (juce::Slider::rotarySliderOutlineColourId, colours::outline);
     setColour (juce::Label::textColourId, colours::text);
+    setColour (juce::PopupMenu::backgroundColourId, colours::panel.brighter (0.04f));
+    setColour (juce::PopupMenu::textColourId, colours::text);
+    setColour (juce::PopupMenu::headerTextColourId, colours::dimText);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, colours::accent);
+    setColour (juce::PopupMenu::highlightedTextColourId, colours::background);
 }
 
 void SynthLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos,

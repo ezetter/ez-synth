@@ -11,10 +11,12 @@
     each note. Their sounds are added together, then go through a high pass and a low pass filter. Three LFOs, each
     with a drawn wave of its own, and three envelopes, which run with each note, can move any of the controls.
 */
-class SynthProcessor final : public juce::AudioProcessor
+class SynthProcessor final : public juce::AudioProcessor,
+                             private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     SynthProcessor();
+    ~SynthProcessor() override;
 
     static constexpr int numOscillators = modulation::numOscillators;
     static constexpr int numLfos = modulation::numLfos;
@@ -162,6 +164,41 @@ public:
     float getPosition (int target) const;
 
     //==============================================================================
+    // Presets: the whole sound, saved in a file. These are for the message thread.
+
+    static constexpr auto presetExtension = ".ezsynth";
+    static constexpr auto initPresetName = "Init";
+
+    /** Where presets are kept: ~/Documents/EZ Synth/Presets. */
+    static juce::File getPresetFolder();
+
+    /** The presets in a folder, in order of name, numbers counted as numbers. */
+    static juce::Array<juce::File> findPresets (const juce::File& folder = getPresetFolder());
+
+    /** Saves the whole sound as a preset named after the file, which is given the preset extension if it hasn't
+        got it. Returns false if the file couldn't be written.
+    */
+    bool savePreset (const juce::File&);
+
+    /** Loads a preset. Returns false, and leaves the sound alone, if the file isn't one. */
+    bool loadPreset (const juce::File&);
+
+    /** Goes back to the sound the synth starts with. */
+    void loadInitPreset();
+
+    /** The name of the preset last loaded or saved, or Init. */
+    juce::String getPresetName() const   { return presetName; }
+
+    /** The file of the preset last loaded or saved, or none for Init. */
+    juce::File getPresetFile() const   { return presetFile; }
+
+    /** Whether the sound has been changed since its preset was loaded or saved. */
+    bool isPresetEdited() const noexcept   { return presetEdited; }
+
+    /** Goes up whenever a preset is loaded or saved. */
+    int getPresetVersion() const noexcept   { return presetVersion; }
+
+    //==============================================================================
     /** The note most recently started, or -1 if none has been. */
     int getLastNote() const noexcept   { return lastNote.load(); }
 
@@ -173,6 +210,11 @@ public:
 
 private:
     juce::AudioProcessorEditor* createEditor() override;
+    void parameterChanged (const juce::String& parameterId, float newValue) override;
+
+    /** The whole sound, and the preset it came from, as saved with a host's project or in a preset file. */
+    juce::ValueTree createState();
+    void loadState (juce::ValueTree);
 
     struct Oscillator
     {
@@ -258,6 +300,12 @@ private:
     modulation::Assignments assignments, velocityAssignments;
     int shapeVersion = 0;
     int modulationVersion = 0;
+
+    juce::String presetName { initPresetName };
+    juce::File presetFile;
+    std::atomic<bool> presetEdited { false };   // set from whichever thread changes a parameter
+    int presetVersion = 0;
+    juce::ValueTree initState;
 
     // The audio thread only ever tries the lock, so it never waits.
     juce::SpinLock sharedLock;

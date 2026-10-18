@@ -939,6 +939,84 @@ namespace
                "a save from before velocity could be assigned still has softer notes play quieter");
     }
 
+    void testPresets()
+    {
+        std::cout << "Presets" << std::endl;
+
+        const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                .getChildFile ("EZ Synth tests " + juce::String (juce::Time::currentTimeMillis()));
+        folder.createDirectory();
+
+        SynthProcessor synth;
+        check (synth.getPresetName() == "Init" && ! synth.isPresetEdited(), "the synth starts on Init, unedited");
+
+        setParameter (synth, SynthProcessor::levelId (0), 0.3f);
+        check (synth.isPresetEdited(), "turning a dial edits the preset");
+
+        waveform::Shape drawn {};
+        drawn.fill (0.25f);
+        drawn[100] = -0.75f;
+        synth.setShape (1, drawn);
+        setEnvelope (synth, 2, { 1.5f, 0.2f, 0.4f, 3.0f });
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::highPass), { modulation::envelopeSource (2), 0.6f, true });
+        synth.setVelocityAssignment (modulation::volumeTarget, {});
+        synth.setVelocityAssignment (modulation::harmonicTarget (0, 2), { modulation::velocitySource, 0.25f, false });
+
+        // Saving adds the preset extension, names the preset after its file, and counts as unedited.
+        check (synth.savePreset (folder.getChildFile ("Glassy Pad")), "a preset can be saved");
+        const auto saved = folder.getChildFile (juce::String ("Glassy Pad") + SynthProcessor::presetExtension);
+        check (saved.existsAsFile() && synth.getPresetName() == "Glassy Pad" && ! synth.isPresetEdited(),
+               "a saved preset gets the preset extension and its file's name, and isn't edited");
+        check (juce::XmlDocument::parse (saved) != nullptr, "a preset is a readable XML file");
+
+        // Loading it into a fresh synth brings back the whole sound.
+        SynthProcessor loaded;
+        check (loaded.loadPreset (saved), "a preset can be loaded");
+        check (loaded.getShape (1) == drawn && isNear (loaded.getEnvelopeSettings (2).release, 3.0, 1.0e-4)
+                 && isNear (loaded.parameters.getRawParameterValue (SynthProcessor::levelId (0))->load(), 0.3, 1.0e-4),
+               "loading a preset brings back its waves and settings");
+        check (loaded.getAssignment (modulation::filterCutoffTarget (modulation::highPass)) == modulation::Assignment { modulation::envelopeSource (2), 0.6f, true }
+                 && ! loaded.getVelocityAssignment (modulation::volumeTarget).isActive()
+                 && loaded.getVelocityAssignment (modulation::harmonicTarget (0, 2)).isActive(),
+               "...and what its LFOs, envelopes and velocity move");
+        check (loaded.getPresetName() == "Glassy Pad" && loaded.getPresetFile() == saved && ! loaded.isPresetEdited(),
+               "...under its name, unedited");
+
+        // A host's project remembers the preset, and whether it was edited.
+        loaded.setShape (0, drawn);
+        juce::MemoryBlock state;
+        loaded.getStateInformation (state);
+        SynthProcessor reopened;
+        reopened.setStateInformation (state.getData(), (int) state.getSize());
+        check (reopened.getPresetName() == "Glassy Pad" && reopened.isPresetEdited(),
+               "a host's project remembers the preset's name, and that it had been edited");
+
+        // Init goes back to the sound the synth starts with.
+        loaded.loadInitPreset();
+        SynthProcessor fresh;
+        check (loaded.getPresetName() == "Init" && ! loaded.isPresetEdited() && loaded.getShape (1) == fresh.getShape (1)
+                 && loaded.getVelocityAssignment (modulation::volumeTarget) == modulation::startingVelocityOnVolume
+                 && ! loaded.getAssignment (modulation::filterCutoffTarget (modulation::highPass)).isActive(),
+               "Init goes back to the sound the synth starts with");
+
+        // Presets are listed by name, with numbers counted as numbers.
+        for (const auto* name : { "Bass 10", "Bass 2", "Arp" })
+            synth.savePreset (folder.getChildFile (name));
+
+        juce::StringArray names;
+
+        for (const auto& file : SynthProcessor::findPresets (folder))
+            names.add (file.getFileNameWithoutExtension());
+
+        check (names.joinIntoString (", ") == "Arp, Bass 2, Bass 10, Glassy Pad", "presets are listed in order of name");
+
+        const auto notPreset = folder.getChildFile ("notes.ezsynth");
+        notPreset.replaceWithText ("not a preset");
+        check (! loaded.loadPreset (notPreset) && loaded.getPresetName() == "Init", "a file that isn't a preset is refused, leaving the sound alone");
+
+        folder.deleteRecursively();
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -1026,6 +1104,11 @@ namespace
         };
 
         save ("1-sawtooth");
+
+        // A preset with a name, edited since it was saved, for the pictures that follow.
+        const auto presetFolder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("EZ Synth snapshots");
+        synth.savePreset (presetFolder.getChildFile ("Glassy Pad"));
+        presetFolder.deleteRecursively();
 
         hold (69);
         setPreset (synth, 0, waveform::Preset::square);
@@ -1140,6 +1223,7 @@ int main (int argc, char* argv[])
     testLfos();
     testEnvelopes();
     testVelocity();
+    testPresets();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

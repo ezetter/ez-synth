@@ -107,9 +107,20 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   dot and a stretch from where it's set, following the newest note and how hard it was played. An LFO's card lists everything it
   moves, with each one's range and polarity. Click one to change it, or its cross to stop the LFO moving it.
 
-Everything is saved with your DAW project: each oscillator's and LFO's wave and settings, the envelopes, the
-filters, and what the LFOs, envelopes and velocity move. Everything except the waves and what moves what can be
-automated.
+### Presets
+
+- **Save** in the header saves the whole sound as a preset: every oscillator's and LFO's wave and settings,
+  the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
+  suggests the current preset's name, so saving again over it is quick.
+- **The preset's name** opens a menu of your presets, to load one, as well as **Init**, the sound EZ Synth
+  starts with, a way to open a preset file from anywhere, and a way to show the presets folder in Finder.
+- **The arrows** either side of the name step back and forth through your presets, in order of name.
+- A dot after the name means the sound has changed since the preset was loaded or saved.
+- Presets are kept in `~/Documents/EZ Synth/Presets`, as `.ezsynth` files. They're readable XML, so they
+  can be copied, shared or renamed in Finder; a preset is named after its file.
+
+Everything is also saved with your DAW project, including which preset the sound came from and whether it's
+been edited since. Everything except the waves and what moves what can be automated.
 
 ## Building
 
@@ -153,7 +164,8 @@ pitch with the right harmonics, that raising and lowering a harmonic changes it 
 together at their levels, that the filters cut and boost each harmonic by as much as theory says, that LFOs
 move each kind of control by the range and in the direction they're set to, looping or once per note, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
-the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that high notes leave out harmonics too high to play cleanly, that changing the
+the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
+presets save and load the whole sound, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -206,6 +218,7 @@ save pictures of the window showing several waves.
 | `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, and velocity, with their ranges and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
+| `Source/PresetBar.*` | Loading, stepping through and saving presets |
 | `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |
 | `Source/FilterStage.*` | A low or high pass filter that switches and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on |

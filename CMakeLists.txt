@@ -45,6 +45,7 @@ target_sources(EZSynth
         Source/ModulatableControls.cpp
         Source/Modulation.cpp
         Source/ModulationEditor.cpp
+        Source/PresetBar.cpp
         Source/SourceCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
