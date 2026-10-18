@@ -1,0 +1,128 @@
+#include "HarmonicSelector.h"
+
+#include "SynthLookAndFeel.h"
+#include "Waveform.h"
+
+HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
+    : attachment (parameter, [this] (float value)
+                  {
+                      selected = juce::roundToInt (value);
+                      repaint();
+                  })
+{
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setMouseClickGrabsKeyboardFocus (false);
+    setTitle ("Number of harmonics");
+    attachment.sendInitialUpdate();
+}
+
+void HarmonicSelector::setNumAvailable (int newNumAvailable)
+{
+    if (newNumAvailable != numAvailable)
+    {
+        numAvailable = newNumAvailable;
+        repaint();
+    }
+}
+
+juce::Rectangle<float> HarmonicSelector::getButtonArea (int number) const
+{
+    constexpr auto gap = 4.0f;
+    const auto width = ((float) getWidth() - gap * (waveform::maxPartials - 1)) / waveform::maxPartials;
+    return { (float) (number - 1) * (width + gap), 0.0f, width, (float) getHeight() };
+}
+
+int HarmonicSelector::getNumberAt (juce::Point<float> position) const
+{
+    const auto proportion = position.x / (float) juce::jmax (1, getWidth());
+    return juce::jlimit (1, waveform::maxPartials, 1 + (int) (proportion * waveform::maxPartials));
+}
+
+void HarmonicSelector::paint (juce::Graphics& g)
+{
+    for (int number = 1; number <= waveform::maxPartials; ++number)
+    {
+        const auto area = getButtonArea (number).reduced (0.5f);
+        const auto colour = colours::forPartial (number - 1);
+        const auto lit = number <= selected && number <= numAvailable;
+
+        if (lit)
+        {
+            g.setColour (colour);
+            g.fillRoundedRectangle (area, 5.0f);
+        }
+        else if (number <= selected)
+        {
+            // Asked for, but the wave has no more harmonics to give.
+            g.setColour (colour.withAlpha (0.12f));
+            g.fillRoundedRectangle (area, 5.0f);
+            g.setColour (colour.withAlpha (0.7f));
+            g.drawRoundedRectangle (area.reduced (0.5f), 5.0f, 1.0f);
+        }
+        else
+        {
+            g.setColour (colours::panel.brighter (0.08f));
+            g.fillRoundedRectangle (area, 5.0f);
+            g.setColour (colours::outline);
+            g.drawRoundedRectangle (area, 5.0f, 1.0f);
+        }
+
+        if (number == hovered)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.18f));
+            g.fillRoundedRectangle (area, 5.0f);
+        }
+
+        if (number == selected)
+        {
+            g.setColour (colours::text);
+            g.drawRoundedRectangle (area.reduced (1.0f), 4.0f, 2.0f);
+        }
+
+        g.setColour (lit ? colours::background : (number <= selected ? colour : colours::dimText));
+        g.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        g.drawText (juce::String (number), area, juce::Justification::centred);
+    }
+}
+
+void HarmonicSelector::mouseDown (const juce::MouseEvent& e)
+{
+    attachment.beginGesture();
+    select (getNumberAt (e.position));
+}
+
+void HarmonicSelector::mouseDrag (const juce::MouseEvent& e)
+{
+    select (getNumberAt (e.position));
+    setHovered (getNumberAt (e.position));
+}
+
+void HarmonicSelector::mouseUp (const juce::MouseEvent&)
+{
+    attachment.endGesture();
+}
+
+void HarmonicSelector::mouseMove (const juce::MouseEvent& e)
+{
+    setHovered (getNumberAt (e.position));
+}
+
+void HarmonicSelector::mouseExit (const juce::MouseEvent&)
+{
+    setHovered (0);
+}
+
+void HarmonicSelector::select (int number)
+{
+    if (number != selected)
+        attachment.setValueAsPartOfGesture ((float) number);
+}
+
+void HarmonicSelector::setHovered (int number)
+{
+    if (number != hovered)
+    {
+        hovered = number;
+        repaint();
+    }
+}
