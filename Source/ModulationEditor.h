@@ -5,8 +5,8 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** Sets what moves a control: an LFO or envelope, and the key velocity, each with how far and which way. It opens
-    next to the control when the control is right-clicked or Control-clicked.
+/** Sets what moves a control: an LFO or envelope, with how far and which way, and the key velocity, with how far.
+    It opens next to the control when the control is right-clicked or Control-clicked.
 */
 class ModulationEditor final : public juce::Component
 {
@@ -17,10 +17,14 @@ public:
     void resized() override;
 
 private:
-    /** The controls for one thing moving the control: what it is, or whether it's on, its range and its polarity. */
+    /** The controls for one thing moving the control: what it is, or whether it's on, its range and, for an LFO or
+        envelope, its polarity.
+    */
     struct Section
     {
-        explicit Section (juce::StringArray choices);
+        Section (juce::StringArray choices, bool hasPolarity);
+
+        const bool hasPolarity;
 
         ChoiceButtons choice;
         juce::Slider range;
@@ -42,8 +46,10 @@ private:
     SynthProcessor& synthProcessor;
     const int target;
 
-    Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" } };
-    Section velocity { { "Off", "On" } };
+    Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true };
+
+    /** Velocity always moves a control down for softer notes, so it has no polarity. */
+    Section velocity { { "Off", "On" }, false };
 
     juce::Rectangle<int> titleArea, dividerArea;
 

@@ -86,8 +86,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch or level, the
   harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
-  switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**
-  and **polarity**, and both can move the same control at once, their movements adding up.
+  switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
+  the top part a **polarity** too, and both can move the same control at once, their movements adding up.
   - **Moved by** None, LFO 1 to 3, or Env 1 to 3. A control can be moved by one of these at a time, as well
     as by velocity.
   - **Range** is how far the control moves, from one end of the source to the other, as a share of its
@@ -98,8 +98,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     by its whole range for the softest. So what you hear when you click the on-screen keys, which always play
     as hard as they can, is what the controls say. To make softer notes darker, for instance, set the low
     pass cutoff where you want the hardest notes, and give it velocity with a range of 30% or so.
-  - **Normal** polarity raises the control as the LFO, envelope or velocity rises. **Inverted** lowers it, so
-    with velocity, softer notes move it up.
+  - **Normal** polarity raises the control as the LFO or envelope rises. **Inverted** lowers it. Velocity has
+    no polarity: softer notes always move a control down.
   - Choose **None**, or switch velocity **Off**, to stop it being moved.
 - **Velocity starts out on the volume**, with a range of 35%, so softer notes are quieter, as on most
   instruments. Switch it off there for every note to play as loud as the hardest, or move it elsewhere.

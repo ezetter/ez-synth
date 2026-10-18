@@ -143,7 +143,9 @@ public:
     /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
     void setAssignment (int target, const modulation::Assignment&);
 
-    /** What the key velocity moves. Velocity can move a control as well as an LFO or envelope does. */
+    /** What the key velocity moves. Velocity can move a control as well as an LFO or envelope does. It always moves
+        a control down for softer notes, so an assignment's polarity is ignored.
+    */
     const modulation::Assignment& getVelocityAssignment (int target) const noexcept;
     void setVelocityAssignment (int target, const modulation::Assignment&);
 

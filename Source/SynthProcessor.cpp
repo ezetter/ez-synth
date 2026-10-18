@@ -556,7 +556,7 @@ const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target)
 
 void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
 {
-    velocityAssignments[(size_t) target] = assignment;
+    velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
     share();
     ++modulationVersion;
 }
@@ -652,7 +652,6 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
             juce::ValueTree assignmentTree ("ASSIGNMENT");
             assignmentTree.setProperty ("target", modulation::getKey (target), nullptr);
             assignmentTree.setProperty ("range", assignment.range, nullptr);
-            assignmentTree.setProperty ("inverted", assignment.inverted, nullptr);
             velocityTree.appendChild (assignmentTree, nullptr);
         }
     }
@@ -750,8 +749,7 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
     for (const auto& assignmentTree : velocityTree)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
-                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]),
-                                                      (bool) assignmentTree["inverted"] };
+                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false };
 
     share();
     ++modulationVersion;

@@ -901,8 +901,8 @@ namespace
 
         synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
         synth.setVelocityAssignment (modulation::oscillatorLevelTarget (0), { modulation::velocitySource, 0.4f, true });
-        const auto pushedUp = loudness (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4) / loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
-        check (isNear (pushedUp, (0.5 + 0.4 * (1.0 - soft)) / 0.5, 0.02), "inverted, velocity moves softer notes' controls up");
+        check (! synth.getVelocityAssignment (modulation::oscillatorLevelTarget (0)).inverted,
+               "velocity has no polarity: it always moves controls down for softer notes");
 
         // The window can show the newest note's velocity.
         synth.prepareToPlay (sampleRate, blockSize);
@@ -928,7 +928,7 @@ namespace
         synth.getStateInformation (state);
         SynthProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
-        check (restored.getVelocityAssignment (modulation::oscillatorLevelTarget (0)) == modulation::Assignment { modulation::velocitySource, 0.4f, true }
+        check (restored.getVelocityAssignment (modulation::oscillatorLevelTarget (0)) == modulation::Assignment { modulation::velocitySource, 0.4f, false }
                  && ! restored.getVelocityAssignment (modulation::volumeTarget).isActive(),
                "what velocity moves is restored, even when it moves nothing it started out moving");
 

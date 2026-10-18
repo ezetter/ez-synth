@@ -2,8 +2,9 @@
 
 #include "SynthLookAndFeel.h"
 
-ModulationEditor::Section::Section (juce::StringArray choices)
-    : choice (std::move (choices))
+ModulationEditor::Section::Section (juce::StringArray choices, bool withPolarity)
+    : hasPolarity (withPolarity),
+      choice (std::move (choices))
 {
 }
 
@@ -16,7 +17,7 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
 
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
-    setSize (470, 336);
+    setSize (470, 302);
 }
 
 void ModulationEditor::setUp (Section& section)
@@ -35,8 +36,12 @@ void ModulationEditor::setUp (Section& section)
     {
         control->setMouseClickGrabsKeyboardFocus (false);
         control->setWantsKeyboardFocus (false);
-        addAndMakeVisible (control);
+        addChildComponent (control);
     }
+
+    section.choice.setVisible (true);
+    section.range.setVisible (true);
+    section.polarity.setVisible (section.hasPolarity);
 }
 
 void ModulationEditor::show (Section& section, const modulation::Assignment& assignment)
@@ -66,7 +71,7 @@ void ModulationEditor::apply()
                                             source.polarity.getChosen() == 1 });
 
     synthProcessor.setVelocityAssignment (target, { velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
-                                                    (float) velocity.range.getValue(), velocity.polarity.getChosen() == 1 });
+                                                    (float) velocity.range.getValue(), false });
 
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
@@ -104,8 +109,7 @@ juce::String ModulationEditor::describeVelocity() const
     if (! assignment.isActive())
         return "Switch on to have how hard each key is played move the " + control + ", as well as anything above.";
 
-    return "The hardest notes leave the " + control + " where it's set. Softer ones move it "
-         + (assignment.inverted ? "up" : "down") + ", by as much as "
+    return "The hardest notes leave the " + control + " where it's set. Softer ones move it down, by as much as "
          + juce::String (juce::roundToInt (assignment.range * 100.0f)) + "% of its travel for the softest.";
 }
 
@@ -124,10 +128,13 @@ void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
     section.range.setBounds (row);
     area.removeFromTop (8);
 
-    row = area.removeFromTop (26);
-    section.polarityCaption = row.removeFromLeft (captionWidth);
-    section.polarity.setBounds (row.removeFromLeft (180));
-    area.removeFromTop (6);
+    if (section.hasPolarity)
+    {
+        row = area.removeFromTop (26);
+        section.polarityCaption = row.removeFromLeft (captionWidth);
+        section.polarity.setBounds (row.removeFromLeft (180));
+        area.removeFromTop (6);
+    }
 
     section.descriptionArea = area.removeFromTop (34);
 }
@@ -151,10 +158,11 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
 
-    for (const auto& [caption, area] : { std::pair (choiceCaption, section.choiceCaption),
-                                         std::pair (juce::String ("RANGE"), section.rangeCaption),
-                                         std::pair (juce::String ("POLARITY"), section.polarityCaption) })
-        g.drawText (caption, area, juce::Justification::centredLeft);
+    g.drawText (choiceCaption, section.choiceCaption, juce::Justification::centredLeft);
+    g.drawText ("RANGE", section.rangeCaption, juce::Justification::centredLeft);
+
+    if (section.hasPolarity)
+        g.drawText ("POLARITY", section.polarityCaption, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
     g.setColour (active ? colours::text : colours::dimText);
