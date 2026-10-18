@@ -105,7 +105,7 @@ HarmonicSliders::Layout HarmonicSliders::getLayout() const
 
     auto area = getLocalBounds();
     const auto numRows = 2 + juce::jmax (1, (int) harmonics.size());
-    const auto rowHeight = juce::jlimit (16, 26, (area.getHeight() - dividerSpace - headingHeight) / numRows);
+    const auto rowHeight = juce::jlimit (14, 26, (area.getHeight() - dividerSpace - headingHeight) / numRows);
     const auto keyHeight = juce::jmin (20, rowHeight);
 
     Layout layout;

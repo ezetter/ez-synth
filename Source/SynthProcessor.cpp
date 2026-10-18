@@ -18,6 +18,47 @@ namespace
             .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue() / 100.0f; });
     }
 
+    juce::String formatFrequency (float hertz)
+    {
+        // Compared once rounded, as a cutoff of 1 kHz comes back from its range as 999.99 Hz.
+        if (juce::roundToInt (hertz) < 1000)
+            return juce::String (juce::roundToInt (hertz)) + " Hz";
+
+        return juce::String (hertz / 1000.0f, hertz < 10000.0f ? 2 : 1) + " kHz";
+    }
+
+    /** Cutoffs are spread evenly by octave, as pitch is heard, from 20 Hz to 20 kHz. */
+    juce::NormalisableRange<float> cutoffRange()
+    {
+        const auto octaves = std::log2 (FilterStage::highestCutoff / FilterStage::lowestCutoff);
+
+        return { FilterStage::lowestCutoff, FilterStage::highestCutoff,
+                 [octaves] (float start, float, float proportion) { return start * std::pow (2.0f, proportion * octaves); },
+                 [octaves] (float start, float, float hertz) { return std::log2 (hertz / start) / octaves; } };
+    }
+
+    std::unique_ptr<juce::AudioProcessorParameterGroup> createFilterParameters (const juce::String& groupId,
+                                                                                const SynthProcessor::FilterIds& ids,
+                                                                                const juce::String& name,
+                                                                                float defaultCutoff)
+    {
+        return std::make_unique<juce::AudioProcessorParameterGroup> (
+            groupId, name, " ",
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids.on, 1 }, name + " On", false),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { ids.cutoff, 1 }, name + " Cutoff", cutoffRange(), defaultCutoff,
+                juce::AudioParameterFloatAttributes()
+                    .withStringFromValueFunction ([] (float value, int) { return formatFrequency (value); })
+                    .withValueFromStringFunction ([] (const juce::String& text)
+                    {
+                        const auto number = text.retainCharacters ("0123456789.").getFloatValue();
+                        return text.containsIgnoreCase ("k") ? number * 1000.0f : number;
+                    })),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { ids.resonance, 1 }, name + " Resonance", juce::NormalisableRange<float> (0.0f, 1.0f),
+                0.0f, asPercentage()));
+    }
+
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters()
     {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -43,6 +84,10 @@ namespace
                     1, waveform::maxHarmonics, waveform::defaultHarmonics)));
         }
 
+        // Both filters start switched out, at cutoffs that change the sound clearly once they're switched in.
+        layout.add (createFilterParameters ("highPass", SynthProcessor::highPassIds, "High Pass", 250.0f));
+        layout.add (createFilterParameters ("lowPass", SynthProcessor::lowPassIds, "Low Pass", 1000.0f));
+
         return layout;
     }
 
@@ -62,6 +107,11 @@ SynthProcessor::SynthProcessor()
       parameters (*this, nullptr, "EZSynth", createParameters())
 {
     volume = parameters.getRawParameterValue (volumeId);
+
+    for (auto [filterParameters, ids] : { std::pair (&highPassParameters, highPassIds), std::pair (&lowPassParameters, lowPassIds) })
+        *filterParameters = { parameters.getRawParameterValue (ids.on),
+                              parameters.getRawParameterValue (ids.cutoff),
+                              parameters.getRawParameterValue (ids.resonance) };
 
     for (int i = 0; i < numOscillators; ++i)
         oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
@@ -88,11 +138,18 @@ bool SynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
 }
 
-void SynthProcessor::prepareToPlay (double sampleRate, int)
+void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     synth.setCurrentPlaybackSampleRate (sampleRate);
     gain.reset (sampleRate, 0.05);
     gain.setCurrentAndTargetValue (volumeToGain (volume->load()));
+
+    const juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) samplesPerBlock,
+                                        (juce::uint32) juce::jmax (1, getTotalNumOutputChannels()) };
+
+    for (auto [filter, filterParameters] : { std::pair (&highPass, &highPassParameters), std::pair (&lowPass, &lowPassParameters) })
+        filter->prepare (spec, filterParameters->on->load() >= 0.5f, filterParameters->cutoff->load(),
+                         filterParameters->resonance->load());
 }
 
 void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -134,9 +191,51 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         updateTargets();
 
     synth.renderNextBlock (buffer, midi, 0, buffer.getNumSamples());
+    applyFilters (buffer);
 
     gain.setTargetValue (volumeToGain (volume->load()));
     gain.applyGain (buffer, buffer.getNumSamples());
+}
+
+void SynthProcessor::applyFilters (juce::AudioBuffer<float>& buffer)
+{
+    for (auto [filter, filterParameters] : { std::pair (&highPass, &highPassParameters), std::pair (&lowPass, &lowPassParameters) })
+        filter->setTargets (filterParameters->on->load() >= 0.5f, filterParameters->cutoff->load(),
+                            filterParameters->resonance->load());
+
+    const auto highPassActive = highPass.isActive();
+    const auto lowPassActive = lowPass.isActive();
+
+    // A filter that's out starts afresh when it's switched back in.
+    if (! highPassActive)
+        highPass.reset();
+
+    if (! lowPassActive)
+        lowPass.reset();
+
+    if (! highPassActive && ! lowPassActive)
+        return;
+
+    const auto numChannels = juce::jmin (buffer.getNumChannels(), juce::jmax (1, getTotalNumOutputChannels()));
+
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    {
+        highPass.advance();
+        lowPass.advance();
+
+        for (int channel = 0; channel < numChannels; ++channel)
+        {
+            auto sample = buffer.getSample (channel, i);
+
+            if (highPassActive)
+                sample = highPass.process (channel, sample);
+
+            if (lowPassActive)
+                sample = lowPass.process (channel, sample);
+
+            buffer.setSample (channel, i, sample);
+        }
+    }
 }
 
 SynthProcessor::Settings SynthProcessor::readSettings (int oscillator) const noexcept

@@ -8,6 +8,7 @@ namespace
 SynthEditor::SynthEditor (SynthProcessor& p)
     : AudioProcessorEditor (p),
       synthProcessor (p),
+      filterPanel (p.parameters),
       harmonicSelector (*p.parameters.getParameter (SynthProcessor::harmonicsId (p.editedOscillator))),
       volumeAttachment (p.parameters, SynthProcessor::volumeId, volumeKnob),
       keyboard (p.keyboardState)
@@ -63,11 +64,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     volumeKnob.onValueChange = [this] { repaint (volumeValue); };
     addAndMakeVisible (volumeKnob);
 
+    addAndMakeVisible (filterPanel);
     addAndMakeVisible (keyboard);
 
     setResizable (true, true);
-    setResizeLimits (960, 700, 1800, 1200);
-    setSize (1100, 820);
+    setResizeLimits (1060, 820, 1900, 1300);
+    setSize (1200, 860);
 
     refresh();
     startTimerHz (30);
@@ -165,7 +167,7 @@ void SynthEditor::resized()
 
     area.removeFromTop (14);
 
-    auto bottom = area.removeFromBottom (juce::jlimit (110, 150, getHeight() / 5));
+    auto bottom = area.removeFromBottom (juce::jlimit (100, 150, getHeight() / 6));
     volumePanel = bottom.removeFromLeft (120);
     bottom.removeFromLeft (12);
     keyboard.setBounds (bottom);
@@ -177,7 +179,11 @@ void SynthEditor::resized()
 
     area.removeFromBottom (14);
 
-    sidePanel = area.removeFromRight (290);
+    // The right-hand column has the chosen oscillator's harmonics, with the filters below them.
+    auto column = area.removeFromRight (380);
+    filterPanel.setBounds (column.removeFromBottom (FilterPanel::preferredHeight));
+    column.removeFromBottom (12);
+    sidePanel = column;
     area.removeFromRight (14);
     grid.setBounds (area);
 

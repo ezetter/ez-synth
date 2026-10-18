@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FilterPanel.h"
 #include "HarmonicSelector.h"
 #include "HarmonicSliders.h"
 #include "Keyboard.h"
@@ -11,7 +12,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth's window: a card for each oscillator, preset waves, the grid to draw the chosen oscillator's wave
-    on, how many harmonics it plays with a slider for each, the volume knob and a piano keyboard.
+    on, how many harmonics it plays with a slider for each, the filters, the volume knob and a piano keyboard.
 */
 class SynthEditor final : public juce::AudioProcessorEditor,
                           private juce::Timer
@@ -50,6 +51,7 @@ private:
     std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> cards;
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
+    FilterPanel filterPanel;
     HarmonicSelector harmonicSelector;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     juce::Slider volumeKnob;

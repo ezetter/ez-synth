@@ -3,7 +3,7 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note.
+each note, through a low pass and a high pass filter.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
 
@@ -34,6 +34,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
   phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
+- **Filter the sound** with the Filters panel, below the harmonics. It shapes all the oscillators together.
+  The low pass filter cuts harmonics above its cutoff, and the high pass filter cuts those below. Each has
+  a switch, a cutoff dial from 20 Hz to 20 kHz, and a resonance dial that makes the filter peak at its
+  cutoff, boosting the harmonics there up to 8 times. Both start switched out, with cutoffs of 1 kHz and
+  250 Hz that change the sound clearly when you switch them in. Double-click a dial to reset it.
 - **Play.** Each key plays the wave with the key's pitch as its fundamental frequency. The header shows the
   last note and its frequency. Click the on-screen keys, or in the standalone app type on the computer
   keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. A MIDI
@@ -41,8 +46,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   wheel bends two semitones either way.
 - **Volume** is the knob left of the keys. Double-click it to reset it.
 
-Each oscillator's wave, switch, level and number of harmonics are saved with your DAW project. All of
-them except the waves can be automated, as can the volume.
+Each oscillator's wave, switch, level and number of harmonics, and the filters' settings, are saved with your
+DAW project. Everything except the waves can be automated, as can the volume.
 
 ## Building
 
@@ -71,7 +76,7 @@ Apple's validator, run `auval -v aumu Ezs1 Ezsy`.
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
-together at their levels, that high notes leave out harmonics too high to play cleanly, that changing the
+together at their levels, that the filters cut and boost each harmonic by as much as theory says, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -90,6 +95,11 @@ save pictures of the window showing several waves.
   fade out between 16 and 19 kHz, so high notes don't alias. When a wave, level, switch or number of
   harmonics changes during a note, the voice glides to the new sound over 10 ms rather than clicking. Notes
   start in 8 ms and fade out over 250 ms when let go.
+- **Filtering.** The oscillators' sound goes through a high pass filter, then a low pass filter
+  (`Source/FilterStage.cpp`). Both are JUCE's state variable filters, 12 dB an octave. Switching a filter
+  fades it in or out over 20 ms, and its cutoff and resonance glide over 30 ms, so nothing clicks. A
+  filter that's switched out is skipped entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at
+  low sample rates, are lowered to 45% of the sample rate.
 - **Between the threads.** The window analyses the drawing on the message thread. The analysis reaches the
   audio thread through a lock that the audio thread only ever tries, so audio never waits on drawing.
 
@@ -100,6 +110,8 @@ save pictures of the window showing several waves.
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
 | `Source/OscillatorCard.*` | An oscillator's switch, wave picture and level dial |
+| `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |
+| `Source/FilterStage.*` | A low or high pass filter that switches and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
 | `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |

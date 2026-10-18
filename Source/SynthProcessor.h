@@ -1,12 +1,13 @@
 #pragma once
 
+#include "FilterStage.h"
 #include "HarmonicVoice.h"
 #include "Waveform.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth. Up to three oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
-    each note, and their sounds are added together.
+    each note. Their sounds are added together, then go through a high pass and a low pass filter.
 */
 class SynthProcessor final : public juce::AudioProcessor
 {
@@ -21,6 +22,17 @@ public:
     static juce::String onId (int oscillator);
     static juce::String levelId (int oscillator);
     static juce::String harmonicsId (int oscillator);
+
+    /** The IDs of a filter's parameters: whether it's on, its cutoff frequency in hertz, and its resonance. */
+    struct FilterIds
+    {
+        const char* on;
+        const char* cutoff;
+        const char* resonance;
+    };
+
+    static constexpr FilterIds lowPassIds { "lowPassOn", "lowPassCutoff", "lowPassResonance" };
+    static constexpr FilterIds highPassIds { "highPassOn", "highPassCutoff", "highPassResonance" };
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
@@ -79,6 +91,7 @@ public:
 private:
     juce::AudioProcessorEditor* createEditor() override;
     void updateTargets();
+    void applyFilters (juce::AudioBuffer<float>&);
 
     /** Sets an oscillator's wave, remembering the phase of each harmonic it has. */
     void replaceShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset>);
@@ -119,6 +132,13 @@ private:
         std::atomic<float>* numHarmonics = nullptr;
     };
 
+    struct FilterParameters
+    {
+        std::atomic<float>* on = nullptr;
+        std::atomic<float>* cutoff = nullptr;
+        std::atomic<float>* resonance = nullptr;
+    };
+
     Settings readSettings (int oscillator) const noexcept;
 
     std::array<Oscillator, numOscillators> oscillators;
@@ -138,6 +158,10 @@ private:
     std::array<OscillatorParameters, numOscillators> oscillatorParameters;
     std::atomic<float>* volume = nullptr;
     juce::SmoothedValue<float> gain;
+
+    FilterStage highPass { juce::dsp::StateVariableTPTFilterType::highpass };
+    FilterStage lowPass { juce::dsp::StateVariableTPTFilterType::lowpass };
+    FilterParameters highPassParameters, lowPassParameters;
 
     juce::Synthesiser synth;
     std::atomic<int> lastNote { -1 };

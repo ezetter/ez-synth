@@ -40,6 +40,23 @@ namespace
         setParameter (synth, SynthProcessor::harmonicsId (oscillator), (float) count);
     }
 
+    void setFilter (SynthProcessor& synth, const SynthProcessor::FilterIds& ids, bool on, float cutoff, float resonance = 0.0f)
+    {
+        setParameter (synth, ids.on, on ? 1.0f : 0.0f);
+        setParameter (synth, ids.cutoff, cutoff);
+        setParameter (synth, ids.resonance, resonance);
+    }
+
+    /** How much a filter should pass at a frequency. The filters are digital copies of the analog state variable
+        filter, made with the bilinear transform, which squeezes frequencies so the cutoff lands where it should.
+    */
+    double expectedGain (bool lowPass, double frequency, double cutoff, double q)
+    {
+        const auto w = std::tan (pi * frequency / sampleRate) / std::tan (pi * cutoff / sampleRate);
+        const auto denominator = std::sqrt (std::pow (1.0 - w * w, 2.0) + std::pow (w / q, 2.0));
+        return (lowPass ? 1.0 : w * w) / denominator;
+    }
+
     void setPreset (SynthProcessor& synth, int oscillator, waveform::Preset preset)
     {
         synth.setShape (oscillator, waveform::makePreset (preset), preset);
@@ -359,6 +376,110 @@ namespace
         check (peakOf (play (synth, 69, 0.5, 0.8)) < 1.0e-6f, "an oscillator at zero level is silent");
     }
 
+    void testFilters()
+    {
+        std::cout << "Filtering" << std::endl;
+
+        SynthProcessor synth;   // a sawtooth
+        setNumHarmonics (synth, 9);
+        const auto open = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);   // A4: harmonics from 440 Hz to 3960 Hz
+        const auto gainAt = [&open] (const std::vector<float>& filtered, double frequency)
+        {
+            return amplitudeAt (filtered, frequency) / amplitudeAt (open, frequency);
+        };
+        const auto flatQ = (double) FilterStage::resonanceToQ (0.0f);
+
+        check (synth.parameters.getRawParameterValue (SynthProcessor::lowPassIds.on)->load() < 0.5f
+                 && synth.parameters.getRawParameterValue (SynthProcessor::highPassIds.on)->load() < 0.5f,
+               "both filters are out to begin with");
+
+        setFilter (synth, SynthProcessor::lowPassIds, true, 1000.0f);
+        const auto lowPassed = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (lowPassed, 440.0), expectedGain (true, 440.0, 1000.0, flatQ), 0.02)
+                 && isNear (gainAt (lowPassed, 3960.0), expectedGain (true, 3960.0, 1000.0, flatQ), 0.05),
+               "a low pass at 1 kHz keeps the 1st harmonic and cuts the 9th by "
+                 + juce::String (-juce::Decibels::gainToDecibels (expectedGain (true, 3960.0, 1000.0, flatQ)), 1) + " dB");
+
+        setFilter (synth, SynthProcessor::lowPassIds, false, 1000.0f);
+        const auto switchedOut = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (switchedOut, 3960.0), 1.0, 0.001), "switching it out restores the sound");
+
+        setFilter (synth, SynthProcessor::highPassIds, true, 1000.0f);
+        const auto highPassed = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (highPassed, 440.0), expectedGain (false, 440.0, 1000.0, flatQ), 0.02)
+                 && isNear (gainAt (highPassed, 3960.0), expectedGain (false, 3960.0, 1000.0, flatQ), 0.02),
+               "a high pass at 1 kHz cuts the 1st harmonic by "
+                 + juce::String (-juce::Decibels::gainToDecibels (expectedGain (false, 440.0, 1000.0, flatQ)), 1)
+                 + " dB and keeps the 9th");
+
+        setFilter (synth, SynthProcessor::highPassIds, true, 500.0f);
+        setFilter (synth, SynthProcessor::lowPassIds, true, 2000.0f);
+        const auto band = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (band, 880.0), expectedGain (false, 880.0, 500.0, flatQ) * expectedGain (true, 880.0, 2000.0, flatQ), 0.02),
+               "both filters at once shape the sound one after the other");
+
+        setFilter (synth, SynthProcessor::highPassIds, false, 500.0f);
+        setFilter (synth, SynthProcessor::lowPassIds, true, 1320.0f, 1.0f);
+        const auto resonant = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (resonant, 1320.0), FilterStage::resonanceToQ (1.0f), 0.03),
+               "full resonance boosts the harmonic at the cutoff " + juce::String (FilterStage::resonanceToQ (1.0f), 1) + " times");
+
+        // Switching a filter in during a note fades it in, rather than jumping.
+        setFilter (synth, SynthProcessor::lowPassIds, false, 300.0f);
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> output;
+
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+            if (block == 20)
+                setParameter (synth, SynthProcessor::lowPassIds.on, 1.0f);
+
+            synth.processBlock (buffer, midi);
+            output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        const auto largestJump = [&output] (size_t from, size_t to)
+        {
+            auto largest = 0.0f;
+
+            for (auto i = from; i < to; ++i)
+                largest = std::max (largest, std::abs (output[i] - output[i - 1]));
+
+            return largest;
+        };
+
+        const auto switchPoint = (size_t) (20 * blockSize);
+        check (largestJump (switchPoint, output.size()) <= largestJump (1000, switchPoint) * 1.05f,
+               "switching a filter in during a note doesn't click");
+
+        // At a low sample rate a 20 kHz cutoff is beyond the Nyquist frequency, where the filter can't work.
+        SynthProcessor lowRate;
+        setFilter (lowRate, SynthProcessor::lowPassIds, true, 20000.0f);
+        lowRate.prepareToPlay (11025.0, blockSize);
+        std::vector<float> lowRateOutput;
+
+        for (int block = 0; block < 20; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+            lowRate.processBlock (buffer, midi);
+            lowRateOutput.insert (lowRateOutput.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        check (std::all_of (lowRateOutput.begin(), lowRateOutput.end(), [] (float sample) { return std::isfinite (sample); })
+                 && peakOf (lowRateOutput) > 0.05f && peakOf (lowRateOutput) < 1.0f,
+               "a cutoff too high for the sample rate is lowered to fit, rather than failing");
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -376,6 +497,7 @@ namespace
         setNumHarmonics (original, 7, 1);
         setParameter (original, SynthProcessor::onId (1), 1.0f);
         setParameter (original, SynthProcessor::levelId (1), 0.4f);
+        setFilter (original, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
 
         juce::MemoryBlock state;
         original.getStateInformation (state);
@@ -391,6 +513,10 @@ namespace
         check (restored.isOn (0) && restored.isOn (1) && ! restored.isOn (2), "which oscillators are on is restored");
         check (isNear (restored.parameters.getRawParameterValue (SynthProcessor::levelId (1))->load(), 0.4, 1.0e-6),
                "oscillator levels are restored");
+        check (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.on)->load() > 0.5f
+                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.cutoff)->load(), 3000.0, 1.0e-4)
+                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.resonance)->load(), 0.5, 1.0e-4),
+               "the filters' settings are restored");
 
         restored.setStateInformation ("not a saved state", 17);
         check (restored.getPreset (2) == waveform::Preset::triangle, "a corrupt state is ignored");
@@ -481,13 +607,17 @@ namespace
         setParameter (synth, SynthProcessor::levelId (1), 0.6f);
         setParameter (synth, SynthProcessor::levelId (2), 0.35f);
         synth.editedOscillator = 1;
+        setFilter (synth, SynthProcessor::lowPassIds, true, 1800.0f, 0.4f);
+        setFilter (synth, SynthProcessor::highPassIds, true, 90.0f);
         save ("6-three-oscillators");
 
         setParameter (synth, SynthProcessor::onId (2), 0.0f);
         synth.editedOscillator = 2;
         save ("7-editing-an-oscillator-that-is-off");
 
-        editor->setSize (960, 700);
+        // The smallest the window goes, with the most harmonic sliders.
+        setNumHarmonics (synth, 9, 2);
+        editor->setSize (1060, 820);
         save ("8-smallest");
     }
 }
@@ -501,6 +631,7 @@ int main (int argc, char* argv[])
     testChangingTheWaveMidNote();
     testEditingHarmonics();
     testOscillators();
+    testFilters();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)
