@@ -10,6 +10,9 @@ namespace modulation
 
     juce::String getSourceName (int source)
     {
+        if (source == velocitySource)
+            return "Velocity";
+
         return isEnvelope (source) ? "Env " + juce::String (source - numLfos + 1) : "LFO " + juce::String (source + 1);
     }
 

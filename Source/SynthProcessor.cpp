@@ -224,6 +224,8 @@ SynthProcessor::SynthProcessor()
 
     synth.addSound (new HarmonicSound());
 
+    velocityAssignments[(size_t) modulation::volumeTarget] = modulation::startingVelocityOnVolume;
+
     for (int i = 0; i < numOscillators; ++i)
         setShape (i, waveform::makePreset (startingPresets[(size_t) i]), startingPresets[(size_t) i]);
 
@@ -272,7 +274,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     updatePatch();
     synth.renderNextBlock (buffer, midi, 0, numSamples);
-    shareEnvelopeDisplay();
+    shareNewestNote();
 
     for (size_t i = 0; i < lfoPhases.size(); ++i)
     {
@@ -291,9 +293,8 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     samplesPlayed += numSamples;
 }
 
-void SynthProcessor::shareEnvelopeDisplay()
+void SynthProcessor::shareNewestNote()
 {
-    // The window shows where the newest note still sounding is in each envelope.
     const HarmonicVoice* newest = nullptr;
 
     for (const auto* voice : voices)
@@ -304,6 +305,8 @@ void SynthProcessor::shareEnvelopeDisplay()
 
     if (newest == nullptr)
         return;
+
+    newestVelocity = newest->getVelocity();
 
     for (int i = 0; i < numEnvelopes; ++i)
     {
@@ -356,6 +359,7 @@ void SynthProcessor::updatePatch()
                 patch.lfos[i].shape = received.lfoShapes[i];
 
             patch.assignments = received.assignments;
+            patch.velocityAssignments = received.velocityAssignments;
         }
     }
 
@@ -545,8 +549,23 @@ void SynthProcessor::setAssignment (int target, const modulation::Assignment& as
     ++modulationVersion;
 }
 
+const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target) const noexcept
+{
+    return velocityAssignments[(size_t) target];
+}
+
+void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
+{
+    velocityAssignments[(size_t) target] = assignment;
+    share();
+    ++modulationVersion;
+}
+
 std::optional<float> SynthProcessor::getSourceValue (int source) const
 {
+    if (source == modulation::velocitySource)
+        return noteSounding ? std::optional (newestVelocity.load()) : std::nullopt;
+
     if (modulation::isEnvelope (source))
     {
         if (const auto display = getEnvelopeDisplay (source - numLfos))
@@ -585,6 +604,7 @@ void SynthProcessor::share()
         shared.lfoShapes[i] = lfos[i].shape;
 
     shared.assignments = assignments;
+    shared.velocityAssignments = velocityAssignments;
     ++sharedVersion;
 }
 
@@ -622,6 +642,23 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
         }
     }
 
+    // Saved even when empty, so a patch whose velocity was taken off everything loads that way.
+    juce::ValueTree velocityTree ("VELOCITY");
+
+    for (int target = 0; target < modulation::numTargets; ++target)
+    {
+        if (const auto& assignment = velocityAssignments[(size_t) target]; assignment.isActive())
+        {
+            juce::ValueTree assignmentTree ("ASSIGNMENT");
+            assignmentTree.setProperty ("target", modulation::getKey (target), nullptr);
+            assignmentTree.setProperty ("range", assignment.range, nullptr);
+            assignmentTree.setProperty ("inverted", assignment.inverted, nullptr);
+            velocityTree.appendChild (assignmentTree, nullptr);
+        }
+    }
+
+    state.appendChild (velocityTree, nullptr);
+
     if (const auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
@@ -647,6 +684,9 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
         modulations.push_back (child);
         state.removeChild (child, nullptr);
     }
+
+    const auto velocityTree = state.getChildWithName ("VELOCITY");
+    state.removeChild (velocityTree, nullptr);
 
     parameters.replaceState (state);
 
@@ -700,6 +740,18 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
             assignments[(size_t) *target] = { source, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
                                                (bool) modulationTree["inverted"] };
     }
+
+    // Saves from before velocity could be assigned had it make softer notes quieter, as it does to start with.
+    velocityAssignments = {};
+
+    if (! velocityTree.isValid())
+        velocityAssignments[(size_t) modulation::volumeTarget] = modulation::startingVelocityOnVolume;
+
+    for (const auto& assignmentTree : velocityTree)
+        if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
+            velocityAssignments[(size_t) *target] = { modulation::velocitySource,
+                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]),
+                                                      (bool) assignmentTree["inverted"] };
 
     share();
     ++modulationVersion;

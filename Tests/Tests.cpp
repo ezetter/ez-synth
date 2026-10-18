@@ -83,7 +83,7 @@ namespace
     /** Plays a note, lets it go after holdSeconds, and returns the left channel. Leave time for the note to fade
         away, or it will still be heard at the start of the next one.
     */
-    std::vector<float> play (SynthProcessor& synth, int note, double holdSeconds, double totalSeconds)
+    std::vector<float> play (SynthProcessor& synth, int note, double holdSeconds, double totalSeconds, float velocity = 1.0f)
     {
         synth.prepareToPlay (sampleRate, blockSize);
 
@@ -97,7 +97,7 @@ namespace
             juce::MidiBuffer midi;
 
             if (start == 0)
-                midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, velocity), 0);
 
             if (start <= holdSamples && holdSamples < start + blockSize)
                 midi.addEvent (juce::MidiMessage::noteOff (1, note), holdSamples - start);
@@ -845,6 +845,100 @@ namespace
                "a save from before there were envelopes still has its LFOs moving what they moved");
     }
 
+    void testVelocity()
+    {
+        std::cout << "Velocity" << std::endl;
+
+        // MIDI velocities are whole numbers up to 127, so these are ones it can send exactly.
+        const auto soft = 32.0f / 127.0f, medium = 64.0f / 127.0f;
+        const auto volumeAt = [] (float velocity) { return Patch::volumeToGain (0.75f - 0.35f * (1.0f - velocity)); };
+
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        check (synth.getVelocityAssignment (modulation::volumeTarget) == modulation::startingVelocityOnVolume,
+               "velocity starts out moving the volume");
+
+        const auto hard = loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
+        const auto mediumLoudness = loudness (play (synth, 69, 0.5, 0.8, medium), 0.2, 0.4);
+        const auto softLoudness = loudness (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4);
+        check (isNear (mediumLoudness / hard, volumeAt (medium) / volumeAt (1.0f), 0.01)
+                 && isNear (softLoudness / hard, volumeAt (soft) / volumeAt (1.0f), 0.01),
+               "softer notes are quieter, the softest by up to 35% of the volume's travel");
+
+        synth.setVelocityAssignment (modulation::volumeTarget, {});
+        check (isNear (loudness (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4), hard, 0.001),
+               "taking velocity off the volume makes every note as loud as the hardest");
+
+        // Velocity on the low pass cutoff: softer notes are darker.
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 9);
+        setFilter (synth, SynthProcessor::lowPassIds, true, 4000.0f);
+        synth.setVelocityAssignment (modulation::filterCutoffTarget (modulation::lowPass), { modulation::velocitySource, 0.5f, false });
+        const auto bright = slice (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
+        const auto dark = slice (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4);
+        check (amplitudeAt (dark, 5 * 440.0) / amplitudeAt (dark, 440.0) < 0.2 * amplitudeAt (bright, 5 * 440.0) / amplitudeAt (bright, 440.0),
+               "velocity on the low pass cutoff makes softer notes darker");
+        synth.setVelocityAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
+        setFilter (synth, SynthProcessor::lowPassIds, false, 4000.0f);
+
+        // Velocity and an LFO on the same control. A square LFO swings OSC 1's level, set at 50%, by 20% either way,
+        // and velocity lowers it by up to 40% for the softest notes.
+        setPreset (synth, 0, waveform::Preset::sine);
+        setNumHarmonics (synth, 3);
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 1.0f, false, waveform::Preset::square);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.4f, false });
+        synth.setVelocityAssignment (modulation::oscillatorLevelTarget (0), { modulation::velocitySource, 0.4f, false });
+
+        auto signal = play (synth, 69, 0.95, 1.3);
+        check (isNear (loudness (signal, 0.1, 0.4) / loudness (signal, 0.6, 0.9), 0.7 / 0.3, 0.02),
+               "played hard, an LFO alone moves a control that velocity also moves");
+
+        signal = play (synth, 69, 0.95, 1.3, medium);   // velocity takes off about 20%, about cancelling the LFO's rise
+        const auto velocityOffset = 0.4f * (1.0f - medium);
+        check (isNear (loudness (signal, 0.1, 0.4) / loudness (signal, 0.6, 0.9), (0.7 - velocityOffset) / (0.3 - velocityOffset), 0.03),
+               "played softly, velocity moves it as well as the LFO");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
+        synth.setVelocityAssignment (modulation::oscillatorLevelTarget (0), { modulation::velocitySource, 0.4f, true });
+        const auto pushedUp = loudness (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4) / loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
+        check (isNear (pushedUp, (0.5 + 0.4 * (1.0 - soft)) / 0.5, 0.02), "inverted, velocity moves softer notes' controls up");
+
+        // The window can show the newest note's velocity.
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 60, medium), 0);
+        synth.processBlock (buffer, midi);
+        check (isNear (synth.getSourceValue (modulation::velocitySource).value_or (0.0f), medium, 1.0e-4),
+               "the window can show how hard the newest note was played");
+
+        juce::MidiBuffer letGo;
+        letGo.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        synth.processBlock (buffer, letGo);
+
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer nothing;
+            synth.processBlock (buffer, nothing);
+        }
+
+        // Saving and loading, including a patch with velocity taken off everything.
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (restored.getVelocityAssignment (modulation::oscillatorLevelTarget (0)) == modulation::Assignment { modulation::velocitySource, 0.4f, true }
+                 && ! restored.getVelocityAssignment (modulation::volumeTarget).isActive(),
+               "what velocity moves is restored, even when it moves nothing it started out moving");
+
+        juce::XmlElement older ("EZSynth");
+        juce::AudioProcessor::copyXmlToBinary (older, state);
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (restored.getVelocityAssignment (modulation::volumeTarget) == modulation::startingVelocityOnVolume,
+               "a save from before velocity could be assigned still has softer notes play quieter");
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -1045,6 +1139,7 @@ int main (int argc, char* argv[])
     testFilters();
     testLfos();
     testEnvelopes();
+    testVelocity();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

@@ -365,10 +365,10 @@ void SynthEditor::refresh()
 
 void SynthEditor::showModulation()
 {
-    // Where each LFO and envelope is now, for those that are moving anything.
-    std::array<std::optional<float>, modulation::numSources> sourceValues;
+    // Where each LFO and envelope is now, and how hard the newest note was played, for those moving anything.
+    std::array<std::optional<float>, modulation::numSources + 1> sourceValues;
 
-    for (int i = 0; i < modulation::numSources; ++i)
+    for (int i = 0; i <= modulation::velocitySource; ++i)
         sourceValues[(size_t) i] = synthProcessor.getSourceValue (i);
 
     // Controls that are hidden, such as the harmonic sliders while an LFO is shown, are left alone.
@@ -378,14 +378,16 @@ void SynthEditor::showModulation()
 
         if (const auto target = modulatable::getTarget (component))
         {
-            const auto& assignment = synthProcessor.getAssignment (*target);
-            std::optional<float> livePosition;
+            std::optional<float> offset;
 
-            if (assignment.isActive() && visible)
-                if (const auto sourceValue = sourceValues[(size_t) assignment.source])
-                    livePosition = assignment.apply (synthProcessor.getPosition (*target), *sourceValue);
+            for (const auto* assignment : { &synthProcessor.getAssignment (*target), &synthProcessor.getVelocityAssignment (*target) })
+                if (assignment->isActive() && visible)
+                    if (const auto sourceValue = sourceValues[(size_t) assignment->source])
+                        offset = offset.value_or (0.0f) + assignment->offset (*sourceValue);
 
-            modulatable::setLivePosition (component, livePosition);
+            modulatable::setLivePosition (component, offset.has_value()
+                                                         ? std::optional (juce::jlimit (0.0f, 1.0f, synthProcessor.getPosition (*target) + *offset))
+                                                         : std::nullopt);
         }
 
         for (auto* child : component.getChildren())

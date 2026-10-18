@@ -47,7 +47,9 @@ struct Patch
     float volume = 0.75f;
     std::array<Lfo, modulation::numLfos> lfos;
     std::array<EnvelopeSettings, modulation::numEnvelopes> envelopes;
-    modulation::Assignments assignments;
+
+    /** What each control is moved by: an LFO or envelope, and its key velocity, each of which can move it. */
+    modulation::Assignments assignments, velocityAssignments;
 
     /** The volume knob follows a square law, which sounds more even over its turn than a straight line does. */
     static float volumeToGain (float volume)   { return volume * volume; }

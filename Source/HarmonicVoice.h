@@ -52,6 +52,9 @@ public:
     /** How long ago the note started, so the window can show the newest note's envelopes. */
     juce::int64 getSamplesSinceNoteOn() const noexcept   { return samplesSinceNoteOn; }
 
+    /** How hard the note's key was played, from 0 to 1. */
+    float getVelocity() const noexcept   { return noteVelocity; }
+
 private:
     /** Where the voice is heading: its harmonics, its filters and its loudness, with the LFOs applied. */
     struct Targets
@@ -87,7 +90,7 @@ private:
     double frequency = 440.0;
     int noteNumber = 69;
     int pitchWheel = 8192;
-    float level = 0.0f;
+    float noteVelocity = 1.0f;
     juce::ADSR ownEnvelope;   // the voice's own, which keeps notes from clicking as they start and stop
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicVoice)

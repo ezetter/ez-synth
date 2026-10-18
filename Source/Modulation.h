@@ -6,7 +6,7 @@
 
 #include <optional>
 
-/** The controls the LFOs and envelopes can move, and how each moves one. */
+/** The controls the LFOs, envelopes and key velocity can move, and how each moves one. */
 namespace modulation
 {
     inline constexpr int numLfos = 3;
@@ -15,10 +15,13 @@ namespace modulation
 
     /** What moves controls: the LFOs, then the envelopes, numbered in that order. */
     inline constexpr int numSources = numLfos + numEnvelopes;
-    constexpr bool isEnvelope (int source)          { return source >= numLfos; }
+    constexpr bool isEnvelope (int source)          { return source >= numLfos && source < numSources; }
     constexpr int envelopeSource (int envelope)     { return numLfos + envelope; }
 
-    /** What a source is called, such as "LFO 2" or "Env 1". */
+    /** How hard each key is played can move a control too, as well as an LFO or envelope moving it. */
+    inline constexpr int velocitySource = numSources;
+
+    /** What a source is called, such as "LFO 2", "Env 1" or "Velocity". */
     juce::String getSourceName (int source);
 
     /** The filters, in the order they're numbered: the low pass and the high pass. */
@@ -66,15 +69,16 @@ namespace modulation
     */
     bool isLoudness (int target);
 
-    /** How an LFO or envelope moves a control. */
+    /** How an LFO, envelope or key velocity moves a control. */
     struct Assignment
     {
-        /** The LFO or envelope that moves it, or -1 if nothing does. */
+        /** The LFO, envelope or velocity that moves it, or -1 if nothing does. */
         int source = -1;
 
         /** How far the control moves, from one end of the source's values to the other, as a proportion of its
             travel. An LFO, from -1 to 1, swings the control evenly either side of where it's set. An envelope, from
-            0 to 1, moves it one way from where it's set and back.
+            0 to 1, moves it one way from where it's set and back. Velocity, from 0 to 1, leaves the control where
+            it's set for the hardest notes, and moves it down for softer ones.
         */
         float range = 0.5f;
 
@@ -83,11 +87,18 @@ namespace modulation
 
         bool isActive() const noexcept   { return source >= 0; }
 
+        /** How far the source at a value moves a control along its travel, from where it's set. */
+        float offset (float sourceValue) const noexcept
+        {
+            const auto amount = source == velocitySource ? sourceValue - 1.0f
+                                                         : (isEnvelope (source) ? sourceValue : 0.5f * sourceValue);
+            return (inverted ? -1.0f : 1.0f) * range * amount;
+        }
+
         /** Where the source at a value moves a control set at a position from 0 to 1. */
         float apply (float position, float sourceValue) const noexcept
         {
-            const auto amount = isEnvelope (source) ? sourceValue : 0.5f * sourceValue;
-            return juce::jlimit (0.0f, 1.0f, position + (inverted ? -1.0f : 1.0f) * range * amount);
+            return juce::jlimit (0.0f, 1.0f, position + offset (sourceValue));
         }
 
         bool operator== (const Assignment& other) const noexcept
@@ -97,6 +108,9 @@ namespace modulation
     };
 
     using Assignments = std::array<Assignment, numTargets>;
+
+    /** Velocity starts out moving the volume, so softer notes are quieter, as they are on most instruments. */
+    inline constexpr Assignment startingVelocityOnVolume { velocitySource, 0.35f, false };
 
     //==============================================================================
     // Where controls sit along their travel, from 0 to 1, and back. These are safe on the audio thread.

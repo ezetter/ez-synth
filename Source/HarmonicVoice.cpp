@@ -4,8 +4,10 @@ namespace
 {
     constexpr auto twoPi = juce::MathConstants<double>::twoPi;
 
-    /** How loud a note is at full velocity, leaving headroom for chords. */
-    constexpr float fullLevel = 0.3f;
+    /** How loud a note is, leaving headroom for chords. How its velocity changes that is up to what velocity is
+        assigned to, which to start with is the volume.
+    */
+    constexpr float noteLevel = 0.3f;
 
     /** How quickly a playing note follows changes to its harmonics: it covers about two thirds of the way in this
         time, and nearly all of it in four times as long.
@@ -71,7 +73,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     updateFrequency();
 
     phase = 0.0;
-    level = fullLevel * (0.3f + 0.7f * velocity);
+    noteVelocity = velocity;
     samplesSinceNoteOn = 0;
 
     for (auto& run : envelopeRuns)
@@ -162,16 +164,20 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (int i = 0; i < numEnvelopes; ++i)
         sourceValues[(size_t) envelopeSource (i)] = envelopeRuns[(size_t) i].getLevel();
 
-    // Moves a control's position, from 0 to 1, by the LFO or envelope assigned to it, if there is one. An LFO that's
-    // switched off moves nothing.
+    // Moves a control's position, from 0 to 1, by the LFO or envelope assigned to it, and by the note's velocity, if
+    // either is. An LFO that's switched off moves nothing.
     const auto modulate = [this, &sourceValues] (int target, float position)
     {
-        const auto& assignment = patch.assignments[(size_t) target];
+        auto offset = 0.0f;
 
-        if (! assignment.isActive() || (! isEnvelope (assignment.source) && ! patch.lfos[(size_t) assignment.source].on))
-            return position;
+        if (const auto& assignment = patch.assignments[(size_t) target];
+            assignment.isActive() && (isEnvelope (assignment.source) || patch.lfos[(size_t) assignment.source].on))
+            offset += assignment.offset (sourceValues[(size_t) assignment.source]);
 
-        return assignment.apply (position, sourceValues[(size_t) assignment.source]);
+        if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
+            offset += byVelocity.offset (noteVelocity);
+
+        return juce::jlimit (0.0f, 1.0f, position + offset);
     };
 
     Targets targets;
@@ -197,7 +203,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             const auto target = harmonicTarget (i, harmonic);
             auto amplitude = oscillator.amplitudes[index];
 
-            if (patch.assignments[(size_t) target].isActive())
+            if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
                 amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
 
             // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so their sine waves
@@ -346,7 +352,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             value = lowPass.process (0, value);
         }
 
-        const auto sample = value * level * gain.getNextValue() * ownEnvelope.getNextSample();
+        const auto sample = value * noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
 
         for (int channel = 0; channel < output.getNumChannels(); ++channel)
             output.addSample (channel, startSample + s, sample);

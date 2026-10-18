@@ -143,8 +143,13 @@ public:
     /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
     void setAssignment (int target, const modulation::Assignment&);
 
-    /** An LFO's or envelope's value now, as the newest note has it, or nothing if it isn't moving anything: an
-        LFO that's off, or that runs once before any key has been pressed, or an envelope when no note is sounding.
+    /** What the key velocity moves. Velocity can move a control as well as an LFO or envelope does. */
+    const modulation::Assignment& getVelocityAssignment (int target) const noexcept;
+    void setVelocityAssignment (int target, const modulation::Assignment&);
+
+    /** An LFO's, envelope's or velocity's value now, as the newest note has it, or nothing if it isn't moving
+        anything: an LFO that's off, or that runs once before any key has been pressed, or an envelope or velocity
+        when no note is sounding.
     */
     std::optional<float> getSourceValue (int source) const;
 
@@ -189,7 +194,7 @@ private:
         std::array<waveform::Decomposition, numOscillators> decompositions;
         std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {};
         std::array<waveform::Shape, numLfos> lfoShapes {};
-        modulation::Assignments assignments;
+        modulation::Assignments assignments, velocityAssignments;
     };
 
     struct OscillatorParameters
@@ -229,7 +234,8 @@ private:
         std::atomic<float> level { 0.0f };
     };
 
-    void shareEnvelopeDisplay();
+    /** Shares where the newest note still sounding is in each envelope, and how hard it was played. */
+    void shareNewestNote();
 
     /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
         this, in case the save is corrupt.
@@ -247,7 +253,7 @@ private:
 
     std::array<Oscillator, numOscillators> oscillators;
     std::array<Lfo, numLfos> lfos;
-    modulation::Assignments assignments;
+    modulation::Assignments assignments, velocityAssignments;
     int shapeVersion = 0;
     int modulationVersion = 0;
 
@@ -271,6 +277,7 @@ private:
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
     std::atomic<bool> noteSounding { false };
+    std::atomic<float> newestVelocity { 1.0f };
     std::vector<HarmonicVoice*> voices;
 
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
