@@ -1,6 +1,5 @@
 #include "Waveform.h"
 
-#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -78,9 +77,9 @@ namespace waveform
             return table;
         }();
 
-        std::array<Partial, maxHarmonic> harmonics {};
+        Decomposition result;
 
-        for (int k = 1; k <= maxHarmonic; ++k)
+        for (int k = 1; k <= maxHarmonics; ++k)
         {
             double sineSum = 0.0, cosineSum = 0.0;
 
@@ -94,31 +93,22 @@ namespace waveform
             // The harmonic is b sin θ + a cos θ, which is the same as A sin (θ + φ).
             const auto b = 2.0 * sineSum / numPoints;
             const auto a = 2.0 * cosineSum / numPoints;
-            harmonics[(size_t) k - 1] = { k, (float) std::hypot (a, b), (float) std::atan2 (a, b) };
+            const auto amplitude = std::hypot (a, b);
+
+            // Anything 100 dB below full scale is a rounding error, such as a sine's 2nd harmonic.
+            if (amplitude > 1.0e-5)
+                result.harmonics[(size_t) k - 1] = { k, (float) amplitude, (float) std::atan2 (a, b) };
+            else
+                result.harmonics[(size_t) k - 1] = { k, 0.0f, 0.0f };
         }
 
-        std::stable_sort (harmonics.begin(), harmonics.end(),
-                          [] (const Partial& x, const Partial& y) { return x.amplitude > y.amplitude; });
-
-        Decomposition result;
-        const auto loudest = harmonics.front().amplitude;
-
-        // Harmonics over 60 dB quieter than the loudest are rounding errors, or too faint to hear.
-        if (loudest > 1.0e-4f)
-            while (result.numStrongest < maxPartials
-                   && harmonics[(size_t) result.numStrongest].amplitude > loudest * 1.0e-3f)
-            {
-                result.strongest[(size_t) result.numStrongest] = harmonics[(size_t) result.numStrongest];
-                ++result.numStrongest;
-            }
-
         // Sample the sums finely enough to catch the peaks of even the highest harmonic.
-        constexpr int resolution = 4096;
+        constexpr int resolution = 2048;
         std::vector<float> sum ((size_t) resolution, 0.0f);
 
-        for (int n = 1; n <= result.numStrongest; ++n)
+        for (int n = 1; n <= maxHarmonics; ++n)
         {
-            const auto& partial = result.strongest[(size_t) n - 1];
+            const auto& partial = result.harmonics[(size_t) n - 1];
             auto peak = 0.0f;
 
             for (int i = 0; i < resolution; ++i)
@@ -131,5 +121,11 @@ namespace waveform
         }
 
         return result;
+    }
+
+    void addHarmonic (Shape& shape, int harmonic, float amplitude, float phase)
+    {
+        for (int i = 0; i < numPoints; ++i)
+            shape[(size_t) i] += Partial { harmonic, amplitude, phase }.valueAt ((double) i / numPoints);
     }
 }

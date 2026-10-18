@@ -1,7 +1,6 @@
 #include "HarmonicSelector.h"
 
 #include "SynthLookAndFeel.h"
-#include "Waveform.h"
 
 HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
 {
@@ -22,11 +21,11 @@ void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter)
     attachment->sendInitialUpdate();
 }
 
-void HarmonicSelector::setNumAvailable (int newNumAvailable)
+void HarmonicSelector::setSilentHarmonics (std::array<bool, waveform::maxHarmonics> newSilent)
 {
-    if (newNumAvailable != numAvailable)
+    if (newSilent != silent)
     {
-        numAvailable = newNumAvailable;
+        silent = newSilent;
         repaint();
     }
 }
@@ -34,23 +33,23 @@ void HarmonicSelector::setNumAvailable (int newNumAvailable)
 juce::Rectangle<float> HarmonicSelector::getButtonArea (int number) const
 {
     constexpr auto gap = 4.0f;
-    const auto width = ((float) getWidth() - gap * (waveform::maxPartials - 1)) / waveform::maxPartials;
+    const auto width = ((float) getWidth() - gap * (waveform::maxHarmonics - 1)) / waveform::maxHarmonics;
     return { (float) (number - 1) * (width + gap), 0.0f, width, (float) getHeight() };
 }
 
 int HarmonicSelector::getNumberAt (juce::Point<float> position) const
 {
     const auto proportion = position.x / (float) juce::jmax (1, getWidth());
-    return juce::jlimit (1, waveform::maxPartials, 1 + (int) (proportion * waveform::maxPartials));
+    return juce::jlimit (1, waveform::maxHarmonics, 1 + (int) (proportion * waveform::maxHarmonics));
 }
 
 void HarmonicSelector::paint (juce::Graphics& g)
 {
-    for (int number = 1; number <= waveform::maxPartials; ++number)
+    for (int number = 1; number <= waveform::maxHarmonics; ++number)
     {
         const auto area = getButtonArea (number).reduced (0.5f);
         const auto colour = colours::forPartial (number - 1);
-        const auto lit = number <= selected && number <= numAvailable;
+        const auto lit = number <= selected && ! silent[(size_t) number - 1];
 
         if (lit)
         {
@@ -59,7 +58,7 @@ void HarmonicSelector::paint (juce::Graphics& g)
         }
         else if (number <= selected)
         {
-            // Asked for, but the wave has no more harmonics to give.
+            // Played, but the wave doesn't have this harmonic, as a square has no 2nd.
             g.setColour (colour.withAlpha (0.12f));
             g.fillRoundedRectangle (area, 5.0f);
             g.setColour (colour.withAlpha (0.7f));

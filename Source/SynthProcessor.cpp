@@ -40,7 +40,7 @@ namespace
                     juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f, asPercentage()),
                 std::make_unique<juce::AudioParameterInt> (
                     juce::ParameterID { SynthProcessor::harmonicsId (i), 1 }, name + " Harmonics",
-                    1, waveform::maxPartials, waveform::defaultPartials)));
+                    1, waveform::maxHarmonics, waveform::defaultHarmonics)));
         }
 
         return layout;
@@ -144,7 +144,7 @@ SynthProcessor::Settings SynthProcessor::readSettings (int oscillator) const noe
     const auto& oscillatorParameter = oscillatorParameters[(size_t) oscillator];
     return { oscillatorParameter.on->load() >= 0.5f,
              oscillatorParameter.level->load(),
-             juce::roundToInt (oscillatorParameter.numPartials->load()) };
+             juce::roundToInt (oscillatorParameter.numHarmonics->load()) };
 }
 
 void SynthProcessor::updateTargets()
@@ -160,16 +160,16 @@ void SynthProcessor::updateTargets()
         if (! settings.on)
             continue;
 
-        // Each oscillator's wave peaks at its level, however many sine waves it has.
-        const auto used = decomposition.getNumUsed (settings.numPartials);
-        const auto peak = decomposition.peaks[(size_t) used];
-        const auto scale = peak > 1.0e-6f ? settings.level / peak : 0.0f;
+        // An oscillator plays its wave at its level. A wave whose harmonics add up to more than full scale is
+        // turned down to fit, so it can't swamp the others.
+        const auto numHarmonics = juce::jlimit (1, waveform::maxHarmonics, settings.numHarmonics);
+        const auto scale = settings.level / std::max (1.0f, decomposition.peaks[(size_t) numHarmonics]);
 
         // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so the sine waves
         // at each harmonic add up to one, and the voices play all the oscillators at once.
-        for (int j = 0; j < used; ++j)
+        for (int j = 0; j < numHarmonics; ++j)
         {
-            const auto& partial = decomposition.strongest[(size_t) j];
+            const auto& partial = decomposition.harmonics[(size_t) j];
             targets.cosines[(size_t) partial.harmonic] += scale * partial.amplitude * std::sin (partial.phase);
             targets.sines[(size_t) partial.harmonic] += scale * partial.amplitude * std::cos (partial.phase);
         }
@@ -198,17 +198,28 @@ bool SynthProcessor::isOn (int oscillator) const noexcept
     return oscillatorParameters[(size_t) oscillator].on->load() >= 0.5f;
 }
 
-int SynthProcessor::getNumPartials (int oscillator) const noexcept
+int SynthProcessor::getNumHarmonics (int oscillator) const noexcept
 {
-    return juce::roundToInt (oscillatorParameters[(size_t) oscillator].numPartials->load());
+    return juce::roundToInt (oscillatorParameters[(size_t) oscillator].numHarmonics->load());
 }
 
 void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+{
+    // A harmonic the new wave doesn't have will start like a sine, rising from zero, if it's raised.
+    oscillators[(size_t) oscillator].phases.fill (0.0f);
+    replaceShape (oscillator, newShape, fromPreset);
+}
+
+void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
     auto& changed = oscillators[(size_t) oscillator];
     changed.shape = newShape;
     changed.preset = fromPreset;
     changed.decomposition = waveform::decompose (newShape);
+
+    for (const auto& harmonic : changed.decomposition.harmonics)
+        if (harmonic.amplitude > 0.0f)
+            changed.phases[(size_t) harmonic.harmonic - 1] = harmonic.phase;
 
     {
         const juce::SpinLock::ScopedLockType lock (sharedLock);
@@ -217,6 +228,21 @@ void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, 
     }
 
     ++shapeVersion;
+}
+
+void SynthProcessor::setHarmonicAmplitude (int oscillator, int harmonic, float amplitude)
+{
+    const auto& changed = oscillators[(size_t) oscillator];
+    const auto& current = changed.decomposition.harmonics[(size_t) harmonic - 1];
+    auto shape = changed.shape;
+
+    // A harmonic being raised from nothing comes back in the phase it last had.
+    if (current.amplitude > 0.0f)
+        waveform::addHarmonic (shape, harmonic, amplitude - current.amplitude, current.phase);
+    else
+        waveform::addHarmonic (shape, harmonic, amplitude, changed.phases[(size_t) harmonic - 1]);
+
+    replaceShape (oscillator, shape, std::nullopt);
 }
 
 void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
@@ -270,7 +296,7 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
         std::memcpy (restored.data(), points.getData(), sizeof (restored));
 
         for (auto& value : restored)
-            value = std::isfinite (value) ? juce::jlimit (-1.0f, 1.0f, value) : 0.0f;
+            value = std::isfinite (value) ? juce::jlimit (-maxValue, maxValue, value) : 0.0f;
 
         setShape (oscillator, restored, waveform::findPreset (wave["preset"].toString()));
     }

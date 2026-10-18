@@ -115,6 +115,29 @@ juce::Font SynthLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHei
     return juce::FontOptions (juce::jmin (14.0f, (float) buttonHeight * 0.45f), juce::Font::bold);
 }
 
+void SynthLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
+                                         float minSliderPos, float maxSliderPos, juce::Slider::SliderStyle style,
+                                         juce::Slider& slider)
+{
+    if (style != juce::Slider::LinearHorizontal)
+    {
+        LookAndFeel_V4::drawLinearSlider (g, x, y, width, height, sliderPos, minSliderPos, maxSliderPos, style, slider);
+        return;
+    }
+
+    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
+    const auto track = bounds.withSizeKeepingCentre (bounds.getWidth(), 4.0f);
+
+    g.setColour (colours::outline.brighter (0.15f));
+    g.fillRoundedRectangle (track, 2.0f);
+    g.setColour (slider.findColour (juce::Slider::trackColourId));
+    g.fillRoundedRectangle (track.withRight (sliderPos), 2.0f);
+
+    const auto thumb = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ sliderPos, bounds.getCentreY() });
+    g.setColour (slider.isMouseOverOrDragging() ? colours::text : colours::text.darker (0.15f));
+    g.fillEllipse (thumb);
+}
+
 void SynthLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
                                          bool shouldDrawButtonAsHighlighted, bool)
 {

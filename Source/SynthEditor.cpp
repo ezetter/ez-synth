@@ -28,8 +28,14 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         refresh();
     };
 
+    harmonicSliders.onAmplitudeChange = [this] (int harmonic, float amplitude)
+    {
+        synthProcessor.setHarmonicAmplitude (synthProcessor.editedOscillator, harmonic, amplitude);
+        refresh();
+    };
+
     addAndMakeVisible (grid);
-    addAndMakeVisible (legend);
+    addAndMakeVisible (harmonicSliders);
     addAndMakeVisible (harmonicSelector);
 
     for (size_t i = 0; i < presetButtons.size(); ++i)
@@ -97,13 +103,6 @@ void SynthEditor::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
     g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
     g.drawText ("VOLUME", volumeCaption, juce::Justification::centred);
-
-    const auto numPartials = synthProcessor.getNumPartials (edited);
-    g.setFont (fonts::body (12.5f));
-    g.drawFittedText ("The wave is rebuilt from its "
-                          + (numPartials == 1 ? juce::String ("strongest sine wave.")
-                                              : juce::String (numPartials) + " strongest sine waves."),
-                      harmonicsHint, juce::Justification::topLeft, 2);
 
     g.setColour (colours::text);
     g.setFont (fonts::body (14.0f));
@@ -186,10 +185,8 @@ void SynthEditor::resized()
     harmonicsCaption = side.removeFromTop (18);
     side.removeFromTop (8);
     harmonicSelector.setBounds (side.removeFromTop (34));
-    side.removeFromTop (10);
-    harmonicsHint = side.removeFromTop (36);
-    side.removeFromTop (8);
-    legend.setBounds (side);
+    side.removeFromTop (14);
+    harmonicSliders.setBounds (side);
 }
 
 void SynthEditor::editOscillator (int oscillator)
@@ -198,17 +195,17 @@ void SynthEditor::editOscillator (int oscillator)
     refresh();
 }
 
-std::vector<waveform::Partial> SynthEditor::getPlayedPartials (int oscillator) const
+std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) const
 {
-    const auto& decomposition = synthProcessor.getDecomposition (oscillator);
-    const auto numUsed = decomposition.getNumUsed (synthProcessor.getNumPartials (oscillator));
-    return { decomposition.strongest.begin(), std::next (decomposition.strongest.begin(), numUsed) };
+    const auto& harmonics = synthProcessor.getDecomposition (oscillator).harmonics;
+    const auto numHarmonics = juce::jlimit (1, waveform::maxHarmonics, synthProcessor.getNumHarmonics (oscillator));
+    return { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
 }
 
 juce::String SynthEditor::getWaveName (int oscillator) const
 {
     const auto preset = synthProcessor.getPreset (oscillator);
-    return preset.has_value() ? waveform::getName (*preset) : juce::String ("Drawn");
+    return preset.has_value() ? waveform::getName (*preset) : juce::String ("Custom");
 }
 
 void SynthEditor::refresh()
@@ -219,7 +216,7 @@ void SynthEditor::refresh()
 
     for (size_t i = 0; i < cards.size(); ++i)
     {
-        now.numPartials[i] = synthProcessor.getNumPartials ((int) i);
+        now.numHarmonics[i] = synthProcessor.getNumHarmonics ((int) i);
         now.on[i] = synthProcessor.isOn ((int) i);
     }
 
@@ -229,7 +226,7 @@ void SynthEditor::refresh()
 
         for (size_t i = 0; i < cards.size(); ++i)
         {
-            cards[i]->setWave (getPlayedPartials ((int) i), getWaveName ((int) i));
+            cards[i]->setWave (getPlayedHarmonics ((int) i), getWaveName ((int) i));
             cards[i]->setSelected ((int) i == edited);
         }
 
@@ -239,25 +236,30 @@ void SynthEditor::refresh()
         if (edited != shown.editedOscillator || now.shapeVersion != shown.shapeVersion)
             grid.setShape (synthProcessor.getShape (edited));
 
-        auto partials = getPlayedPartials (edited);
-        grid.setPartials (partials);
+        const auto harmonics = getPlayedHarmonics (edited);
+        grid.setPartials (harmonics);
         grid.setOscillator (edited + 1, now.on[(size_t) edited]);
-        legend.setPartials (std::move (partials), now.numPartials[(size_t) edited]);
-        harmonicSelector.setNumAvailable (synthProcessor.getDecomposition (edited).numStrongest);
+        harmonicSliders.setHarmonics (harmonics);
+
+        std::array<bool, waveform::maxHarmonics> silent {};
+
+        for (const auto& harmonic : synthProcessor.getDecomposition (edited).harmonics)
+            silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
+
+        harmonicSelector.setSilentHarmonics (silent);
 
         for (size_t i = 0; i < presetButtons.size(); ++i)
             presetButtons[i].setToggleState (synthProcessor.getPreset (edited) == waveform::allPresets[i],
                                              juce::dontSendNotification);
 
         repaint (harmonicsCaption);
-        repaint (harmonicsHint);
         shown = now;
     }
 
     if (const auto note = synthProcessor.getLastNote(); note != shownNote)
     {
         shownNote = note;
-        legend.setFundamental (note >= 0 ? std::optional (juce::MidiMessage::getMidiNoteInHertz (note)) : std::nullopt);
+        harmonicSliders.setFundamental (note >= 0 ? std::optional (juce::MidiMessage::getMidiNoteInHertz (note)) : std::nullopt);
         repaint (noteArea);
     }
 }

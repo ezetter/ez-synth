@@ -119,12 +119,12 @@ void HarmonicVoice::renderNextBlock (juce::AudioBuffer<float>& output, int start
     // Each harmonic is a point going round a circle, turned by a fixed angle every sample, which is much cheaper
     // than calling sin() every sample. The points are placed afresh from the phase each block, so rounding errors
     // can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
-    std::array<int, waveform::maxHarmonic> harmonics {};
-    std::array<double, waveform::maxHarmonic> x {}, y {}, turnX {}, turnY {};
-    std::array<float, waveform::maxHarmonic> gains {};
+    std::array<int, waveform::maxHarmonics> harmonics {};
+    std::array<double, waveform::maxHarmonics> x {}, y {}, turnX {}, turnY {};
+    std::array<float, waveform::maxHarmonics> gains {};
     size_t numHarmonics = 0;
 
-    for (int k = 1; k <= waveform::maxHarmonic; ++k)
+    for (int k = 1; k <= waveform::maxHarmonics; ++k)
     {
         const auto index = (size_t) k;
         const auto playing = cosines[index] != 0.0f || sines[index] != 0.0f;

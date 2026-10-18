@@ -35,9 +35,9 @@ juce_add_plugin(EZSynth
 target_sources(EZSynth
     PRIVATE
         Source/HarmonicSelector.cpp
+        Source/HarmonicSliders.cpp
         Source/HarmonicVoice.cpp
         Source/Keyboard.cpp
-        Source/Legend.cpp
         Source/OscillatorCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp

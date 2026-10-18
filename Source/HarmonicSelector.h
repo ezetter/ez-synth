@@ -1,9 +1,11 @@
 #pragma once
 
+#include "Waveform.h"
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** A row of buttons, 1 to 9, for how many sine waves to play the wave with. Each lit button is coloured like
-    the sine wave it adds.
+/** A row of buttons, 1 to 9, for how many harmonics to play the wave with, from the 1st up. Each lit button is
+    coloured like its harmonic.
 */
 class HarmonicSelector final : public juce::Component
 {
@@ -13,8 +15,8 @@ public:
     /** Switches to setting another parameter, such as another oscillator's number of harmonics. */
     void setParameter (juce::RangedAudioParameter&);
 
-    /** How many harmonics the wave has. Buttons asking for more than that are lit only in outline. */
-    void setNumAvailable (int);
+    /** Which harmonics the wave doesn't have. Their buttons are lit only in outline. */
+    void setSilentHarmonics (std::array<bool, waveform::maxHarmonics>);
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -31,7 +33,7 @@ private:
 
     std::unique_ptr<juce::ParameterAttachment> attachment;
     int selected = 1;
-    int numAvailable = 0;
+    std::array<bool, waveform::maxHarmonics> silent {};
     int hovered = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicSelector)

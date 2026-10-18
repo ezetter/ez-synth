@@ -35,7 +35,7 @@ namespace
         parameter.setValueNotifyingHost (parameter.convertTo0to1 (value));
     }
 
-    void setNumPartials (SynthProcessor& synth, int count, int oscillator = 0)
+    void setNumHarmonics (SynthProcessor& synth, int count, int oscillator = 0)
     {
         setParameter (synth, SynthProcessor::harmonicsId (oscillator), (float) count);
     }
@@ -107,68 +107,66 @@ namespace
         return peak;
     }
 
-    /** Checks a preset's strongest harmonics are the expected ones, at the expected strengths. */
-    void checkPreset (waveform::Preset preset, const std::vector<int>& expectedHarmonics,
+    /** Checks a preset's harmonics, 1st to 9th, have their textbook strengths. Missing ones should be exactly 0. */
+    void checkPreset (waveform::Preset preset, const juce::String& description,
                       const std::function<double (int harmonic)>& expectedAmplitude)
     {
         const auto decomposition = waveform::decompose (waveform::makePreset (preset));
-        const auto name = waveform::getName (preset).toLowerCase();
-
-        std::vector<int> harmonics;
         auto amplitudesRight = true;
 
-        for (int i = 0; i < decomposition.numStrongest; ++i)
+        for (const auto& harmonic : decomposition.harmonics)
         {
-            const auto& partial = decomposition.strongest[(size_t) i];
-            harmonics.push_back (partial.harmonic);
-            amplitudesRight = amplitudesRight && isNear (partial.amplitude, expectedAmplitude (partial.harmonic), 0.01);
+            const auto expected = expectedAmplitude (harmonic.harmonic);
+            amplitudesRight = amplitudesRight && (expected == 0.0 ? harmonic.amplitude == 0.0f
+                                                                  : isNear (harmonic.amplitude, expected, 0.01));
         }
 
-        juce::StringArray expected;
-
-        for (const auto harmonic : expectedHarmonics)
-            expected.add (juce::String (harmonic));
-
-        check (harmonics == expectedHarmonics, "a " + name + "'s strongest harmonics are " + expected.joinIntoString (", "));
-        check (amplitudesRight, "a " + name + "'s harmonics have the textbook strengths");
+        check (amplitudesRight, "a " + waveform::getName (preset).toLowerCase() + " " + description);
     }
 
     void testDecomposition()
     {
         std::cout << "Breaking waves down into sine waves" << std::endl;
 
-        checkPreset (waveform::Preset::sine, { 1 }, [] (int) { return 1.0; });
-        checkPreset (waveform::Preset::sawtooth, { 1, 2, 3, 4, 5, 6, 7, 8, 9 }, [] (int k) { return 2.0 / (pi * k); });
-        checkPreset (waveform::Preset::square, { 1, 3, 5, 7, 9, 11, 13, 15, 17 }, [] (int k) { return 4.0 / (pi * k); });
-        checkPreset (waveform::Preset::triangle, { 1, 3, 5, 7, 9, 11, 13, 15, 17 }, [] (int k) { return 8.0 / (pi * pi * k * k); });
+        const auto isOdd = [] (int k) { return k % 2 == 1; };
+
+        checkPreset (waveform::Preset::sine, "has only its 1st harmonic", [] (int k) { return k == 1 ? 1.0 : 0.0; });
+        checkPreset (waveform::Preset::sawtooth, "has every harmonic, the kth at 2/(πk)", [] (int k) { return 2.0 / (pi * k); });
+        checkPreset (waveform::Preset::square, "has odd harmonics at 4/(πk), and the even ones at 0",
+                     [isOdd] (int k) { return isOdd (k) ? 4.0 / (pi * k) : 0.0; });
+        checkPreset (waveform::Preset::triangle, "has odd harmonics at 8/(πk)², and the even ones at 0",
+                     [isOdd] (int k) { return isOdd (k) ? 8.0 / (pi * pi * k * k) : 0.0; });
 
         const auto sine = waveform::decompose (waveform::makePreset (waveform::Preset::sine));
-        check (std::abs (sine.strongest[0].phase) < 1.0e-4, "a sine's harmonic starts at zero, rising");
-        check (isNear (sine.peaks[1], 1.0, 0.001), "a sine peaks at 1");
+        check (std::abs (sine.harmonics[0].phase) < 1.0e-4, "a sine's harmonic starts at zero, rising");
+        check (isNear (sine.peaks[1], 1.0, 0.001) && isNear (sine.peaks[9], 1.0, 0.001), "a sine peaks at 1");
 
         const auto square = waveform::decompose (waveform::makePreset (waveform::Preset::square));
-        check (square.peaks[9] > 1.1f && square.peaks[9] < 1.25f, "nine of a square's sine waves overshoot its corners, as the Gibbs effect says");
+        check (square.peaks[9] > 1.1f && square.peaks[9] < 1.25f, "a square's first nine harmonics overshoot its corners, as the Gibbs effect says");
+
+        const auto isSilent = [] (const waveform::Decomposition& decomposition)
+        {
+            return std::all_of (decomposition.harmonics.begin(), decomposition.harmonics.end(),
+                                [] (const waveform::Partial& harmonic) { return harmonic.amplitude == 0.0f; });
+        };
 
         waveform::Shape flat {};
-        check (waveform::decompose (flat).numStrongest == 0, "a flat wave has no harmonics");
+        check (isSilent (waveform::decompose (flat)), "a flat wave has no harmonics");
 
         waveform::Shape offset {};
         offset.fill (0.5f);
-        check (waveform::decompose (offset).numStrongest == 0, "an offset from zero isn't a harmonic");
+        check (isSilent (waveform::decompose (offset)), "an offset from zero isn't a harmonic");
 
-        // A wave made mostly of its fifth harmonic, with a little of its first.
+        // A wave made mostly of its 5th harmonic, with a little of its 1st.
         waveform::Shape mostlyFifth {};
-
-        for (int i = 0; i < waveform::numPoints; ++i)
-        {
-            const auto t = (double) i / waveform::numPoints;
-            mostlyFifth[(size_t) i] = (float) (0.8 * std::sin (twoPi * 5.0 * t) + 0.2 * std::sin (twoPi * t + 1.0));
-        }
+        waveform::addHarmonic (mostlyFifth, 5, 0.8f, 0.0f);
+        waveform::addHarmonic (mostlyFifth, 1, 0.2f, 1.0f);
 
         const auto fifth = waveform::decompose (mostlyFifth);
-        check (fifth.numStrongest == 2 && fifth.strongest[0].harmonic == 5 && fifth.strongest[1].harmonic == 1,
-               "the strongest harmonic is picked first, even when it isn't the first harmonic");
-        check (std::abs (fifth.strongest[1].phase - 1.0) < 1.0e-3, "a harmonic's phase is found");
+        check (isNear (fifth.harmonics[4].amplitude, 0.8, 1.0e-4) && isNear (fifth.harmonics[0].amplitude, 0.2, 1.0e-4)
+                 && fifth.harmonics[1].amplitude == 0.0f && fifth.harmonics[2].amplitude == 0.0f,
+               "adding sine waves at the 1st and 5th harmonics gives a wave with just those harmonics");
+        check (std::abs (fifth.harmonics[0].phase - 1.0) < 1.0e-3, "a harmonic's phase is found");
     }
 
     void testPlaying()
@@ -189,23 +187,27 @@ namespace
         check (amplitudeAt (steady, 1760.0) / first < 1.0e-3, "it has no 4th harmonic, as only 3 were asked for");
         check (peakOf (slice (signal, 0.8, 1.0)) < 1.0e-4f, "the note fades away after its key is let go");
 
-        setNumPartials (synth, 9);
+        setNumHarmonics (synth, 9);
         const auto nine = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (amplitudeAt (nine, 9 * 440.0) / amplitudeAt (nine, 440.0), 1.0 / 9.0, 0.02), "asking for 9 sine waves adds up to the 9th harmonic");
 
         setPreset (synth, 0, waveform::Preset::square);
-        setNumPartials (synth, 3);
+        setNumHarmonics (synth, 3);
         const auto square = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);   // A3, 220 Hz
         const auto squareFirst = amplitudeAt (square, 220.0);
-        check (isNear (amplitudeAt (square, 660.0) / squareFirst, 1.0 / 3.0, 0.02)
-                 && isNear (amplitudeAt (square, 1100.0) / squareFirst, 1.0 / 5.0, 0.02),
-               "a square played with 3 sine waves has its 1st, 3rd and 5th harmonics");
-        check (amplitudeAt (square, 440.0) / squareFirst < 1.0e-3 && amplitudeAt (square, 1540.0) / squareFirst < 1.0e-3,
-               "...and not its 2nd or 7th");
+        check (isNear (amplitudeAt (square, 660.0) / squareFirst, 1.0 / 3.0, 0.02),
+               "a square played with 3 harmonics has its 1st and 3rd");
+        check (amplitudeAt (square, 440.0) / squareFirst < 1.0e-3 && amplitudeAt (square, 1100.0) / squareFirst < 1.0e-3,
+               "...and not its 2nd, which is 0, or its 5th, which is beyond the 3");
+
+        setNumHarmonics (synth, 5);
+        const auto squareFive = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (amplitudeAt (squareFive, 1100.0) / amplitudeAt (squareFive, 220.0), 1.0 / 5.0, 0.02),
+               "played with 5, it has its 5th too");
 
         // C8, 4186 Hz: a square's 5th harmonic is 20.9 kHz, too high to hear, and its 7th and 9th would alias
         // down to 18.7 kHz and 10.3 kHz.
-        setNumPartials (synth, 9);
+        setNumHarmonics (synth, 9);
         const auto high = slice (play (synth, 108, 0.5, 0.8), 0.1, 0.45);
         const auto highFirst = amplitudeAt (high, 4186.0);
         check (amplitudeAt (high, 3 * 4186.0) / highFirst > 0.3, "a high note keeps the harmonics that can be heard");
@@ -248,6 +250,65 @@ namespace
         check (largestJump < 0.05f, "the note glides to the new wave without a click");
     }
 
+    void testEditingHarmonics()
+    {
+        std::cout << "Raising and lowering harmonics" << std::endl;
+
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setNumHarmonics (synth, 3);
+        const auto plainSine = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+
+        synth.setHarmonicAmplitude (0, 3, 0.5f);
+        const auto& raised = synth.getDecomposition (0);
+        check (isNear (raised.harmonics[2].amplitude, 0.5, 1.0e-4), "a sine's 3rd harmonic can be raised from nothing");
+        check (isNear (raised.harmonics[0].amplitude, 1.0, 1.0e-4) && raised.harmonics[1].amplitude == 0.0f,
+               "...leaving its other harmonics as they were");
+        check (! synth.getPreset (0).has_value(), "...after which it's no longer a sine");
+
+        const auto played = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (amplitudeAt (played, 1320.0) / amplitudeAt (played, 440.0), 0.5, 0.02), "the raised harmonic is heard");
+
+        synth.setHarmonicAmplitude (0, 1, 0.5f);
+        synth.setHarmonicAmplitude (0, 3, 0.0f);
+        const auto lowered = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (synth.getDecomposition (0).harmonics[2].amplitude == 0.0f, "a harmonic can be lowered to nothing");
+        check (isNear (amplitudeAt (lowered, 440.0) / amplitudeAt (plainSine, 440.0), 0.5, 0.02),
+               "lowering a sine's fundamental to half makes it half as loud");
+
+        // A sawtooth's harmonics fall as a sine wave does at half a turn, upside down.
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        const auto sawtooth = synth.getShape (0);
+        const auto secondAmplitude = synth.getDecomposition (0).harmonics[1].amplitude;
+        synth.setHarmonicAmplitude (0, 2, 0.0f);
+        synth.setHarmonicAmplitude (0, 2, secondAmplitude);
+
+        auto largestDifference = 0.0f;
+
+        for (size_t i = 0; i < sawtooth.size(); ++i)
+            largestDifference = std::max (largestDifference, std::abs (synth.getShape (0)[i] - sawtooth[i]));
+
+        check (largestDifference < 1.0e-4f, "a harmonic lowered to nothing and raised again comes back as it was");
+
+        setPreset (synth, 0, waveform::Preset::sine);
+        synth.setHarmonicAmplitude (0, 2, 0.5f);
+        check (std::abs (synth.getDecomposition (0).harmonics[1].phase) < 1.0e-4,
+               "a harmonic raised from nothing after choosing a preset starts like a sine, whatever the wave before had");
+
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        synth.setHarmonicAmplitude (0, 7, 0.3f);
+        check (isNear (synth.getDecomposition (0).harmonics[6].amplitude, 0.3, 1.0e-4),
+               "a harmonic beyond those played can be set too, and is kept for when it's played");
+
+        synth.setHarmonicAmplitude (0, 1, waveform::maxAmplitude);
+        synth.setHarmonicAmplitude (0, 2, waveform::maxAmplitude);
+        synth.setHarmonicAmplitude (0, 3, waveform::maxAmplitude);
+        const auto loud = play (synth, 69, 0.5, 0.8);
+        setPreset (synth, 0, waveform::Preset::sine);
+        const auto plain = play (synth, 69, 0.5, 0.8);
+        check (peakOf (loud) <= peakOf (plain) * 1.001f, "a wave raised beyond full scale is turned down to fit");
+    }
+
     void testOscillators()
     {
         std::cout << "Mixing oscillators" << std::endl;
@@ -277,16 +338,18 @@ namespace
         setParameter (synth, SynthProcessor::onId (1), 1.0f);
         const auto mixed = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);   // A3, 220 Hz
 
+        // A wave whose harmonics add up to more than full scale is turned down to fit, as a square's do.
         const auto& square = synth.getDecomposition (1);
-        const auto squareScale = 0.5 / square.peaks[3];
-        const auto expectedFirst = 1.0 + squareScale * square.strongest[0].amplitude;
-        const auto expectedThird = squareScale * square.strongest[1].amplitude;
+        const auto squareScale = 0.5 / std::max (1.0f, square.peaks[3]);
+        const auto expectedFirst = 1.0 + squareScale * square.harmonics[0].amplitude;
+        const auto expectedThird = squareScale * square.harmonics[2].amplitude;
         const auto mixedFirst = amplitudeAt (mixed, 220.0);
         check (isNear (amplitudeAt (mixed, 660.0) / mixedFirst, expectedThird / expectedFirst, 0.02),
                "a square in the second oscillator adds its 3rd harmonic to the first oscillator's sine");
         check (amplitudeAt (mixed, 440.0) / mixedFirst < 1.0e-3, "...and no 2nd harmonic, as neither wave has one");
+        check (square.peaks[3] > 1.0f, "(a square's first 3 harmonics do add up to more than full scale)");
 
-        setNumPartials (synth, 1, 1);
+        setNumHarmonics (synth, 1, 1);
         const auto fewer = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);
         check (amplitudeAt (fewer, 660.0) / amplitudeAt (fewer, 220.0) < 1.0e-3,
                "each oscillator has its own number of harmonics");
@@ -307,8 +370,10 @@ namespace
             drawn[(size_t) i] = i < waveform::numPoints / 8 ? 1.0f : -0.25f;
 
         original.setShape (1, drawn);
+        original.setHarmonicAmplitude (1, 1, waveform::maxAmplitude);
+        drawn = original.getShape (1);
         setPreset (original, 2, waveform::Preset::triangle);
-        setNumPartials (original, 7, 1);
+        setNumHarmonics (original, 7, 1);
         setParameter (original, SynthProcessor::onId (1), 1.0f);
         setParameter (original, SynthProcessor::levelId (1), 0.4f);
 
@@ -318,11 +383,11 @@ namespace
         SynthProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
 
-        check (restored.getShape (1) == drawn, "a drawn wave is restored to its oscillator");
+        check (restored.getShape (1) == drawn, "a drawn wave is restored to its oscillator, even beyond full scale");
         check (! restored.getPreset (1).has_value(), "...and isn't taken for a preset");
         check (restored.getPreset (2) == waveform::Preset::triangle && restored.getPreset (0) == waveform::Preset::sawtooth,
                "the other oscillators' presets are restored as those presets");
-        check (restored.getNumPartials (1) == 7 && restored.getNumPartials (0) == 3, "each oscillator's number of harmonics is restored");
+        check (restored.getNumHarmonics (1) == 7 && restored.getNumHarmonics (0) == 3, "each oscillator's number of harmonics is restored");
         check (restored.isOn (0) && restored.isOn (1) && ! restored.isOn (2), "which oscillators are on is restored");
         check (isNear (restored.parameters.getRawParameterValue (SynthProcessor::levelId (1))->load(), 0.4, 1.0e-6),
                "oscillator levels are restored");
@@ -379,12 +444,20 @@ namespace
 
         hold (69);
         setPreset (synth, 0, waveform::Preset::square);
-        setNumPartials (synth, 9);
+        setNumHarmonics (synth, 9);
         save ("2-square-9");
 
         setPreset (synth, 0, waveform::Preset::sine);
-        setNumPartials (synth, 3);
+        setNumHarmonics (synth, 3);
         save ("3-sine");
+
+        setPreset (synth, 0, waveform::Preset::square);
+        save ("3a-square-3");
+
+        setPreset (synth, 0, waveform::Preset::sine);
+        synth.setHarmonicAmplitude (0, 2, 0.25f);
+        synth.setHarmonicAmplitude (0, 3, 0.6f);
+        save ("3b-sine-with-raised-harmonics");
 
         // Something a person might draw: a lopsided bump and a dip.
         waveform::Shape drawn {};
@@ -398,7 +471,7 @@ namespace
 
         hold (48);
         synth.setShape (0, drawn);
-        setNumPartials (synth, 5);
+        setNumHarmonics (synth, 5);
         save ("4-drawn-5");
 
         // All three on: a drawn wave, a square at 60% and a triangle at 35%, with the square being edited.
@@ -426,6 +499,7 @@ int main (int argc, char* argv[])
     testDecomposition();
     testPlaying();
     testChangingTheWaveMidNote();
+    testEditingHarmonics();
     testOscillators();
     testSavingAndLoading();
 

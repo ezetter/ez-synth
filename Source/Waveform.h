@@ -5,22 +5,26 @@
 #include <array>
 #include <optional>
 
-/** The wave drawn on the grid, and its breakdown into sine waves. */
+/** The drawn waves, and their breakdown into sine waves. */
 namespace waveform
 {
     /** How many evenly spaced points describe the one wavelength drawn on the grid. */
     inline constexpr int numPoints = 512;
 
-    /** The highest harmonic the breakdown looks for. */
-    inline constexpr int maxHarmonic = 64;
+    /** The most harmonics a wave can be played with: the 1st up to the 9th. */
+    inline constexpr int maxHarmonics = 9;
 
-    /** The most sine waves a wave can be played with. */
-    inline constexpr int maxPartials = 9;
+    /** How many harmonics a wave is played with until the user picks another number. */
+    inline constexpr int defaultHarmonics = 3;
 
-    /** How many sine waves a wave is played with until the user picks another number. */
-    inline constexpr int defaultPartials = 3;
+    /** The highest a harmonic can be raised to. A wave drawn between -1 and 1 can't have a harmonic stronger than
+        4/π, which a square wave's fundamental is.
+    */
+    inline constexpr float maxAmplitude = 1.5f;
 
-    /** One wavelength, as values from -1 to 1. Point i is i / numPoints of the way through the cycle. */
+    /** One wavelength, as values at evenly spaced points: point i is i / numPoints of the way through the cycle.
+        Drawing keeps values between -1 and 1, but raising a harmonic can take a wave beyond that.
+    */
     using Shape = std::array<float, numPoints>;
 
     enum class Preset { sine, sawtooth, square, triangle };
@@ -43,22 +47,25 @@ namespace waveform
         float valueAt (double t) const noexcept;
     };
 
-    /** A shape's strongest harmonics. It holds no heap memory, so the audio thread can copy it. */
+    /** A shape's first harmonics. It holds no heap memory, so the audio thread can copy it. */
     struct Decomposition
     {
-        /** The strongest harmonics, strongest first. Ones too faint to matter are left out, so a sine has just one. */
-        std::array<Partial, maxPartials> strongest {};
-        int numStrongest = 0;
+        /** Harmonics 1 to maxHarmonics, in order, so harmonics[0] is the fundamental. A harmonic the shape
+            doesn't have has an amplitude of 0, as the even harmonics of a square do.
+        */
+        std::array<Partial, maxHarmonics> harmonics {};
 
-        /** peaks[n] is the highest the sum of the n strongest harmonics reaches, above or below zero. */
-        std::array<float, maxPartials + 1> peaks {};
-
-        /** How many sine waves asking for `count` of them gives, as some shapes have fewer. */
-        int getNumUsed (int count) const noexcept   { return juce::jlimit (0, numStrongest, count); }
+        /** peaks[n] is the highest the sum of harmonics 1 to n reaches, above or below zero. */
+        std::array<float, maxHarmonics + 1> peaks {};
     };
 
-    /** Breaks a shape down into the sine waves at its harmonics, with a Fourier transform. Any offset from zero
-        is left out, as it can't be heard.
+    /** Breaks a shape down into the sine waves at its first harmonics, with a Fourier transform. Any offset from
+        zero is left out, as it can't be heard.
     */
     Decomposition decompose (const Shape&);
+
+    /** Adds a sine wave at one of a shape's harmonics. As harmonics are independent of each other, this changes
+        that harmonic of the shape and no other. A negative amplitude takes the sine wave away.
+    */
+    void addHarmonic (Shape&, int harmonic, float amplitude, float phase);
 }

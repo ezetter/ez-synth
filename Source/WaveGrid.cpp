@@ -4,8 +4,10 @@
 
 namespace
 {
-    /** The grid shows a little beyond -1 to 1, the range that can be drawn in, as sine waves can go further. */
-    constexpr float valueRange = 1.35f;
+    /** The grid shows at least a little beyond -1 to 1, the range that can be drawn in, as sine waves can go
+        further.
+    */
+    constexpr float smallestValueRange = 1.35f;
 
     const juce::String degrees (juce::CharPointer_UTF8 ("\xc2\xb0"));
     const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
@@ -21,13 +23,43 @@ WaveGrid::WaveGrid()
 void WaveGrid::setShape (const waveform::Shape& newShape)
 {
     shape = newShape;
+    updateValueRange();
     repaint();
 }
 
 void WaveGrid::setPartials (std::vector<waveform::Partial> newPartials)
 {
     partials = std::move (newPartials);
+    updateValueRange();
     repaint();
+}
+
+void WaveGrid::updateValueRange()
+{
+    // The scale stays put while the user draws, so the line keeps up with the mouse.
+    if (lastDrawn.has_value())
+        return;
+
+    // Raising harmonics can take a wave, or its sine waves, past -1 to 1, so the grid stretches to fit them.
+    auto highest = 1.0f;
+
+    for (const auto value : shape)
+        highest = std::max (highest, std::abs (value));
+
+    for (const auto& partial : partials)
+        highest = std::max (highest, partial.amplitude);
+
+    for (int i = 0; i < 512; ++i)
+    {
+        auto sum = 0.0f;
+
+        for (const auto& partial : partials)
+            sum += partial.valueAt (i / 512.0);
+
+        highest = std::max (highest, std::abs (sum));
+    }
+
+    valueRange = std::max (smallestValueRange, highest * 1.12f);
 }
 
 void WaveGrid::setOscillator (int number, bool isOn)
@@ -151,21 +183,38 @@ void WaveGrid::paintGrid (juce::Graphics& g, juce::Rectangle<float> plot) const
         g.drawVerticalLine (juce::roundToInt (toX (i / 16.0)), plot.getY(), plot.getBottom());
     }
 
-    for (int i = -4; i <= 4; ++i)
+    // Lines every quarter, or further apart when the grid stretches, with -1 and 1 always marked.
+    auto step = 0.25f;
+
+    while (valueRange / step > 6.0f)
+        step *= 2.0f;
+
+    const auto numSteps = (int) (valueRange / step);
+
+    for (int i = -numSteps; i <= numSteps; ++i)
     {
-        g.setColour (i == 0 ? colours::gridLineStrong.brighter (0.4f)
-                            : (i % 4 == 0 ? colours::gridLineStrong : colours::gridLine));
-        g.drawHorizontalLine (juce::roundToInt (toY ((float) i / 4.0f)), plot.getX(), plot.getRight());
+        g.setColour (i == 0 ? colours::gridLineStrong.brighter (0.4f) : colours::gridLine);
+        g.drawHorizontalLine (juce::roundToInt (toY ((float) i * step)), plot.getX(), plot.getRight());
     }
+
+    g.setColour (colours::gridLineStrong);
+    g.drawHorizontalLine (juce::roundToInt (toY (1.0f)), plot.getX(), plot.getRight());
+    g.drawHorizontalLine (juce::roundToInt (toY (-1.0f)), plot.getX(), plot.getRight());
 
     g.setFont (fonts::body (11.5f));
     g.setColour (colours::dimText);
 
-    for (const auto& [value, label] : { std::pair (1.0f, juce::String ("+1")),
-                                        std::pair (0.0f, juce::String ("0")),
-                                        std::pair (-1.0f, minus + "1") })
-        g.drawText (label, juce::Rectangle<float> (plot.getX() - 42.0f, toY (value) - 8.0f, 34.0f, 16.0f),
+    const auto labelStep = std::max (1, (int) (step * 2.0f));
+
+    for (int value = -(int) valueRange; value <= (int) valueRange; ++value)
+    {
+        if (value % labelStep != 0 && std::abs (value) != 1)
+            continue;
+
+        const auto label = value > 0 ? "+" + juce::String (value) : (value < 0 ? minus + juce::String (-value) : juce::String ("0"));
+        g.drawText (label, juce::Rectangle<float> (plot.getX() - 42.0f, toY ((float) value) - 8.0f, 34.0f, 16.0f),
                     juce::Justification::centredRight);
+    }
 
     for (int i = 0; i <= 4; ++i)
         g.drawText (juce::String (i * 90) + degrees,
@@ -220,6 +269,8 @@ void WaveGrid::mouseDrag (const juce::MouseEvent& e)
 void WaveGrid::mouseUp (const juce::MouseEvent&)
 {
     lastDrawn.reset();
+    updateValueRange();
+    repaint();
 }
 
 void WaveGrid::drawTo (juce::Point<float> position)

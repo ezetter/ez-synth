@@ -21,7 +21,7 @@ namespace colours
     /** The sum of the sine waves: the wave as played. */
     inline const juce::Colour sum { 0xffffffff };
 
-    /** Tells the sine waves apart, strongest first. */
+    /** Tells the harmonics apart, from the 1st up. */
     juce::Colour forPartial (int index);
 }
 
@@ -48,6 +48,10 @@ public:
                                bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
 
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
+
+    /** Draws horizontal sliders as a thin track, filled up to a round thumb in the slider's track colour. */
+    void drawLinearSlider (juce::Graphics&, int x, int y, int width, int height, float sliderPos,
+                           float minSliderPos, float maxSliderPos, juce::Slider::SliderStyle, juce::Slider&) override;
 
     /** Draws toggle buttons as on/off switches. */
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&,

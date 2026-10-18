@@ -11,7 +11,7 @@
 */
 struct HarmonicTargets
 {
-    std::array<float, waveform::maxHarmonic + 1> cosines {}, sines {};
+    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
 
     /** Goes up whenever the amplitudes change. */
     int version = 0;
@@ -60,7 +60,7 @@ private:
     int targetsVersion = -1;
 
     // The amplitudes being played, by harmonic, and how much each moves per sample while gliding to the targets.
-    std::array<float, waveform::maxHarmonic + 1> cosines {}, sines {}, cosineSteps {}, sineSteps {};
+    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {}, cosineSteps {}, sineSteps {};
     int glideSamplesLeft = 0;
 
     double phase = 0.0;   // how far through the wave's cycle the voice is, from 0 to 1

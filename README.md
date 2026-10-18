@@ -10,8 +10,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ## Using it
 
 - **Choose an oscillator.** The three cards across the top are the oscillators. Click one to show its wave
-  on the grid. The presets, the drawing and the harmonic buttons all work on that oscillator, and its card
-  is outlined. Only OSC 1 is on to begin with. The others start as a square and a sine, so each sounds
+  on the grid. The presets, the drawing, the harmonic buttons and the harmonic sliders all work on that
+  oscillator, and its card is outlined. Only OSC 1 is on to begin with. The others start as a square and a sine, so each sounds
   different once switched on.
 - **Switch oscillators on and off** with the switch on each card. Every oscillator that's on plays every
   note, added together. You can still edit one that's off: its wave is drawn faintly, and the grid says it's
@@ -20,16 +20,20 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   Double-click a dial to reset it to 100%.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
-- **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the drawing. Draw over one to change it.
-- **Pick how many sine waves to use**, 1 to 9, with the numbered buttons under *Harmonics* (3 to start
-  with). Each oscillator has its own number. The wave is rebuilt from its strongest harmonics: a sawtooth's 1st, 2nd and 3rd, a square's 1st,
-  3rd and 5th. A shape with fewer harmonics than you ask for uses all it has. A sine has only one, so the
-  buttons beyond it are only outlined.
-- **Read the grid.** The faint band is your drawing. Each coloured line is one harmonic, at its true size
-  and phase. The white line is their sum, which is the wave that oscillator plays. Adding harmonics makes the white line
-  follow your drawing more closely.
-- **Read the legend.** It lists each harmonic, strongest first, with its strength relative to the strongest.
-  Once you've played a note, it also shows each harmonic's frequency.
+- **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
+- **Pick how many harmonics to play**, 1 to 9, with the numbered buttons under *Harmonics* (3 to start
+  with). The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
+  its own number. Harmonics the wave doesn't have are still played, at nothing: a square played with 3 has
+  its 1st and 3rd, and its 2nd at 0, so the 2nd button is only outlined.
+- **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
+  amplitude next to it, and once you've played a note, its frequency. A slider changes the wave itself,
+  adding or taking away that harmonic's sine wave and leaving the others alone, so the drawing and the
+  sliders always agree. Raise a sine's 2nd and 3rd harmonics from 0, for instance, and the wave becomes
+  Custom. A harmonic you lower to 0 and raise again comes back as it was. Raised harmonics can take a wave
+  past −1 and +1, and the grid stretches to show it.
+- **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
+  phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
+  Playing more harmonics makes the white line follow the wave more closely.
 - **Play.** Each key plays the wave with the key's pitch as its fundamental frequency. The header shows the
   last note and its frequency. Click the on-screen keys, or in the standalone app type on the computer
   keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. A MIDI
@@ -66,19 +70,22 @@ Apple's validator, run `auval -v aumu Ezs1 Ezsy`.
 ```
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
-pitch with the right harmonics, that oscillators add together at their levels, that high notes leave out harmonics too high to play cleanly, that changing
-the wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
+pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
+together at their levels, that high notes leave out harmonics too high to play cleanly, that changing the
+wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
 ## How it works
 
-- **Breaking the wave down.** The drawing is 512 evenly spaced points. A discrete Fourier transform finds
-  the amplitude and phase of harmonics 1 to 64 (`Source/Waveform.cpp`). Any offset from zero is left out,
-  as it can't be heard. The strongest 9 harmonics are kept, ignoring any more than 60 dB below the
-  strongest.
+- **Breaking the wave down.** A wave is 512 evenly spaced points. A discrete Fourier transform finds the
+  amplitude and phase of its harmonics 1 to 9 (`Source/Waveform.cpp`). Any offset from zero is left out, as
+  it can't be heard, and anything 100 dB below full scale counts as 0.
+- **Changing a harmonic.** Harmonics on 512 points are independent, so adding a sine wave at harmonic k to
+  the wave changes harmonic k and nothing else. A slider adds the difference between the amplitude it's
+  set to and the one the wave has.
 - **Playing it.** Each voice adds up the chosen harmonics as sine waves (`Source/HarmonicVoice.cpp`).
-  Every oscillator's wave is scaled so its sum peaks at the oscillator's level, however many harmonics it
-  has. As every oscillator plays the same note, the oscillators' sine waves at each harmonic add up to a
+  An oscillator plays its harmonics at their amplitudes times its level. If they add up to more than full
+  scale, as a square's do, the oscillator turns them down to fit. As every oscillator plays the same note, the oscillators' sine waves at each harmonic add up to a
   single sine wave, so a voice plays all three oscillators for little more than the cost of one. Harmonics
   fade out between 16 and 19 kHz, so high notes don't alias. When a wave, level, switch or number of
   harmonics changes during a note, the voice glides to the new sound over 10 ms rather than clicking. Notes
@@ -95,7 +102,7 @@ save pictures of the window showing several waves.
 | `Source/OscillatorCard.*` | An oscillator's switch, wave picture and level dial |
 | `Source/WaveGrid.*` | The grid you draw on |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
-| `Source/Legend.*` | The key to the grid's lines |
+| `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
-| `Source/SynthLookAndFeel.*` | Colours, fonts, the knob and buttons |
+| `Source/SynthLookAndFeel.*` | Colours, fonts, the knobs, sliders, switches and buttons |
 | `Tests/Tests.cpp` | The tests and the window pictures |

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "HarmonicSelector.h"
+#include "HarmonicSliders.h"
 #include "Keyboard.h"
-#include "Legend.h"
 #include "OscillatorCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
@@ -11,7 +11,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** The synth's window: a card for each oscillator, preset waves, the grid to draw the chosen oscillator's wave
-    on, how many harmonics it plays, a legend, the volume knob and a piano keyboard.
+    on, how many harmonics it plays with a slider for each, the volume knob and a piano keyboard.
 */
 class SynthEditor final : public juce::AudioProcessorEditor,
                           private juce::Timer
@@ -32,7 +32,7 @@ private:
     {
         int shapeVersion = -1;
         int editedOscillator = -1;
-        std::array<int, SynthProcessor::numOscillators> numPartials {};
+        std::array<int, SynthProcessor::numOscillators> numHarmonics {};
         std::array<bool, SynthProcessor::numOscillators> on {};
 
         bool operator== (const Shown&) const = default;
@@ -41,7 +41,7 @@ private:
     void timerCallback() override;
     void paintNote (juce::Graphics&) const;
     void editOscillator (int);
-    std::vector<waveform::Partial> getPlayedPartials (int oscillator) const;
+    std::vector<waveform::Partial> getPlayedHarmonics (int oscillator) const;
     juce::String getWaveName (int oscillator) const;
 
     SynthProcessor& synthProcessor;
@@ -49,15 +49,14 @@ private:
 
     std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> cards;
     WaveGrid grid;
-    Legend legend;
+    HarmonicSliders harmonicSliders;
     HarmonicSelector harmonicSelector;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     juce::Slider volumeKnob;
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;
     Keyboard keyboard;
 
-    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, harmonicsHint, volumePanel,
-                         volumeCaption, volumeValue;
+    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, volumePanel, volumeCaption, volumeValue;
 
     Shown shown;
     int shownNote = -2;

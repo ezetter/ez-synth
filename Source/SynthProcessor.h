@@ -5,8 +5,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The synth. Up to three oscillators each play a drawn wave, rebuilt from its strongest harmonics, at the pitch
-    of each note, and their sounds are added together.
+/** The synth. Up to three oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
+    each note, and their sounds are added together.
 */
 class SynthProcessor final : public juce::AudioProcessor
 {
@@ -56,13 +56,16 @@ public:
 
     void setShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset> fromPreset = std::nullopt);
 
+    /** Raises or lowers one harmonic of an oscillator's wave, numbered from 1, leaving the others as they are. */
+    void setHarmonicAmplitude (int oscillator, int harmonic, float amplitude);
+
     /** Goes up whenever any oscillator's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 
     bool isOn (int oscillator) const noexcept;
 
-    /** How many sine waves the user asked to play the oscillator's wave with. */
-    int getNumPartials (int oscillator) const noexcept;
+    /** How many harmonics the oscillator plays its wave with, from the 1st up. */
+    int getNumHarmonics (int oscillator) const noexcept;
 
     /** The note most recently started, or -1 if none has been. */
     int getLastNote() const noexcept   { return lastNote.load(); }
@@ -77,24 +80,35 @@ private:
     juce::AudioProcessorEditor* createEditor() override;
     void updateTargets();
 
+    /** Sets an oscillator's wave, remembering the phase of each harmonic it has. */
+    void replaceShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset>);
+
     struct Oscillator
     {
         waveform::Shape shape {};
         std::optional<waveform::Preset> preset;
         waveform::Decomposition decomposition;
+
+        /** Each harmonic's phase the last time it was heard, for when it's raised again from nothing. */
+        std::array<float, waveform::maxHarmonics> phases {};
     };
+
+    /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
+        this, in case the save is corrupt.
+    */
+    static constexpr float maxValue = 32.0f;
 
     /** What an oscillator's parameters were set to, as the audio thread last read them. */
     struct Settings
     {
         bool on = false;
         float level = 0.0f;
-        int numPartials = 0;
+        int numHarmonics = 0;
 
         // Any change at all, however small, means the targets need working out again.
         bool operator== (const Settings& other) const noexcept
         {
-            return on == other.on && juce::exactlyEqual (level, other.level) && numPartials == other.numPartials;
+            return on == other.on && juce::exactlyEqual (level, other.level) && numHarmonics == other.numHarmonics;
         }
     };
 
@@ -102,7 +116,7 @@ private:
     {
         std::atomic<float>* on = nullptr;
         std::atomic<float>* level = nullptr;
-        std::atomic<float>* numPartials = nullptr;
+        std::atomic<float>* numHarmonics = nullptr;
     };
 
     Settings readSettings (int oscillator) const noexcept;

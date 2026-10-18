@@ -21,7 +21,7 @@ public:
 
     void setShape (const waveform::Shape&);
 
-    /** The sine waves to show, strongest first. */
+    /** The sine waves to show, from the 1st harmonic up. */
     void setPartials (std::vector<waveform::Partial>);
 
     /** Says which oscillator's wave is shown, numbered from 1. One that's off is shown faintly. */
@@ -39,6 +39,7 @@ private:
     double toPosition (float x) const;
     float toValue (float y) const;
 
+    void updateValueRange();
     void paintGrid (juce::Graphics&, juce::Rectangle<float> plot) const;
     juce::Path makeCurve (const std::function<float (double position)>& valueAt) const;
     juce::Path makeShapeCurve() const;
@@ -46,6 +47,7 @@ private:
 
     waveform::Shape shape {};
     std::vector<waveform::Partial> partials;
+    float valueRange = 1.35f;   // how far above and below zero the grid shows
     int oscillatorNumber = 1;
     bool on = true;
 
