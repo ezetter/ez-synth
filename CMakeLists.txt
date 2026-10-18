@@ -15,7 +15,6 @@ FetchContent_Declare(JUCE
 FetchContent_MakeAvailable(JUCE)
 
 # One codebase, three products: a standalone Mac app, a VST3 instrument and an Audio Unit instrument.
-# Building copies the plugins into ~/Library/Audio/Plug-Ins so hosts can find them.
 juce_add_plugin(EZSynth
     PRODUCT_NAME "EZ Synth"
     COMPANY_NAME "EZ Synth"
@@ -25,7 +24,6 @@ juce_add_plugin(EZSynth
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE Ezsy
     PLUGIN_CODE Ezs1
     FORMATS Standalone VST3 AU
@@ -67,8 +65,20 @@ target_link_libraries(EZSynth
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
-# JUCE signs the plugins as it copies them, but the linker signs only the standalone app's executable.
-# Sign the whole app too, so macOS sees an intact bundle.
+# Building installs the plugins where hosts find them: the VST3 in the system-wide folder, beside other VST3
+# plugins, and the Audio Unit in the user's own. The system folder needs a one-time step by an administrator,
+# which the build explains; see cmake/InstallPlugin.cmake.
+set(EZSYNTH_VST3_FOLDER "/Library/Audio/Plug-Ins/VST3" CACHE PATH "Where building installs the VST3 plugin")
+set(EZSYNTH_AU_FOLDER "$ENV{HOME}/Library/Audio/Plug-Ins/Components" CACHE PATH "Where building installs the Audio Unit")
+
+foreach(format VST3 AU)
+    add_custom_command(TARGET EZSynth_${format} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" "-Dbundle=$<TARGET_BUNDLE_DIR:EZSynth_${format}>" "-Dfolder=${EZSYNTH_${format}_FOLDER}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/InstallPlugin.cmake"
+        VERBATIM)
+endforeach()
+
+# The linker signs only the standalone app's executable. Sign the whole app too, so macOS sees an intact bundle.
 add_custom_command(TARGET EZSynth_Standalone POST_BUILD
     COMMAND codesign --force --sign - "$<TARGET_BUNDLE_DIR:EZSynth_Standalone>"
     VERBATIM)

@@ -86,11 +86,23 @@ cmake --build build -j 10
 This builds:
 
 - `build/EZSynth_artefacts/Release/Standalone/EZ Synth.app`, the standalone app
-- `EZ Synth.vst3`, copied into `~/Library/Audio/Plug-Ins/VST3`
-- `EZ Synth.component` (Audio Unit), copied into `~/Library/Audio/Plug-Ins/Components`
+- `EZ Synth.vst3`, installed into the system-wide `/Library/Audio/Plug-Ins/VST3`, with other VST3 plugins
+- `EZ Synth.component` (Audio Unit), installed into your own `~/Library/Audio/Plug-Ins/Components`
 
-Rescan plugins in your DAW to find it under instruments, made by EZ Synth. To check the Audio Unit with
-Apple's validator, run `auval -v aumu Ezs1 Ezsy`.
+Only an administrator can add to `/Library/Audio/Plug-Ins/VST3`, so the first time, the build says it
+couldn't install the VST3 there. Run this once, with your password, to make the plugin's folder there and
+give it to your account. Every build after that installs the VST3 without asking:
+
+```bash
+sudo mkdir "/Library/Audio/Plug-Ins/VST3/EZ Synth.vst3" && sudo chown "$USER" "/Library/Audio/Plug-Ins/VST3/EZ Synth.vst3"
+```
+
+To install somewhere else, set `EZSYNTH_VST3_FOLDER` or `EZSYNTH_AU_FOLDER` when configuring, such as
+`-DEZSYNTH_VST3_FOLDER="$HOME/Library/Audio/Plug-Ins/VST3"`.
+
+Restart your DAW, or rescan its plugins, to find EZ Synth among its instruments, made by EZ Synth. GarageBand
+and Logic use the Audio Unit; Cubase uses the VST3. To check the Audio Unit with Apple's validator, run
+`auval -v aumu Ezs1 Ezsy`.
 
 ## Testing
 
