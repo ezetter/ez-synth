@@ -13,7 +13,7 @@ namespace colours
     inline const juce::Colour gridLineStrong { 0xff2a2f3a };
     inline const juce::Colour text { 0xffe8eaf0 };
     inline const juce::Colour dimText { 0xff8b92a3 };
-    inline const juce::Colour accent { 0xffffb454 };
+    inline const juce::Colour accent { 0xff24ab18 };
 
     /** The wave as drawn. */
     inline const juce::Colour drawn { 0xff9fb3d9 };
