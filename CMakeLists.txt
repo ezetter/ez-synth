@@ -27,6 +27,7 @@ juce_add_plugin(EZSynth
     PLUGIN_MANUFACTURER_CODE Ezsy
     PLUGIN_CODE Ezs1
     FORMATS Standalone VST3 AU
+    ICON_BIG Resources/Icon.png
     VST3_CATEGORIES Instrument Synth
     AU_MAIN_TYPE kAudioUnitType_MusicDevice)
 
@@ -114,3 +115,8 @@ target_link_libraries(EZSynthTests PRIVATE EZSynth)
 add_executable(EZSynthMakeFactoryPresets Tools/MakeFactoryPresets.cpp)
 target_include_directories(EZSynthMakeFactoryPresets PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
 target_link_libraries(EZSynthMakeFactoryPresets PRIVATE EZSynth)
+
+# Draws the icon in Resources/Icon.png. Run it after changing the drawing, then build again.
+add_executable(EZSynthMakeIcon Tools/MakeIcon.cpp)
+target_include_directories(EZSynthMakeIcon PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
+target_link_libraries(EZSynthMakeIcon PRIVATE EZSynth)
