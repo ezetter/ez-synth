@@ -22,6 +22,8 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= oscillatorTuneTarget (0))
+            info = { Kind::oscillatorTune, target - oscillatorTuneTarget (0) };
         else if (target < oscillatorLevelTarget (0))
             info = { Kind::oscillatorOn, target - oscillatorOnTarget (0) };
         else if (target < oscillatorHarmonicsTarget (0))
@@ -57,6 +59,7 @@ namespace modulation
             case Kind::filterOn:             return filter + " switch";
             case Kind::filterCutoff:         return filter + " cutoff";
             case Kind::filterResonance:      return filter + " resonance";
+            case Kind::oscillatorTune:       return oscillator + " tune";
         }
 
         return {};
@@ -78,6 +81,7 @@ namespace modulation
             case Kind::filterOn:             return filter + "On";
             case Kind::filterCutoff:         return filter + "Cutoff";
             case Kind::filterResonance:      return filter + "Resonance";
+            case Kind::oscillatorTune:       return oscillator + "Tune";
         }
 
         return {};

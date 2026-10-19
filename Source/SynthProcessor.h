@@ -3,6 +3,7 @@
 #include "HarmonicVoice.h"
 #include "Modulation.h"
 #include "Patch.h"
+#include "Tuning.h"
 #include "Waveform.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -34,6 +35,7 @@ public:
     static juce::String onId (int oscillator);
     static juce::String levelId (int oscillator);
     static juce::String harmonicsId (int oscillator);
+    static juce::String tuneId (int oscillator);
 
     /** The IDs of a filter's parameters: whether it's on, its cutoff frequency in hertz, and its resonance. */
     struct FilterIds
@@ -101,6 +103,9 @@ public:
 
     /** How many harmonics the oscillator plays its wave with, from the 1st up. */
     int getNumHarmonics (int oscillator) const noexcept;
+
+    /** How many semitones up from the note the oscillator plays, from 0 to an octave. */
+    float getTune (int oscillator) const noexcept;
 
     //==============================================================================
     // The LFOs. An LFO plays its wave just as it's drawn, rather than rebuilt from harmonics.
@@ -281,6 +286,7 @@ private:
         std::atomic<float>* on = nullptr;
         std::atomic<float>* level = nullptr;
         std::atomic<float>* numHarmonics = nullptr;
+        std::atomic<float>* tune = nullptr;
     };
 
     struct FilterParameters

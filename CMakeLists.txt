@@ -50,6 +50,8 @@ target_sources(EZSynth
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
         Source/SynthProcessor.cpp
+        Source/Tuning.cpp
+        Source/TuneSlider.cpp
         Source/WaveGrid.cpp
         Source/Waveform.cpp)
 

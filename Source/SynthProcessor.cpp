@@ -128,7 +128,16 @@ namespace
                     juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f, asPercentage()),
                 std::make_unique<juce::AudioParameterInt> (
                     juce::ParameterID { SynthProcessor::harmonicsId (i), 1 }, name + " Harmonics",
-                    1, waveform::maxHarmonics, waveform::defaultHarmonics)));
+                    1, waveform::maxHarmonics, waveform::defaultHarmonics),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::tuneId (i), 1 }, name + " Tune",
+                    juce::NormalisableRange<float> (0.0f, tuning::octave), 0.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float semitones, int) { return tuning::toText (semitones); })
+                        .withValueFromStringFunction ([] (const juce::String& text)
+                        {
+                            return text.retainCharacters ("0123456789.").getFloatValue();
+                        }))));
         }
 
         // Both filters start switched out, at cutoffs that change the sound clearly once they're switched in.
@@ -219,6 +228,7 @@ namespace
 juce::String SynthProcessor::onId (int oscillator)          { return modulation::getKey (modulation::oscillatorOnTarget (oscillator)); }
 juce::String SynthProcessor::levelId (int oscillator)       { return modulation::getKey (modulation::oscillatorLevelTarget (oscillator)); }
 juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation::getKey (modulation::oscillatorHarmonicsTarget (oscillator)); }
+juce::String SynthProcessor::tuneId (int oscillator)        { return modulation::getKey (modulation::oscillatorTuneTarget (oscillator)); }
 juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
@@ -236,7 +246,8 @@ SynthProcessor::SynthProcessor()
     for (int i = 0; i < numOscillators; ++i)
         oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
                                              parameters.getRawParameterValue (levelId (i)),
-                                             parameters.getRawParameterValue (harmonicsId (i)) };
+                                             parameters.getRawParameterValue (harmonicsId (i)),
+                                             parameters.getRawParameterValue (tuneId (i)) };
 
     for (auto [filter, ids] : { std::pair (modulation::lowPass, lowPassIds), std::pair (modulation::highPass, highPassIds) })
         filterParameters[(size_t) filter] = { parameters.getRawParameterValue (ids.on),
@@ -424,6 +435,7 @@ void SynthProcessor::updatePatch()
         oscillator.on = source.on->load() >= 0.5f;
         oscillator.level = source.level->load();
         oscillator.numHarmonics = juce::jlimit (1, waveform::maxHarmonics, juce::roundToInt (source.numHarmonics->load()));
+        oscillator.tune = source.tune->load();
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
@@ -470,6 +482,11 @@ bool SynthProcessor::isOn (int oscillator) const noexcept
 int SynthProcessor::getNumHarmonics (int oscillator) const noexcept
 {
     return juce::roundToInt (oscillatorParameters[(size_t) oscillator].numHarmonics->load());
+}
+
+float SynthProcessor::getTune (int oscillator) const noexcept
+{
+    return oscillatorParameters[(size_t) oscillator].tune->load();
 }
 
 void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
@@ -826,6 +843,20 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     const auto velocityTree = state.getChildWithName ("VELOCITY");
     state.removeChild (velocityTree, nullptr);
+
+    // A save from before a control existed, such as an oscillator's tune, gives it its default, rather than leaving
+    // it as it was.
+    for (auto* parameter : getParameters())
+    {
+        if (auto* withId = dynamic_cast<juce::RangedAudioParameter*> (parameter);
+            withId != nullptr && ! state.getChildWithProperty ("id", withId->paramID).isValid())
+        {
+            juce::ValueTree missing ("PARAM");
+            missing.setProperty ("id", withId->paramID, nullptr);
+            missing.setProperty ("value", withId->convertFrom0to1 (withId->getDefaultValue()), nullptr);
+            state.appendChild (missing, nullptr);
+        }
+    }
 
     parameters.replaceState (state);
 

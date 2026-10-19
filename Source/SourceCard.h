@@ -31,8 +31,10 @@ protected:
     /** Sets the picture of the wave, from values across one cycle. It's stretched to fill the picture's height. */
     void setWaveValues (std::vector<float>);
 
-    /** Sets the two lines under the name. A card can put a control in place of the second. */
-    void setLines (const juce::String& first, const juce::String& second);
+    /** Sets the two lines under the name. A card can put a control in place of the second. The first line can end
+        with a detail, shown at its right.
+    */
+    void setLines (const juce::String& first, const juce::String& second, const juce::String& firstDetail = {});
 
     juce::Rectangle<int> getSecondLineArea() const noexcept   { return secondLineArea; }
     bool isOn() const   { return onSwitch.getToggleState(); }
@@ -43,7 +45,7 @@ protected:
 private:
     void paintWave (juce::Graphics&) const;
 
-    juce::String name, dialCaption, firstLine, secondLine;
+    juce::String name, dialCaption, firstLine, secondLine, firstLineDetail;
     std::vector<float> waveValues;
     bool selected = false;
 
@@ -55,14 +57,14 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SourceCard)
 };
 
-/** An oscillator's card: its switch, its wave and how many harmonics it plays, and its level. */
+/** An oscillator's card: its switch, its wave, how many harmonics it plays and how far it's tuned up, and its level. */
 class OscillatorCard final : public SourceCard
 {
 public:
     OscillatorCard (int oscillator, juce::AudioProcessorValueTreeState&);
 
-    /** Shows the harmonics the oscillator plays, and the name of its wave. */
-    void setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName);
+    /** Shows the harmonics the oscillator plays, the name of its wave, and how many semitones it's tuned up. */
+    void setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName, float tune);
 };
 
 /** An LFO's card: its switch, its wave, whether it loops or runs once, and its period. */

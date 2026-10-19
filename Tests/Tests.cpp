@@ -722,6 +722,7 @@ namespace
             setNumHarmonics (busy, 9, i);
             busy.setAssignment (modulation::oscillatorLevelTarget (i), { i, 0.5f, false });
             busy.setAssignment (modulation::harmonicTarget (i, 4), { (i + 1) % 3, 0.5f, false, 0.3f * (float) i });
+            setParameter (busy, SynthProcessor::tuneId (i), 3.5f * (float) i);
         }
 
         setFilter (busy, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
@@ -1064,6 +1065,150 @@ namespace
         letGo (synth, 69);
     }
 
+    void testTuning()
+    {
+        std::cout << "Tuning oscillators" << std::endl;
+
+        check (juce::exactlyEqual (tuning::snap (6.93), 7.0) && juce::exactlyEqual (tuning::snap (6.85), 6.85),
+               "dragging the tune snaps to a whole semitone within a tenth of one");
+        check (tuning::getIntervalName (7) == "perfect 5th" && tuning::getIntervalName (4) == "major 3rd"
+                 && tuning::getIntervalName (0) == "unison" && tuning::getIntervalName (12) == "octave",
+               "whole semitones are named as the intervals they make");
+        check (tuning::toText (7.0f) == "+7 st" && tuning::toText (0.15f) == "+0.15 st" && tuning::toText (0.0f) == "0 st",
+               "tunings are written in semitones");
+        check (std::all_of (tuning::markedIntervals.begin(), tuning::markedIntervals.end(),
+                            [] (const tuning::Interval& interval)
+                            {
+                                return tuning::getIntervalName (interval.semitones).endsWith (juce::String (interval.number)
+                                                                                                + (interval.number == 2 ? "nd" : interval.number == 3 ? "rd" : "th"))
+                                    && ! tuning::getIntervalName (interval.semitones).startsWith ("minor");
+                            }),
+               "the slider marks the major and perfect intervals from the 2nd to the 7th");
+
+        SynthProcessor synth;
+        check (juce::exactlyEqual (synth.getTune (0), 0.0f) && juce::exactlyEqual (synth.getTune (2), 0.0f),
+               "the oscillators start in tune");
+
+        // A sine on the first oscillator, in tune, and one on the second, tuned up.
+        setPreset (synth, 0, waveform::Preset::sine);
+        setPreset (synth, 1, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::onId (1), 1.0f);
+
+        const auto playTuned = [&synth] (float tune)
+        {
+            setParameter (synth, SynthProcessor::tuneId (1), tune);
+            return slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
+        };
+
+        const auto inTune = playTuned (0.0f);
+        const auto bothAt440 = amplitudeAt (inTune, 440.0);
+
+        for (const auto& [tune, name] : { std::pair (7.0f, "a 5th"), std::pair (12.0f, "an octave"), std::pair (0.5f, "a quarter tone") })
+        {
+            const auto signal = playTuned (tune);
+            const auto tuned = 440.0 * std::pow (2.0, tune / 12.0);
+            check (isNear (amplitudeAt (signal, tuned) / amplitudeAt (signal, 440.0), 1.0, 0.03)
+                     && isNear (amplitudeAt (signal, 440.0) / bothAt440, 0.5, 0.03),
+                   "an oscillator tuned up " + juce::String (name) + " plays that far above the note, alongside one in tune");
+        }
+
+        // The harmonics too high to play cleanly are worked out at the oscillator's own pitch: a C8 tuned up an
+        // octave plays its 2nd harmonic, at 16.7 kHz, partly faded, and leaves out its 3rd, at 25.1 kHz.
+        setParameter (synth, SynthProcessor::onId (0), 0.0f);
+        setPreset (synth, 1, waveform::Preset::sawtooth);
+        setParameter (synth, SynthProcessor::tuneId (1), 12.0f);
+        const auto high = slice (play (synth, 108, 0.5, 0.8), 0.1, 0.5);
+        const auto c9 = 2.0 * juce::MidiMessage::getMidiNoteInHertz (108);
+        check (amplitudeAt (high, c9) > 0.05 && amplitudeAt (high, sampleRate - 3.0 * c9) < 1.0e-3 * amplitudeAt (high, c9),
+               "an oscillator tuned up leaves out the harmonics too high to play at its pitch");
+
+        // An envelope can sweep the tune: here, straight up a 5th as each key is pressed.
+        setPreset (synth, 1, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::onId (0), 1.0f);
+        setParameter (synth, SynthProcessor::tuneId (1), 0.0f);
+        setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 7.0f / 12.0f, false });
+        auto signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
+        check (isNear (amplitudeAt (signal, 440.0 * std::pow (2.0, 7.0 / 12.0)) / amplitudeAt (signal, 440.0), 1.0, 0.03),
+               "an envelope on an oscillator's tune moves its pitch");
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), {});
+
+        // Retuning while a note plays glides there without a click. A sine's steepest step between samples grows with
+        // its pitch, by half as much again for a 5th up.
+        setParameter (synth, SynthProcessor::onId (0), 0.0f);
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> output;
+
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+            if (block == 20)
+                setParameter (synth, SynthProcessor::tuneId (1), 7.0f);
+
+            synth.processBlock (buffer, midi);
+            output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        const auto largestJump = [&output] (size_t from, size_t to)
+        {
+            auto largest = 0.0f;
+
+            for (auto i = from; i < to; ++i)
+                largest = std::max (largest, std::abs (output[i] - output[i - 1]));
+
+            return largest;
+        };
+
+        const auto switchPoint = (size_t) (20 * blockSize);
+        check (largestJump (switchPoint, output.size()) < 1.55f * largestJump (2000, switchPoint),
+               "retuning a playing note glides to the new pitch without a click");
+        letGo (synth, 69);
+
+        // The window's tune slider shows whichever oscillator is chosen, and moving between them leaves each one's
+        // tune as it was.
+        {
+            SynthProcessor shown;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            setParameter (shown, SynthProcessor::tuneId (0), 7.0f);
+            setParameter (shown, SynthProcessor::tuneId (2), 3.4f);
+
+            for (const auto source : { 2, 0, SynthProcessor::numOscillators, 1, 2, 0 })
+            {
+                shown.editedSource = source;
+                synthEditor.refresh();
+            }
+
+            check (isNear (shown.getTune (0), 7.0, 1.0e-6) && juce::exactlyEqual (shown.getTune (1), 0.0f)
+                     && isNear (shown.getTune (2), 3.4, 1.0e-6),
+                   "choosing one oscillator after another in the window leaves each one's tune as it was");
+        }
+
+        // Saving and loading.
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (juce::exactlyEqual (restored.getTune (1), 7.0f) && juce::exactlyEqual (restored.getTune (0), 0.0f),
+               "each oscillator's tune is restored");
+
+        // Loading a save from before oscillators could be tuned puts them in tune.
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), (int) state.getSize());
+
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+            if (auto* tune = xml->getChildByAttribute ("id", SynthProcessor::tuneId (i)))
+                xml->removeChildElement (tune, true);
+
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (juce::exactlyEqual (restored.getTune (1), 0.0f), "a save from before oscillators could be tuned loads them in tune");
+    }
+
     void testPresets()
     {
         std::cout << "Presets" << std::endl;
@@ -1375,6 +1520,8 @@ namespace
         synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true, 0.25f });
         synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
         synth.setAssignment (modulation::harmonicTarget (0, 2), { 0, 0.8f, false, 0.5f });
+        setParameter (synth, SynthProcessor::tuneId (0), 7.0f);
+        setParameter (synth, SynthProcessor::tuneId (2), 3.4f);
         synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
         synth.setAssignment (modulation::filterResonanceTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.6f, false });
         setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
@@ -1442,6 +1589,7 @@ int main (int argc, char* argv[])
     testEnvelopes();
     testVelocity();
     testShowingMovedHarmonics();
+    testTuning();
     testPresets();
     testFactoryPresets();
     testSavingAndLoading();

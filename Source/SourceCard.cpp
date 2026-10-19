@@ -46,12 +46,13 @@ void SourceCard::setWaveValues (std::vector<float> values)
     repaint();
 }
 
-void SourceCard::setLines (const juce::String& first, const juce::String& second)
+void SourceCard::setLines (const juce::String& first, const juce::String& second, const juce::String& firstDetail)
 {
-    if (first != firstLine || second != secondLine)
+    if (first != firstLine || second != secondLine || firstDetail != firstLineDetail)
     {
         firstLine = first;
         secondLine = second;
+        firstLineDetail = firstDetail;
         repaint();
     }
 }
@@ -93,8 +94,18 @@ void SourceCard::paint (juce::Graphics& g)
     g.drawText (name, nameArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (12.5f));
+    auto firstLineLeft = firstLineArea;
+
+    if (firstLineDetail.isNotEmpty())
+    {
+        const auto detailWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), firstLineDetail)) + 2;
+        g.setColour (colours::dimText);
+        g.drawText (firstLineDetail, firstLineLeft.removeFromRight (detailWidth), juce::Justification::centredRight);
+        firstLineLeft.removeFromRight (6);
+    }
+
     g.setColour (on ? colours::text.withAlpha (0.85f) : colours::dimText);
-    g.drawText (firstLine, firstLineArea, juce::Justification::centredLeft, true);
+    g.drawText (firstLine, firstLineLeft, juce::Justification::centredLeft, true);
     g.setColour (colours::dimText);
     g.drawText (secondLine, secondLineArea, juce::Justification::centredLeft, true);
 
@@ -163,7 +174,7 @@ OscillatorCard::OscillatorCard (int oscillator, juce::AudioProcessorValueTreeSta
     modulatable::setTarget (dial, modulation::oscillatorLevelTarget (oscillator));
 }
 
-void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName)
+void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName, float tune)
 {
     std::vector<float> values (160, 0.0f);
 
@@ -173,7 +184,8 @@ void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, c
 
     const auto numHarmonics = (int) harmonics.size();
     setWaveValues (std::move (values));
-    setLines (waveName, juce::String (numHarmonics) + (numHarmonics == 1 ? " harmonic" : " harmonics"));
+    setLines (waveName, juce::String (numHarmonics) + (numHarmonics == 1 ? " harmonic" : " harmonics"),
+              tuning::toWholeSemitones (tune) != 0 ? tuning::toText (tune) : juce::String());
 }
 
 //==============================================================================

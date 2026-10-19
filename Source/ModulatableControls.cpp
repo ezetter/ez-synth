@@ -51,6 +51,14 @@ namespace modulatable
     }
 }
 
+double ModulatableSlider::snapValue (double attemptedValue, DragMode dragMode)
+{
+    if (snap == nullptr || dragMode == notDragging || juce::ModifierKeys::currentModifiers.isAltDown())
+        return attemptedValue;
+
+    return snap (attemptedValue);
+}
+
 void ModulatableSlider::mouseDown (const juce::MouseEvent& e)
 {
     alternateClick = e.mods.isPopupMenu();

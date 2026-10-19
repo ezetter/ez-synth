@@ -31,6 +31,12 @@ namespace modulatable
 class ModulatableSlider final : public juce::Slider
 {
 public:
+    /** If set, moves where the user drags the slider to, such as onto a whole number. Holding Option while dragging
+        leaves it where it's dragged.
+    */
+    std::function<double (double value)> snap;
+
+    double snapValue (double attemptedValue, DragMode) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;

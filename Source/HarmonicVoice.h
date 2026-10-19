@@ -11,8 +11,8 @@ struct HarmonicSound final : public juce::SynthesiserSound
     bool appliesToChannel (int) override   { return true; }
 };
 
-/** Plays a note: the sine waves at the harmonics of every oscillator that's on, added together, then through the
-    note's own high pass and low pass filters.
+/** Plays a note: the sine waves at the harmonics of every oscillator that's on, each oscillator tuned up from the
+    note by as much as it's set to, added together, then through the note's own high pass and low pass filters.
 
     Every few milliseconds the voice works out where the LFOs and envelopes have moved the controls, and glides
     there, so changes to the waves, the controls and the modulation never click. Each voice runs the envelopes, and
@@ -56,10 +56,16 @@ public:
     float getVelocity() const noexcept   { return noteVelocity; }
 
 private:
-    /** Where the voice is heading: its harmonics, its filters and its loudness, with the LFOs applied. */
+    /** Each oscillator's harmonics, from the 1st up, as the amplitudes of the cosine and sine waves that make them. */
+    using Harmonics = std::array<std::array<float, waveform::maxHarmonics + 1>, modulation::numOscillators>;
+
+    /** Where the voice is heading: its oscillators' harmonics and tunings, its filters and its loudness, with the
+        LFOs applied.
+    */
     struct Targets
     {
-        std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
+        Harmonics cosines {}, sines {};
+        std::array<float, modulation::numOscillators> tunes {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
     };
@@ -74,8 +80,10 @@ private:
 
     const Patch& patch;
 
-    // The amplitudes being played, by harmonic, gliding towards the targets.
-    std::array<float, waveform::maxHarmonics + 1> cosines {}, sines {};
+    // The amplitudes being played, by oscillator and harmonic, and how far each oscillator is tuned up, all gliding
+    // towards the targets.
+    Harmonics cosines {}, sines {};
+    std::array<double, modulation::numOscillators> tunes {};
 
     std::array<FilterStage, modulation::numFilters> filters { FilterStage (juce::dsp::StateVariableTPTFilterType::lowpass),
                                                               FilterStage (juce::dsp::StateVariableTPTFilterType::highpass) };
@@ -86,7 +94,7 @@ private:
     bool startingNote = false;
     bool waitingForEnvelopes = false;   // the key's been let go, but an envelope moving the loudness is still releasing
     juce::int64 samplesSinceNoteOn = 0;
-    double phase = 0.0;   // how far through the wave's cycle the voice is, from 0 to 1
+    std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
     double frequency = 440.0;
     int noteNumber = 69;
     int pitchWheel = 8192;

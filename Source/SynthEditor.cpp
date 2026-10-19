@@ -45,6 +45,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
 
     addAndMakeVisible (grid);
     addChildComponent (harmonicSliders);
+    addChildComponent (tuneSlider);
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
@@ -118,7 +119,12 @@ void SynthEditor::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
 
     if (! SynthProcessor::isLfo (edited))
+    {
         g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
+        g.setColour (colours::outline);
+        g.fillRect (tuneDivider);
+        g.setColour (colours::dimText);
+    }
 
     g.drawText ("VOLUME", volumeCaption, juce::Justification::centred);
 
@@ -229,6 +235,12 @@ void SynthEditor::resized()
     side.removeFromTop (8);
     harmonicSelector.setBounds (side.removeFromTop (34));
     side.removeFromTop (14);
+
+    // The oscillator's tune, at the foot of the panel.
+    tuneSlider.setBounds (side.removeFromBottom (TuneSlider::preferredHeight));
+    side.removeFromBottom (12);
+    tuneDivider = side.removeFromBottom (1);
+    side.removeFromBottom (10);
     harmonicSliders.setBounds (side);
 }
 
@@ -272,6 +284,7 @@ void SynthEditor::refresh()
     for (int i = 0; i < SynthProcessor::numOscillators; ++i)
     {
         now.numHarmonics[(size_t) i] = synthProcessor.getNumHarmonics (i);
+        now.tuneCents[(size_t) i] = juce::roundToInt (synthProcessor.getTune (i) * 100.0f);
         now.on[(size_t) i] = synthProcessor.isOn (i);
     }
 
@@ -302,6 +315,7 @@ void SynthEditor::refresh()
 
         harmonicSelector.setVisible (! editingLfo);
         harmonicSliders.setVisible (! editingLfo);
+        tuneSlider.setVisible (! editingLfo);
         lfoPanel.setVisible (editingLfo);
 
         if (editingLfo)
@@ -317,6 +331,7 @@ void SynthEditor::refresh()
                 harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)));
                 modulatable::setTarget (harmonicSelector, modulation::oscillatorHarmonicsTarget (edited));
                 harmonicSliders.setOscillator (edited);
+                tuneSlider.setOscillator (*synthProcessor.parameters.getParameter (SynthProcessor::tuneId (edited)), edited);
             }
 
             const auto harmonics = getPlayedHarmonics (edited);
@@ -349,7 +364,7 @@ void SynthEditor::refresh()
         if (! changed && live == liveWaves[(size_t) i])
             continue;
 
-        oscillatorCards[(size_t) i]->setWave (live.harmonics, getWaveName (synthProcessor.getPreset (i)));
+        oscillatorCards[(size_t) i]->setWave (live.harmonics, getWaveName (synthProcessor.getPreset (i)), synthProcessor.getTune (i));
 
         if (i == edited)
             grid.setMovedPartials (live.moved ? std::optional (live.harmonics) : std::nullopt);
@@ -380,11 +395,16 @@ void SynthEditor::refresh()
 
     presetBar.refresh();
 
-    if (const auto note = synthProcessor.getLastNote(); note != shownNote)
+    // The harmonics' pitches are those of the note, raised by as much as the oscillator is tuned up.
+    if (const auto note = synthProcessor.getLastNote(); note != shownNote || changed)
     {
+        if (note != shownNote)
+            repaint (noteArea);
+
         shownNote = note;
-        harmonicSliders.setFundamental (note >= 0 ? std::optional (juce::MidiMessage::getMidiNoteInHertz (note)) : std::nullopt);
-        repaint (noteArea);
+        const auto tune = editingLfo ? 0.0f : synthProcessor.getTune (edited);
+        harmonicSliders.setFundamental (note >= 0 ? std::optional (juce::MidiMessage::getMidiNoteInHertz (note) * tuning::toRatio (tune))
+                                                  : std::nullopt);
     }
 }
 

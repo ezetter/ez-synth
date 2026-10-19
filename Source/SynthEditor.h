@@ -11,6 +11,7 @@
 #include "SourceCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
+#include "TuneSlider.h"
 #include "WaveGrid.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -47,6 +48,7 @@ private:
         int modulationVersion = -1;
         int editedSource = -1;
         std::array<int, SynthProcessor::numOscillators> numHarmonics {};
+        std::array<int, SynthProcessor::numOscillators> tuneCents {};
         std::array<bool, SynthProcessor::numSources> on {};
 
         bool operator== (const Shown&) const = default;
@@ -66,6 +68,7 @@ private:
     std::array<std::unique_ptr<LfoCard>, SynthProcessor::numLfos> lfoCards;
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
+    TuneSlider tuneSlider;
     LfoPanel lfoPanel;
     FilterPanel filterPanel;
     std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
@@ -76,7 +79,7 @@ private:
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;
     Keyboard keyboard;
 
-    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, volumePanel, volumeCaption, volumeValue;
+    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, tuneDivider, volumePanel, volumeCaption, volumeValue;
 
     Shown shown;
     std::array<SynthProcessor::LiveWave, SynthProcessor::numOscillators> liveWaves;

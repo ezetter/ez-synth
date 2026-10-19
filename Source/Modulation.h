@@ -38,9 +38,11 @@ namespace modulation
     constexpr int filterOnTarget (int filter)                       { return 37 + filter; }
     constexpr int filterCutoffTarget (int filter)                   { return 39 + filter; }
     constexpr int filterResonanceTarget (int filter)                { return 41 + filter; }
-    inline constexpr int numTargets = 43;
+    constexpr int oscillatorTuneTarget (int oscillator)             { return 43 + oscillator; }
+    inline constexpr int numTargets = 46;
 
-    enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance };
+    enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
+                      oscillatorTune };
 
     struct TargetInfo
     {

@@ -1,5 +1,7 @@
 #include "HarmonicVoice.h"
 
+#include "Tuning.h"
+
 namespace
 {
     constexpr auto twoPi = juce::MathConstants<double>::twoPi;
@@ -72,7 +74,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     pitchWheel = currentPitchWheelPosition;
     updateFrequency();
 
-    phase = 0.0;
+    phases.fill (0.0);
     noteVelocity = velocity;
     samplesSinceNoteOn = 0;
 
@@ -193,6 +195,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     {
         const auto& oscillator = patch.oscillators[(size_t) i];
 
+        // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on.
+        targets.tunes[(size_t) i] = tuning::octave * modulate (oscillatorTuneTarget (i), oscillator.tune / tuning::octave);
+
         if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
             continue;
 
@@ -213,10 +218,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
                 amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
 
-            // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. Every oscillator plays the same note, so their sine waves
-            // at each harmonic add up to one.
-            targets.cosines[(size_t) harmonic] += scale * amplitude * oscillator.phaseSines[index];
-            targets.sines[(size_t) harmonic] += scale * amplitude * oscillator.phaseCosines[index];
+            // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ.
+            targets.cosines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseSines[index];
+            targets.sines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseCosines[index];
         }
     }
 
@@ -259,6 +263,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     {
         cosines = targets.cosines;
         sines = targets.sines;
+        std::copy (targets.tunes.begin(), targets.tunes.end(), tunes.begin());
         gain.setCurrentAndTargetValue (targets.gain);
 
         for (size_t i = 0; i < filters.size(); ++i)
@@ -272,50 +277,71 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     for (size_t i = 0; i < filters.size(); ++i)
         filters[i].setTargets (targets.filters[i].on, targets.filters[i].cutoff, targets.filters[i].resonance);
 
-    // Each chunk moves the harmonics its share of the way to their targets, so they follow smoothly however the
-    // targets move.
+    // Each chunk moves the harmonics and tunings its share of the way to their targets, so they follow smoothly
+    // however the targets move. A tuning holds steady through the chunk.
     const auto glideSamples = std::max ((double) numSamples, glideSeconds * sampleRate);
-    std::array<float, waveform::maxHarmonics + 1> cosineSteps {}, sineSteps {};
+    const auto glideShare = numSamples / glideSamples;
+    std::array<double, modulation::numOscillators> cyclesPerSample {};
 
-    for (size_t k = 1; k < cosines.size(); ++k)
+    for (size_t i = 0; i < tunes.size(); ++i)
     {
-        // Gliding this way never quite arrives, so a harmonic that's nearly there is put there, and one fading out
-        // stops being worked out once it's gone.
-        if (std::abs (targets.cosines[k] - cosines[k]) < 1.0e-6f && std::abs (targets.sines[k] - sines[k]) < 1.0e-6f)
-        {
-            cosines[k] = targets.cosines[k];
-            sines[k] = targets.sines[k];
-            continue;
-        }
+        tunes[i] += (targets.tunes[i] - tunes[i]) * glideShare;
 
-        cosineSteps[k] = (float) ((targets.cosines[k] - cosines[k]) / glideSamples);
-        sineSteps[k] = (float) ((targets.sines[k] - sines[k]) / glideSamples);
+        if (std::abs (targets.tunes[i] - tunes[i]) < 1.0e-4)
+            tunes[i] = targets.tunes[i];
+
+        cyclesPerSample[i] = frequency * tuning::toRatio (tunes[i]) / sampleRate;
     }
 
     // Each harmonic is a point going round a circle, turned by a fixed angle every sample, which is much cheaper
-    // than calling sin() every sample. The points are placed afresh from the phase each chunk, so rounding errors
-    // can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
-    const auto cyclesPerSample = frequency / sampleRate;
-    std::array<size_t, waveform::maxHarmonics> harmonics {};
-    std::array<double, waveform::maxHarmonics> x {}, y {}, turnX {}, turnY {};
-    std::array<float, waveform::maxHarmonics> bandLimits {};
-    size_t numHarmonics = 0;
-
-    for (size_t k = 1; k < cosines.size(); ++k)
+    // than calling sin() every sample. The points are placed afresh from each oscillator's phase each chunk, so
+    // rounding errors can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
+    struct Playing
     {
-        if (cosines[k] == 0.0f && sines[k] == 0.0f && cosineSteps[k] == 0.0f && sineSteps[k] == 0.0f)
-            continue;
+        float cosine = 0.0f, sine = 0.0f, cosineStep = 0.0f, sineStep = 0.0f, bandLimit = 0.0f;
+        double x = 0.0, y = 0.0, turnX = 0.0, turnY = 0.0;
+        size_t oscillator = 0, harmonic = 1;
+    };
 
-        const auto angle = twoPi * (double) k * phase;
-        const auto turn = twoPi * (double) k * cyclesPerSample;
+    std::array<Playing, (size_t) (modulation::numOscillators * waveform::maxHarmonics)> playing;
+    size_t numPlaying = 0;
 
-        harmonics[numHarmonics] = k;
-        x[numHarmonics] = std::cos (angle);
-        y[numHarmonics] = std::sin (angle);
-        turnX[numHarmonics] = std::cos (turn);
-        turnY[numHarmonics] = std::sin (turn);
-        bandLimits[numHarmonics] = bandLimitGain ((double) k * frequency, sampleRate);
-        ++numHarmonics;
+    for (size_t i = 0; i < cosines.size(); ++i)
+    {
+        for (size_t k = 1; k < cosines[i].size(); ++k)
+        {
+            auto& cosine = cosines[i][k];
+            auto& sine = sines[i][k];
+            const auto targetCosine = targets.cosines[i][k];
+            const auto targetSine = targets.sines[i][k];
+
+            // Gliding this way never quite arrives, so a harmonic that's nearly there is put there, and one fading
+            // out stops being worked out once it's gone.
+            if (std::abs (targetCosine - cosine) < 1.0e-6f && std::abs (targetSine - sine) < 1.0e-6f)
+            {
+                cosine = targetCosine;
+                sine = targetSine;
+
+                if (cosine == 0.0f && sine == 0.0f)
+                    continue;
+            }
+
+            const auto angle = twoPi * (double) k * phases[i];
+            const auto turn = twoPi * (double) k * cyclesPerSample[i];
+
+            auto& harmonic = playing[numPlaying++];
+            harmonic.cosine = cosine;
+            harmonic.sine = sine;
+            harmonic.cosineStep = (float) ((targetCosine - cosine) / glideSamples);
+            harmonic.sineStep = (float) ((targetSine - sine) / glideSamples);
+            harmonic.bandLimit = bandLimitGain ((double) k * cyclesPerSample[i] * sampleRate, sampleRate);
+            harmonic.x = std::cos (angle);
+            harmonic.y = std::sin (angle);
+            harmonic.turnX = std::cos (turn);
+            harmonic.turnY = std::sin (turn);
+            harmonic.oscillator = i;
+            harmonic.harmonic = k;
+        }
     }
 
     auto& lowPass = filters[(size_t) modulation::lowPass];
@@ -334,17 +360,17 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     {
         auto value = 0.0f;
 
-        for (size_t i = 0; i < numHarmonics; ++i)
+        for (size_t i = 0; i < numPlaying; ++i)
         {
-            const auto k = harmonics[i];
-            value += bandLimits[i] * (cosines[k] * (float) x[i] + sines[k] * (float) y[i]);
+            auto& harmonic = playing[i];
+            value += harmonic.bandLimit * (harmonic.cosine * (float) harmonic.x + harmonic.sine * (float) harmonic.y);
 
-            const auto nextX = x[i] * turnX[i] - y[i] * turnY[i];
-            y[i] = x[i] * turnY[i] + y[i] * turnX[i];
-            x[i] = nextX;
+            const auto nextX = harmonic.x * harmonic.turnX - harmonic.y * harmonic.turnY;
+            harmonic.y = harmonic.x * harmonic.turnY + harmonic.y * harmonic.turnX;
+            harmonic.x = nextX;
 
-            cosines[k] += cosineSteps[k];
-            sines[k] += sineSteps[k];
+            harmonic.cosine += harmonic.cosineStep;
+            harmonic.sine += harmonic.sineStep;
         }
 
         if (highPassActive)
@@ -371,8 +397,18 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    phase += numSamples * cyclesPerSample;
-    phase -= std::floor (phase);
+    for (size_t i = 0; i < numPlaying; ++i)
+    {
+        cosines[playing[i].oscillator][playing[i].harmonic] = playing[i].cosine;
+        sines[playing[i].oscillator][playing[i].harmonic] = playing[i].sine;
+    }
+
+    for (size_t i = 0; i < phases.size(); ++i)
+    {
+        phases[i] += numSamples * cyclesPerSample[i];
+        phases[i] -= std::floor (phases[i]);
+    }
+
     samplesSinceNoteOn += numSamples;
 
     for (size_t i = 0; i < envelopeRuns.size(); ++i)

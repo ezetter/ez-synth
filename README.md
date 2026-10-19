@@ -19,6 +19,15 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   off.
 - **Set each oscillator's level** with the dial on its card, from 0 to 100% of its full amplitude.
   Double-click a dial to reset it to 100%.
+- **Tune an oscillator** up from the note with the **Tune** slider at the foot of the panel beside the grid,
+  anywhere from in tune to an octave above. Ticks mark each semitone, and the major and perfect intervals
+  are numbered 2 to 7: a major 2nd, 3rd, 6th and 7th, and a perfect 4th and 5th. Dragging the slider snaps
+  to the nearest semitone once you're within a tenth of one, so the intervals are easy to land on exactly.
+  Hold Option while dragging to tune between them, for a slight detune. On a whole semitone the slider
+  names the interval, such as *+7 st · perfect 5th*, and the interval's number lights up. Double-click it
+  to put it back in tune. An oscillator that's tuned shows how far on its card, and the harmonics'
+  frequencies beside the sliders are its own. Like the other controls, the tune can be moved by an LFO, for
+  vibrato, or an envelope, to sweep the pitch with each note.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
@@ -83,8 +92,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### Giving an LFO, envelope or velocity something to move
 
-- **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch or level, the
-  harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
+- **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
+  the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
   switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
   the top part a **phase** and **polarity** too, and both can move the same control at once, their
@@ -206,7 +215,8 @@ and Logic use the Audio Unit; Cubase uses the VST3. To check the Audio Unit with
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
-together at their levels, that the filters cut and boost each harmonic by as much as theory says, that LFOs
+together at their levels, that a tuned oscillator plays as far above the note as it's tuned, glides there
+without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, that LFOs
 move each kind of control by the range and in the direction they're set to, looping or once per note, and
 as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
@@ -227,11 +237,12 @@ save pictures of the window showing several waves.
   set to and the one the wave has.
 - **Playing it.** Each voice adds up the chosen harmonics as sine waves (`Source/HarmonicVoice.cpp`).
   An oscillator plays its harmonics at their amplitudes times its level. If they add up to more than full
-  scale, as a square's do, the oscillator turns them down to fit. As every oscillator plays the same note, the oscillators' sine waves at each harmonic add up to a
-  single sine wave, so a voice plays all three oscillators for little more than the cost of one. Harmonics
-  fade out between 16 and 19 kHz, so high notes don't alias. When a wave, level, switch or number of
-  harmonics changes during a note, the voice glides to the new sound, most of the way in 5 ms and all of it
-  in about 20, rather than clicking. Notes
+  scale, as a square's do, the oscillator turns them down to fit. Each oscillator keeps its own phase and
+  plays at the note's frequency times 2 to the power of its tune in octaves, so oscillators tuned apart
+  drift in and out of step as they should. Only the harmonics that are sounding are worked out. Harmonics
+  fade out between 16 and 19 kHz, worked out at each oscillator's own pitch, so high notes don't alias.
+  When a wave, level, switch, tune or number of harmonics changes during a note, the voice glides to the
+  new sound, most of the way in 5 ms and all of it in about 20, rather than clicking. Notes
   start in 8 ms and fade out over 250 ms when let go.
 - **Filtering.** Each note goes through its own high pass filter, then low pass filter
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Both are
@@ -259,6 +270,8 @@ save pictures of the window showing several waves.
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
+| `Source/Tuning.*` | Semitones, the intervals they make, and snapping to them |
+| `Source/TuneSlider.*` | The tune slider, with its intervals marked |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
