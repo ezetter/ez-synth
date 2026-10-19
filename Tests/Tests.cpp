@@ -987,6 +987,83 @@ namespace
                "a save from before velocity could be assigned still has softer notes play quieter");
     }
 
+    /** Lets go of a held note and plays on until it's faded, so the next test starts in silence. */
+    void letGo (SynthProcessor& synth, int note)
+    {
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        synth.processBlock (buffer, midi);
+
+        for (int block = 0; block < (int) (1.0 * sampleRate / blockSize); ++block)
+        {
+            juce::MidiBuffer nothing;
+            synth.processBlock (buffer, nothing);
+        }
+    }
+
+    void testShowingMovedHarmonics()
+    {
+        std::cout << "Showing moved harmonics" << std::endl;
+
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        auto shown = synth.getLiveWave (0);
+        check (! shown.moved && shown.harmonics.size() == 3 && juce::exactlyEqual (shown.harmonics[0].amplitude, 1.0f)
+                 && juce::exactlyEqual (shown.harmonics[1].amplitude, 0.0f),
+               "with nothing moving them, an oscillator's harmonics are shown as set");
+
+        // A looping sine LFO, a quarter of a period behind, raises the 2nd harmonic from nothing: halfway along its
+        // slider at the LFO's peak, which comes half a period in.
+        setLfo (synth, 0, 1.0f, false, waveform::Preset::sine);
+        synth.setAssignment (modulation::harmonicTarget (0, 2), { 0, 1.0f, false, 0.25f });
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+
+        for (int block = 0; block < juce::roundToInt (0.5 * sampleRate / blockSize); ++block)
+        {
+            juce::MidiBuffer nothing;
+            synth.processBlock (buffer, nothing);
+        }
+
+        const auto lfoValue = std::sin (juce::MathConstants<double>::twoPi * (synth.getLfoProgress (0).value_or (0.0) - 0.25));
+        shown = synth.getLiveWave (0);
+        check (shown.moved && shown.harmonics.size() == 3
+                 && isNear (shown.harmonics[1].amplitude, modulation::amplitudeRange().convertFrom0to1 ((float) (0.5 * lfoValue)), 0.01)
+                 && juce::exactlyEqual (shown.harmonics[0].amplitude, 1.0f),
+               "an LFO moving a harmonic shows it where the LFO has it now, leaving the others as set");
+
+        setParameter (synth, SynthProcessor::lfoOnId (0), 0.0f);
+        check (! synth.getLiveWave (0).moved, "...and as set once the LFO is switched off");
+        synth.setAssignment (modulation::harmonicTarget (0, 2), {});
+
+        // An envelope raising the 3rd harmonic holds it at its sustain, 70%, while the note is held. What's shown is
+        // what's heard.
+        synth.setAssignment (modulation::harmonicTarget (0, 3), { modulation::envelopeSource (0), 1.0f, false });
+        check (! synth.getLiveWave (0).moved, "an envelope moves nothing before a note is played");
+
+        const auto signal = play (synth, 69, 2.0, 1.0);
+        shown = synth.getLiveWave (0);
+        const auto expected = modulation::amplitudeRange().convertFrom0to1 (0.7f);
+        const auto held = slice (signal, 0.6, 1.0);
+
+        check (shown.moved && isNear (shown.harmonics[2].amplitude, expected, 1.0e-3),
+               "an envelope moving a harmonic shows it where the newest note's envelope has it");
+        check (isNear (amplitudeAt (held, 3 * 440.0) / amplitudeAt (held, 440.0),
+                       shown.harmonics[2].amplitude / shown.harmonics[0].amplitude, 0.02),
+               "...which is how strong it's heard");
+        letGo (synth, 69);
+        synth.setAssignment (modulation::harmonicTarget (0, 3), {});
+
+        // Velocity taking away harmonics for softer notes.
+        synth.setVelocityAssignment (modulation::volumeTarget, {});
+        synth.setVelocityAssignment (modulation::oscillatorHarmonicsTarget (0), { modulation::velocitySource, 1.0f, false });
+        play (synth, 69, 2.0, 0.2, 0.5f);
+        shown = synth.getLiveWave (0);
+        check (shown.moved && shown.harmonics.size() == 1, "velocity moving the number of harmonics shows a soft note's fewer");
+        letGo (synth, 69);
+    }
+
     void testPresets()
     {
         std::cout << "Presets" << std::endl;
@@ -1297,6 +1374,7 @@ namespace
         synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
         synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true, 0.25f });
         synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
+        synth.setAssignment (modulation::harmonicTarget (0, 2), { 0, 0.8f, false, 0.5f });
         synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
         synth.setAssignment (modulation::filterResonanceTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.6f, false });
         setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
@@ -1363,6 +1441,7 @@ int main (int argc, char* argv[])
     testLfos();
     testEnvelopes();
     testVelocity();
+    testShowingMovedHarmonics();
     testPresets();
     testFactoryPresets();
     testSavingAndLoading();

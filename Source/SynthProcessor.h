@@ -162,6 +162,24 @@ public:
     */
     std::optional<float> getSourceValue (int source, float phase = 0.0f) const;
 
+    /** Where the LFO, envelope and velocity moving a control have moved it, from 0 to 1 along its travel, as the
+        newest note has it, or nothing if none of them is moving it now.
+    */
+    std::optional<float> getLivePosition (int target) const;
+
+    /** An oscillator's harmonics as the newest note plays them, from the 1st up to as many as it's playing, with
+        whatever the LFOs, envelopes and velocity have done to them and to how many there are.
+    */
+    struct LiveWave
+    {
+        std::vector<waveform::Partial> harmonics;
+        bool moved = false;   // whether anything is moving them, rather than them being as set
+
+        bool operator== (const LiveWave&) const noexcept;
+    };
+
+    LiveWave getLiveWave (int oscillator) const;
+
     /** Goes up whenever an assignment changes. */
     int getModulationVersion() const noexcept   { return modulationVersion; }
 

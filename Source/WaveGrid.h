@@ -22,8 +22,13 @@ public:
 
     void setShape (const waveform::Shape&);
 
-    /** The sine waves to show, from the 1st harmonic up. */
+    /** The sine waves to show, from the 1st harmonic up, as they're set. */
     void setPartials (std::vector<waveform::Partial>);
+
+    /** Where LFOs, envelopes or velocity have moved the sine waves, and how many there are, as the newest note plays
+        them, or nothing to show them as set. They and their sum are drawn there, while the drawn wave stays as drawn.
+    */
+    void setMovedPartials (std::optional<std::vector<waveform::Partial>>);
 
     /** Says which oscillator's wave is shown, numbered from 1. One that's off is shown faintly. */
     void setOscillator (int number, bool isOn);
@@ -51,6 +56,7 @@ private:
     float toValue (float y) const;
 
     void updateValueRange();
+    static float getHighestValue (const std::vector<waveform::Partial>&);
     void paintGrid (juce::Graphics&, juce::Rectangle<float> plot) const;
     void paintHarmonics (juce::Graphics&, float opacity) const;
     void paintHeader (juce::Graphics&, juce::Rectangle<float> bounds) const;
@@ -60,6 +66,7 @@ private:
 
     waveform::Shape shape {};
     std::vector<waveform::Partial> partials;
+    std::optional<std::vector<waveform::Partial>> movedPartials;
     float valueRange = 1.35f;   // how far above and below zero the grid shows
     int sourceNumber = 1;
     bool on = true;

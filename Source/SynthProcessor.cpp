@@ -645,6 +645,63 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
     return std::nullopt;
 }
 
+std::optional<float> SynthProcessor::getLivePosition (int target) const
+{
+    // The LFO or envelope and the velocity moving the control add up.
+    std::optional<float> offset;
+
+    for (const auto* assignment : { &assignments[(size_t) target], &velocityAssignments[(size_t) target] })
+        if (assignment->isActive())
+            if (const auto sourceValue = getSourceValue (assignment->source, assignment->phase))
+                offset = offset.value_or (0.0f) + assignment->offset (*sourceValue);
+
+    if (! offset.has_value())
+        return std::nullopt;
+
+    return juce::jlimit (0.0f, 1.0f, getPosition (target) + *offset);
+}
+
+bool SynthProcessor::LiveWave::operator== (const LiveWave& other) const noexcept
+{
+    return moved == other.moved
+        && std::equal (harmonics.begin(), harmonics.end(), other.harmonics.begin(), other.harmonics.end(),
+                       [] (const waveform::Partial& a, const waveform::Partial& b)
+                       {
+                           return a.harmonic == b.harmonic && juce::exactlyEqual (a.amplitude, b.amplitude)
+                               && juce::exactlyEqual (a.phase, b.phase);
+                       });
+}
+
+SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
+{
+    // Moved as the voices move them (HarmonicVoice::getTargets).
+    LiveWave wave;
+    auto numHarmonics = getNumHarmonics (oscillator);
+
+    if (const auto moved = getLivePosition (modulation::oscillatorHarmonicsTarget (oscillator)))
+    {
+        numHarmonics = modulation::positionToHarmonics (*moved);
+        wave.moved = true;
+    }
+
+    const auto& harmonics = getDecomposition (oscillator).harmonics;
+
+    for (int harmonic = 1; harmonic <= numHarmonics; ++harmonic)
+    {
+        auto partial = harmonics[(size_t) harmonic - 1];
+
+        if (const auto moved = getLivePosition (modulation::harmonicTarget (oscillator, harmonic)))
+        {
+            partial.amplitude = modulation::amplitudeRange().convertFrom0to1 (*moved);
+            wave.moved = true;
+        }
+
+        wave.harmonics.push_back (partial);
+    }
+
+    return wave;
+}
+
 float SynthProcessor::getPosition (int target) const
 {
     if (modulation::isParameter (target))

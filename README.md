@@ -116,6 +116,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   dot and a stretch from where it's set, following the newest note and how hard it was played. An LFO's card lists everything it
   moves, with each one's range, phase and polarity. Click one to change it, or its cross to stop the LFO
   moving it.
+- **Watch the wave change.** While anything moves an oscillator's harmonics, or how many it has, the grid
+  draws its sine waves, and their sum, where they've been moved to, many times a second, and says
+  **As played** in light blue. The drawn wave stays as you drew it, so you can see how far the sound has
+  moved from it. The oscillator's card above follows along too. The grid stretches to fit a harmonic
+  raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
 ### Presets
 
@@ -206,6 +211,7 @@ move each kind of control by the range and in the direction they're set to, loop
 as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
 the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
+the grid shows harmonics where LFOs, envelopes and velocity have moved them, as strong as they're heard, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
 clipping, that the arrows step through the factory presets, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
@@ -242,7 +248,7 @@ save pictures of the window showing several waves.
   the note was played. The two movements add up before the control is kept within its travel. Cutoffs travel by octave, and harmonic sliders give weak
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
   then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
-  shows the same positions for the latest note.
+  shows the same positions for the latest note, on the controls and in the grid's sine waves.
 - **Between the threads.** The window analyses the drawing on the message thread. The analysis reaches the
   audio thread through a lock that the audio thread only ever tries, so audio never waits on drawing.
 

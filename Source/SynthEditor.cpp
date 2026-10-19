@@ -282,13 +282,12 @@ void SynthEditor::refresh()
     const auto editingLfo = SynthProcessor::isLfo (edited);
     const auto lfo = edited - SynthProcessor::numOscillators;
 
-    if (now != shown)
+    const auto changed = now != shown;
+
+    if (changed)
     {
         for (size_t i = 0; i < oscillatorCards.size(); ++i)
-        {
-            oscillatorCards[i]->setWave (getPlayedHarmonics ((int) i), getWaveName (synthProcessor.getPreset ((int) i)));
             oscillatorCards[i]->setSelected ((int) i == edited);
-        }
 
         for (size_t i = 0; i < lfoCards.size(); ++i)
         {
@@ -341,6 +340,23 @@ void SynthEditor::refresh()
         showModulation();
     }
 
+    // The oscillators' waves as the newest note plays them, which LFOs, envelopes and velocity can change all the time.
+    // The grid draws its oscillator's harmonics, and their sum, where they've been moved to, over the wave as drawn.
+    for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+    {
+        auto live = synthProcessor.getLiveWave (i);
+
+        if (! changed && live == liveWaves[(size_t) i])
+            continue;
+
+        oscillatorCards[(size_t) i]->setWave (live.harmonics, getWaveName (synthProcessor.getPreset (i)));
+
+        if (i == edited)
+            grid.setMovedPartials (live.moved ? std::optional (live.harmonics) : std::nullopt);
+
+        liveWaves[(size_t) i] = std::move (live);
+    }
+
     // An LFO's period and where it has got to change all the time, so they're shown on every refresh.
     if (editingLfo)
     {
@@ -380,20 +396,7 @@ void SynthEditor::showModulation()
         const auto visible = parentVisible && component.isVisible();
 
         if (const auto target = modulatable::getTarget (component))
-        {
-            std::optional<float> offset;
-
-            // Where the LFO or envelope moving the control is for it, with its phase, and how hard the newest note was
-            // played.
-            for (const auto* assignment : { &synthProcessor.getAssignment (*target), &synthProcessor.getVelocityAssignment (*target) })
-                if (assignment->isActive() && visible)
-                    if (const auto sourceValue = synthProcessor.getSourceValue (assignment->source, assignment->phase))
-                        offset = offset.value_or (0.0f) + assignment->offset (*sourceValue);
-
-            modulatable::setLivePosition (component, offset.has_value()
-                                                         ? std::optional (juce::jlimit (0.0f, 1.0f, synthProcessor.getPosition (*target) + *offset))
-                                                         : std::nullopt);
-        }
+            modulatable::setLivePosition (component, visible ? synthProcessor.getLivePosition (*target) : std::nullopt);
 
         for (auto* child : component.getChildren())
             show (*child, visible);

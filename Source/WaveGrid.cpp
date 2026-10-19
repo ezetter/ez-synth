@@ -30,8 +30,41 @@ void WaveGrid::setShape (const waveform::Shape& newShape)
 void WaveGrid::setPartials (std::vector<waveform::Partial> newPartials)
 {
     partials = std::move (newPartials);
+    movedPartials.reset();
     updateValueRange();
     repaint();
+}
+
+void WaveGrid::setMovedPartials (std::optional<std::vector<waveform::Partial>> newMovedPartials)
+{
+    movedPartials = std::move (newMovedPartials);
+
+    // The grid stretches to fit sine waves moved beyond it, but doesn't shrink back as they fall, so it holds
+    // steady as they swing. It fits the harmonics as set again when they change.
+    if (movedPartials.has_value() && ! lastDrawn.has_value())
+        valueRange = std::max (valueRange, getHighestValue (*movedPartials) * 1.12f);
+
+    repaint();
+}
+
+float WaveGrid::getHighestValue (const std::vector<waveform::Partial>& sineWaves)
+{
+    auto highest = 0.0f;
+
+    for (const auto& partial : sineWaves)
+        highest = std::max (highest, partial.amplitude);
+
+    for (int i = 0; i < 512; ++i)
+    {
+        auto sum = 0.0f;
+
+        for (const auto& partial : sineWaves)
+            sum += partial.valueAt (i / 512.0);
+
+        highest = std::max (highest, std::abs (sum));
+    }
+
+    return highest;
 }
 
 void WaveGrid::updateValueRange()
@@ -41,23 +74,10 @@ void WaveGrid::updateValueRange()
         return;
 
     // Raising harmonics can take a wave, or its sine waves, past -1 to 1, so the grid stretches to fit them.
-    auto highest = 1.0f;
+    auto highest = std::max (1.0f, getHighestValue (partials));
 
     for (const auto value : shape)
         highest = std::max (highest, std::abs (value));
-
-    for (const auto& partial : partials)
-        highest = std::max (highest, partial.amplitude);
-
-    for (int i = 0; i < 512; ++i)
-    {
-        auto sum = 0.0f;
-
-        for (const auto& partial : partials)
-            sum += partial.valueAt (i / 512.0);
-
-        highest = std::max (highest, std::abs (sum));
-    }
 
     valueRange = std::max (smallestValueRange, highest * 1.12f);
 }
@@ -180,20 +200,22 @@ void WaveGrid::paint (juce::Graphics& g)
 
 void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
 {
+    const auto& shown = movedPartials.has_value() ? *movedPartials : partials;
+
     // The faintest sine waves are drawn last, so the strong ones can't hide them.
-    for (auto i = (int) partials.size() - 1; i >= 0; --i)
+    for (auto i = (int) shown.size() - 1; i >= 0; --i)
     {
-        const auto& partial = partials[(size_t) i];
+        const auto& partial = shown[(size_t) i];
         g.setColour (colours::forPartial (i).withAlpha (0.9f * opacity));
         g.strokePath (makeCurve ([&partial] (double position) { return partial.valueAt (position); }),
                       juce::PathStrokeType (1.7f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
-    const auto sumCurve = makeCurve ([this] (double position)
+    const auto sumCurve = makeCurve ([&shown] (double position)
     {
         auto value = 0.0f;
 
-        for (const auto& partial : partials)
+        for (const auto& partial : shown)
             value += partial.valueAt (position);
 
         return value;
@@ -212,8 +234,18 @@ void WaveGrid::paintHeader (juce::Graphics& g, juce::Rectangle<float> bounds) co
 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    g.drawText (name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH"), header,
-                juce::Justification::centredLeft);
+    const auto caption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH");
+    g.drawText (caption, header, juce::Justification::centredLeft);
+
+    // Says when the harmonics are shown where something has moved them, in the colour of anything moving controls.
+    if (movedPartials.has_value() && ! lfoPeriod.has_value())
+    {
+        const auto captionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  ");
+        g.setColour (colours::modulation);
+        g.drawText (dot + "  AS PLAYED", header.withTrimmedLeft (captionWidth), juce::Justification::centredLeft);
+        g.setColour (colours::dimText);
+    }
+
     g.setFont (fonts::body (12.5f));
 
     if (on)

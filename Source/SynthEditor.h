@@ -79,6 +79,7 @@ private:
     juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, volumePanel, volumeCaption, volumeValue;
 
     Shown shown;
+    std::array<SynthProcessor::LiveWave, SynthProcessor::numOscillators> liveWaves;
     int shownNote = -2;
     bool focusGiven = false;
 
