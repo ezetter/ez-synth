@@ -135,8 +135,17 @@ namespace modulation
         return shortestPeriod * std::pow (longestPeriod / shortestPeriod, position);
     }
 
+    juce::String phaseToText (float phase)
+    {
+        return juce::String (juce::roundToInt (phase * 360.0f)) + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0"));
+    }
+
     float lfoValue (const waveform::Shape& shape, double periodsGone, bool once)
     {
+        // An LFO that runs once, shifted to start later, waits at its first value until it does.
+        if (once && periodsGone <= 0.0)
+            return shape.front();
+
         if (once && periodsGone >= 1.0)
             return shape.back();
 

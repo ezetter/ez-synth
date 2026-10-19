@@ -118,8 +118,10 @@ public:
     */
     std::optional<double> getLfoProgress (int lfo) const noexcept;
 
-    /** Where the LFO's wave is now, from -1 to 1. */
-    float getLfoValue (int lfo) const;
+    /** Where the LFO's wave is now, from -1 to 1, or where it was the given proportion of a period ago, for a control
+        it's moving with a phase.
+    */
+    float getLfoValue (int lfo, float phase = 0.0f) const;
 
     //==============================================================================
     // The envelopes, which run with each note.
@@ -142,7 +144,9 @@ public:
 
     const modulation::Assignment& getAssignment (int target) const noexcept;
 
-    /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on. */
+    /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on.
+        Only an LFO's phase counts.
+    */
     void setAssignment (int target, const modulation::Assignment&);
 
     /** What the key velocity moves. Velocity can move a control as well as an LFO or envelope does. It always moves
@@ -153,9 +157,10 @@ public:
 
     /** An LFO's, envelope's or velocity's value now, as the newest note has it, or nothing if it isn't moving
         anything: an LFO that's off, or that runs once before any key has been pressed, or an envelope or velocity
-        when no note is sounding.
+        when no note is sounding. An LFO's value is taken the given phase behind, as a control assigned it with that
+        phase has it.
     */
-    std::optional<float> getSourceValue (int source) const;
+    std::optional<float> getSourceValue (int source, float phase = 0.0f) const;
 
     /** Goes up whenever an assignment changes. */
     int getModulationVersion() const noexcept   { return modulationVersion; }

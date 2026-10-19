@@ -85,6 +85,12 @@ namespace modulation
         /** Whether the control falls as the source rises, rather than rising with it. */
         bool inverted = false;
 
+        /** For an LFO, how far its wave is shifted to the right for this control, as a proportion of its period, from
+            0, in step with the LFO, up to just short of a whole period. The control follows where the LFO was that
+            long ago, so controls on the same LFO can move out of step with each other.
+        */
+        float phase = 0.0f;
+
         bool isActive() const noexcept   { return source >= 0; }
 
         /** How far the source at a value moves a control along its travel, from where it's set. */
@@ -103,9 +109,16 @@ namespace modulation
 
         bool operator== (const Assignment& other) const noexcept
         {
-            return source == other.source && juce::exactlyEqual (range, other.range) && inverted == other.inverted;
+            return source == other.source && juce::exactlyEqual (range, other.range) && inverted == other.inverted
+                && juce::exactlyEqual (phase, other.phase);
         }
     };
+
+    /** The furthest an LFO's wave can be shifted for a control: a degree short of a whole period. */
+    inline constexpr float latestPhase = 359.0f / 360.0f;
+
+    /** A phase, from 0 to 1, in whole degrees, such as "90°". */
+    juce::String phaseToText (float phase);
 
     using Assignments = std::array<Assignment, numTargets>;
 

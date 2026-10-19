@@ -18,19 +18,21 @@ public:
 
 private:
     /** The controls for one thing moving the control: what it is, or whether it's on, its range and, for an LFO or
-        envelope, its polarity.
+        envelope, its polarity. The phase only counts for an LFO.
     */
     struct Section
     {
-        Section (juce::StringArray choices, bool hasPolarity);
+        Section (juce::StringArray choices, bool hasPhaseAndPolarity);
 
-        const bool hasPolarity;
+        const bool hasPhaseAndPolarity;
 
         ChoiceButtons choice;
         juce::Slider range;
+        juce::Slider phase;   // in degrees
         ChoiceButtons polarity { { "Normal", "Inverted" } };
 
-        juce::Rectangle<int> choiceCaption, rangeCaption, rangeValue, polarityCaption, descriptionArea;
+        juce::Rectangle<int> choiceCaption, rangeCaption, rangeValue, phaseCaption, phaseValue, polarityCaption,
+                             descriptionArea;
     };
 
     void setUp (Section&);
@@ -48,7 +50,7 @@ private:
 
     Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true };
 
-    /** Velocity always moves a control down for softer notes, so it has no polarity. */
+    /** Velocity always moves a control down for softer notes, so it has no polarity, nor any phase. */
     Section velocity { { "Off", "On" }, false };
 
     juce::Rectangle<int> titleArea, dividerArea;

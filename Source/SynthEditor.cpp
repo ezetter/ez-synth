@@ -374,12 +374,6 @@ void SynthEditor::refresh()
 
 void SynthEditor::showModulation()
 {
-    // Where each LFO and envelope is now, and how hard the newest note was played, for those moving anything.
-    std::array<std::optional<float>, modulation::numSources + 1> sourceValues;
-
-    for (int i = 0; i <= modulation::velocitySource; ++i)
-        sourceValues[(size_t) i] = synthProcessor.getSourceValue (i);
-
     // Controls that are hidden, such as the harmonic sliders while an LFO is shown, are left alone.
     std::function<void (juce::Component&, bool)> show = [&] (juce::Component& component, bool parentVisible)
     {
@@ -389,9 +383,11 @@ void SynthEditor::showModulation()
         {
             std::optional<float> offset;
 
+            // Where the LFO or envelope moving the control is for it, with its phase, and how hard the newest note was
+            // played.
             for (const auto* assignment : { &synthProcessor.getAssignment (*target), &synthProcessor.getVelocityAssignment (*target) })
                 if (assignment->isActive() && visible)
-                    if (const auto sourceValue = sourceValues[(size_t) assignment->source])
+                    if (const auto sourceValue = synthProcessor.getSourceValue (assignment->source, assignment->phase))
                         offset = offset.value_or (0.0f) + assignment->offset (*sourceValue);
 
             modulatable::setLivePosition (component, offset.has_value()

@@ -34,7 +34,7 @@ void LfoPanel::Row::paint (juce::Graphics& g)
     g.fillRoundedRectangle (getLocalBounds().toFloat().reduced (0.0f, 2.0f), 5.0f);
 
     area.removeFromLeft (8);
-    const auto detail = area.removeFromRight (104);
+    const auto detail = area.removeFromRight (140);
 
     g.setColour (colours::text);
     g.setFont (fonts::body (13.0f));
@@ -43,6 +43,7 @@ void LfoPanel::Row::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
     g.setFont (fonts::body (12.5f));
     g.drawText ("range " + juce::String (juce::roundToInt (assignment.range * 100.0f)) + "%  "
+                    + modulation::phaseToText (assignment.phase) + "  "
                     + (assignment.inverted ? juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x92")) : juce::String ("+")),
                 detail, juce::Justification::centredRight);
 }

@@ -587,6 +587,21 @@ namespace
         check (isNear (loudness (signal, 0.10, 0.15), loudness (signal, 0.35, 0.40), 0.01), "an LFO that's off moves nothing");
         setParameter (synth, SynthProcessor::lfoOnId (0), 1.0f);
 
+        // Shifted to the right by a phase, a control follows where the LFO was that much of a period ago.
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false, 0.25f });
+        signal = play (synth, 69, 1.6, 2.0);
+        check (loudness (signal, 0.225, 0.275) > 10.0 * loudness (signal, 0.475, 0.525),
+               "a phase of 90 degrees has an LFO move a control a quarter of a period later");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false, 0.75f });
+        signal = play (synth, 69, 1.6, 2.0);
+        check (loudness (signal, 0.475, 0.525) > 10.0 * loudness (signal, 0.225, 0.275),
+               "a phase of 270 degrees moves it a quarter of a period earlier, as the wave repeats");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false, 2.0f });
+        check (juce::exactlyEqual (synth.getAssignment (modulation::oscillatorLevelTarget (0)).phase, modulation::latestPhase),
+               "a phase stops a degree short of a whole period");
+
         // Run once, a rising sawtooth over 0.2 seconds is an envelope that swells each note in, then holds.
         setLfo (synth, 0, 0.2f, true, waveform::Preset::sawtooth);
         synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
@@ -600,6 +615,19 @@ namespace
         check (amplitudeAt (slice (signal, 0.52, 0.56), e5) < 0.3 * amplitudeAt (slice (signal, 0.80, 0.95), e5),
                "a second note starts its own run from the start");
         check (isNear (amplitudeAt (slice (signal, 0.52, 0.56), 440.0), a4Held, 0.02), "...without starting the first note's again");
+
+        // Shifted to the right by half its period, a sine that runs once over 0.4 seconds waits 0.2 seconds after the
+        // key, holding the control where its wave starts. Then it peaks a quarter of a period later, and falls to its
+        // trough a half after that.
+        setLfo (synth, 0, 0.4f, true, waveform::Preset::sine);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false, 0.5f });
+        signal = playNotes (synth, { { 0.0, 69 } }, 1.0);
+        const auto waiting = loudness (signal, 0.05, 0.15);
+
+        check (isNear (waiting, loudness (signal, 0.80, 0.95), 0.03),
+               "a phase holds an LFO that runs once where its wave starts, until it starts late");
+        check (loudness (signal, 0.28, 0.32) > 1.5 * waiting && loudness (signal, 0.48, 0.52) < 0.1 * waiting,
+               "...then runs through its wave");
 
         // Through the last stretch of its period, an LFO that runs once heads for its wave's last point, rather than
         // back to its first as a looping one does.
@@ -669,7 +697,7 @@ namespace
         synth.setLfoShape (2, drawn);
         setParameter (synth, SynthProcessor::lfoPeriodId (2), 7.5f);
         setParameter (synth, SynthProcessor::lfoModeId (2), 1.0f);
-        synth.setAssignment (modulation::volumeTarget, { 2, 0.3f, true });
+        synth.setAssignment (modulation::volumeTarget, { 2, 0.3f, true, 0.75f });
 
         juce::MemoryBlock state;
         synth.getStateInformation (state);
@@ -681,9 +709,9 @@ namespace
                "the LFOs' waves are restored");
         check (isNear (restored.getLfoPeriod (2), 7.5, 1.0e-4) && restored.isLfoOnce (2) && ! restored.isLfoOnce (1),
                "their periods, and whether they loop, are restored");
-        check (restored.getAssignment (modulation::volumeTarget) == modulation::Assignment { 2, 0.3f, true }
+        check (restored.getAssignment (modulation::volumeTarget) == modulation::Assignment { 2, 0.3f, true, 0.75f }
                  && restored.getAssignment (modulation::oscillatorOnTarget (1)) == modulation::Assignment { 1, 1.0f, false },
-               "what each LFO moves, and how, is restored");
+               "what each LFO moves, and how, with what phase, is restored");
 
         // Everything at once: 16 notes, three oscillators of 9 harmonics, both filters, and LFOs moving much of it.
         SynthProcessor busy;
@@ -693,7 +721,7 @@ namespace
             setParameter (busy, SynthProcessor::onId (i), 1.0f);
             setNumHarmonics (busy, 9, i);
             busy.setAssignment (modulation::oscillatorLevelTarget (i), { i, 0.5f, false });
-            busy.setAssignment (modulation::harmonicTarget (i, 4), { (i + 1) % 3, 0.5f, false });
+            busy.setAssignment (modulation::harmonicTarget (i, 4), { (i + 1) % 3, 0.5f, false, 0.3f * (float) i });
         }
 
         setFilter (busy, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
@@ -1263,10 +1291,11 @@ namespace
         synth.editedSource = 2;
         save ("7-editing-an-oscillator-that-is-off");
 
-        // LFO 1 swinging OSC 1's level and the low pass cutoff, and LFO 2 running once on the 3rd harmonic.
+        // LFO 1 swinging OSC 1's level and, a quarter of a period behind, the low pass cutoff, and LFO 2 running once
+        // on the 3rd harmonic.
         setParameter (synth, SynthProcessor::onId (2), 1.0f);
         synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true });
+        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true, 0.25f });
         synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
         synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
         synth.setAssignment (modulation::filterResonanceTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.6f, false });
@@ -1289,10 +1318,12 @@ namespace
         synthEditor.showModulation();
         save ("10-modulated-controls");
 
-        // The editor that opens on a right-click, on its own.
+        // The editor that opens on a right-click, on its own: for an LFO with a phase, and for an envelope, which has
+        // none.
+        const auto saveModulationEditor = [&folder, &synth] (int target, const juce::String& name)
         {
             SynthLookAndFeel lookAndFeel;
-            ModulationEditor modulationEditor (synth, modulation::oscillatorLevelTarget (0));
+            ModulationEditor modulationEditor (synth, target);
             modulationEditor.setLookAndFeel (&lookAndFeel);
 
             juce::Image image (juce::Image::ARGB, modulationEditor.getWidth() * 2, modulationEditor.getHeight() * 2, true);
@@ -1301,12 +1332,15 @@ namespace
             g.fillAll (colours::panel.brighter (0.04f));
             modulationEditor.paintEntireComponent (g, false);
 
-            const auto file = folder.getChildFile ("11-modulation-editor.png");
+            const auto file = folder.getChildFile (name + ".png");
             file.deleteFile();
             juce::FileOutputStream stream (file);
             juce::PNGImageFormat().writeImageToStream (image, stream);
             modulationEditor.setLookAndFeel (nullptr);
-        }
+        };
+
+        saveModulationEditor (modulation::filterCutoffTarget (modulation::lowPass), "11-modulation-editor");
+        saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
 
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);

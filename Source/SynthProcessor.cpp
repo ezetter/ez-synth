@@ -554,9 +554,9 @@ std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
     return progress >= 0.0 ? std::optional (progress) : std::nullopt;
 }
 
-float SynthProcessor::getLfoValue (int lfo) const
+float SynthProcessor::getLfoValue (int lfo, float phase) const
 {
-    return modulation::lfoValue (getLfoShape (lfo), getLfoProgress (lfo).value_or (0.0), isLfoOnce (lfo));
+    return modulation::lfoValue (getLfoShape (lfo), getLfoProgress (lfo).value_or (0.0) - phase, isLfoOnce (lfo));
 }
 
 //==============================================================================
@@ -599,6 +599,7 @@ void SynthProcessor::setAssignment (int target, const modulation::Assignment& as
     presetEdited = true;
 
     assignments[(size_t) target] = assignment;
+    assignments[(size_t) target].phase = juce::jlimit (0.0f, modulation::latestPhase, assignment.phase);
 
     // An LFO that's been given something to move is meant to be heard.
     if (assignment.isActive() && ! modulation::isEnvelope (assignment.source) && ! isLfoOn (assignment.source))
@@ -625,7 +626,7 @@ void SynthProcessor::setVelocityAssignment (int target, const modulation::Assign
     ++modulationVersion;
 }
 
-std::optional<float> SynthProcessor::getSourceValue (int source) const
+std::optional<float> SynthProcessor::getSourceValue (int source, float phase) const
 {
     if (source == modulation::velocitySource)
         return noteSounding ? std::optional (newestVelocity.load()) : std::nullopt;
@@ -639,7 +640,7 @@ std::optional<float> SynthProcessor::getSourceValue (int source) const
     }
 
     if (isLfoOn (source) && getLfoProgress (source).has_value())
-        return getLfoValue (source);
+        return getLfoValue (source, phase);
 
     return std::nullopt;
 }
@@ -717,6 +718,10 @@ juce::ValueTree SynthProcessor::createState()
             modulationTree.setProperty ("source", modulation::getSourceName (assignment.source), nullptr);
             modulationTree.setProperty ("range", assignment.range, nullptr);
             modulationTree.setProperty ("inverted", assignment.inverted, nullptr);
+
+            if (! modulation::isEnvelope (assignment.source) && assignment.phase > 0.0f)
+                modulationTree.setProperty ("phase", assignment.phase, nullptr);
+
             state.appendChild (modulationTree, nullptr);
         }
     }
@@ -815,7 +820,10 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
         if (target.has_value() && source >= 0 && source < modulation::numSources)
             assignments[(size_t) *target] = { source, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
-                                               (bool) modulationTree["inverted"] };
+                                               (bool) modulationTree["inverted"],
+                                               modulation::isEnvelope (source)
+                                                   ? 0.0f
+                                                   : juce::jlimit (0.0f, modulation::latestPhase, (float) modulationTree["phase"]) };
     }
 
     // Saves from before velocity could be assigned had it make softer notes quieter, as it does to start with.

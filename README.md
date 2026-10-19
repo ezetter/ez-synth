@@ -87,7 +87,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
   switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
-  the top part a **polarity** too, and both can move the same control at once, their movements adding up.
+  the top part a **phase** and **polarity** too, and both can move the same control at once, their
+  movements adding up.
   - **Moved by** None, LFO 1 to 3, or Env 1 to 3. A control can be moved by one of these at a time, as well
     as by velocity.
   - **Range** is how far the control moves, from one end of the source to the other, as a share of its
@@ -98,6 +99,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     by its whole range for the softest. So what you hear when you click the on-screen keys, which always play
     as hard as they can, is what the controls say. To make softer notes darker, for instance, set the low
     pass cutoff where you want the hardest notes, and give it velocity with a range of 30% or so.
+  - **Phase**, for an LFO, shifts its wave to the right for this control alone, from 0°, in step with the
+    LFO, up to 359°, a degree short of a whole period. The control follows where the LFO was that much of a
+    period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase
+    just short of 360° is the same as shifting it slightly to the left: at 270° the control peaks a quarter
+    of a period before the LFO does. Give two controls on the same LFO different phases and they move out of
+    step. For an LFO that runs **Once**, a phase is a delay: after each key, the control waits where the
+    wave starts for that share of the period, then runs through the wave. Double-click the slider to put it
+    back to 0°. Envelopes and velocity have no phase.
   - **Normal** polarity raises the control as the LFO or envelope rises. **Inverted** lowers it. Velocity has
     no polarity: softer notes always move a control down.
   - Choose **None**, or switch velocity **Off**, to stop it being moved.
@@ -105,7 +114,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   instruments. Switch it off there for every note to play as loud as the hardest, or move it elsewhere.
 - **See them at work.** A control that's being moved shows where it's been moved to, in light blue, as a
   dot and a stretch from where it's set, following the newest note and how hard it was played. An LFO's card lists everything it
-  moves, with each one's range and polarity. Click one to change it, or its cross to stop the LFO moving it.
+  moves, with each one's range, phase and polarity. Click one to change it, or its cross to stop the LFO
+  moving it.
 
 ### Presets
 
@@ -192,7 +202,8 @@ and Logic use the Audio Unit; Cubase uses the VST3. To check the Audio Unit with
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
 together at their levels, that the filters cut and boost each harmonic by as much as theory says, that LFOs
-move each kind of control by the range and in the direction they're set to, looping or once per note, that
+move each kind of control by the range and in the direction they're set to, looping or once per note, and
+as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
 the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
@@ -225,8 +236,9 @@ save pictures of the window showing several waves.
 - **Modulation.** Every 64 samples, each note works out where the LFOs and its envelopes are, and where
   they've moved its controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at
   the start of the block; one that runs once, and each envelope (`Source/Envelope.cpp`), counts from the
-  note's start. A control's position along its travel, from 0 to 1, moves by its range times half an LFO's
-  value, or times an envelope's whole value, and by its velocity range times how far short of full velocity
+  note's start. A control given a phase takes the LFO's value that share of a period earlier; an LFO that
+  runs once holds its first value until then. A control's position along its travel, from 0 to 1, moves by
+  its range times half an LFO's value, or times an envelope's whole value, and by its velocity range times how far short of full velocity
   the note was played. The two movements add up before the control is kept within its travel. Cutoffs travel by octave, and harmonic sliders give weak
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
   then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
@@ -246,7 +258,7 @@ save pictures of the window showing several waves.
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
-| `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, and velocity, with their ranges and polarities |
+| `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, and velocity, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/PresetBar.*` | Loading, stepping through and saving presets |

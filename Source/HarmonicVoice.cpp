@@ -149,30 +149,37 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 {
     using namespace modulation;
 
-    // A looping LFO carries on from where it was at the start of the block. One that runs once started with the note,
-    // as the envelopes did.
-    std::array<float, numSources> sourceValues {};
+    // How far through its periods each LFO is. A looping LFO carries on from where it was at the start of the block. One
+    // that runs once started with the note, as the envelopes did.
+    std::array<double, numLfos> lfoPeriodsGone {};
 
-    for (size_t i = 0; i < (size_t) numLfos; ++i)
+    for (size_t i = 0; i < lfoPeriodsGone.size(); ++i)
     {
         const auto& lfo = patch.lfos[i];
-        const auto periodsGone = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
-                                          : lfo.phase + startSample / lfo.periodSamples;
-        sourceValues[i] = lfoValue (lfo.shape, periodsGone, lfo.once);
+        lfoPeriodsGone[i] = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
+                                     : lfo.phase + startSample / lfo.periodSamples;
     }
 
-    for (int i = 0; i < numEnvelopes; ++i)
-        sourceValues[(size_t) envelopeSource (i)] = envelopeRuns[(size_t) i].getLevel();
+    // Where the source assigned to a control is for it. A control given a phase follows where its LFO was that much
+    // of a period ago.
+    const auto sourceValue = [this, &lfoPeriodsGone] (const Assignment& assignment)
+    {
+        if (isEnvelope (assignment.source))
+            return envelopeRuns[(size_t) (assignment.source - numLfos)].getLevel();
+
+        const auto& lfo = patch.lfos[(size_t) assignment.source];
+        return lfoValue (lfo.shape, lfoPeriodsGone[(size_t) assignment.source] - assignment.phase, lfo.once);
+    };
 
     // Moves a control's position, from 0 to 1, by the LFO or envelope assigned to it, and by the note's velocity, if
     // either is. An LFO that's switched off moves nothing.
-    const auto modulate = [this, &sourceValues] (int target, float position)
+    const auto modulate = [this, &sourceValue] (int target, float position)
     {
         auto offset = 0.0f;
 
         if (const auto& assignment = patch.assignments[(size_t) target];
             assignment.isActive() && (isEnvelope (assignment.source) || patch.lfos[(size_t) assignment.source].on))
-            offset += assignment.offset (sourceValues[(size_t) assignment.source]);
+            offset += assignment.offset (sourceValue (assignment));
 
         if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
             offset += byVelocity.offset (noteVelocity);
