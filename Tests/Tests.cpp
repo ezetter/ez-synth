@@ -601,6 +601,26 @@ namespace
                "a second note starts its own run from the start");
         check (isNear (amplitudeAt (slice (signal, 0.52, 0.56), 440.0), a4Held, 0.02), "...without starting the first note's again");
 
+        // Through the last stretch of its period, an LFO that runs once heads for its wave's last point, rather than
+        // back to its first as a looping one does.
+        {
+            const auto rising = waveform::makePreset (waveform::Preset::sawtooth);
+            const auto secondToLast = rising[waveform::numPoints - 2];
+            auto stays = true;
+
+            for (int i = 0; i <= 100; ++i)
+            {
+                const auto periodsGone = (waveform::numPoints - 2 + 2.0 * i / 100) / waveform::numPoints;
+                stays = stays && modulation::lfoValue (rising, periodsGone, true) >= secondToLast;
+            }
+
+            check (stays, "an LFO that runs once doesn't slide back towards its first value at the end of its period");
+
+            const auto lastStretch = (waveform::numPoints - 0.5) / waveform::numPoints;
+            check (modulation::lfoValue (rising, lastStretch, false) < rising.back() - 0.1f,
+                   "...while a looping one does, as its wave repeats");
+        }
+
         synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
         setParameter (synth, SynthProcessor::levelId (0), 1.0f);
 

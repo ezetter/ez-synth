@@ -123,11 +123,11 @@ namespace waveform
         return result;
     }
 
-    float valueAt (const Shape& shape, double position) noexcept
+    float valueAt (const Shape& shape, double position, bool repeats) noexcept
     {
         const auto point = juce::jlimit (0.0, 1.0, position) * numPoints;
         const auto before = std::min ((int) point, numPoints - 1);
-        const auto after = (before + 1) % numPoints;   // the wave repeats, so the last point leads back to the first
+        const auto after = repeats ? (before + 1) % numPoints : std::min (before + 1, numPoints - 1);
         const auto proportion = (float) (point - before);
         return shape[(size_t) before] + proportion * (shape[(size_t) after] - shape[(size_t) before]);
     }

@@ -344,12 +344,12 @@ void SynthEditor::refresh()
     // An LFO's period and where it has got to change all the time, so they're shown on every refresh.
     if (editingLfo)
     {
-        grid.setLfo (lfo + 1, synthProcessor.isLfoOn (lfo), synthProcessor.getLfoPeriod (lfo));
+        const auto once = synthProcessor.isLfoOnce (lfo);
+        grid.setLfo (lfo + 1, synthProcessor.isLfoOn (lfo), synthProcessor.getLfoPeriod (lfo), once);
 
         if (const auto progress = synthProcessor.getLfoProgress (lfo))
         {
             // One that runs once stays at the end of its period once it's got there.
-            const auto once = synthProcessor.isLfoOnce (lfo);
             const auto position = once ? std::min (*progress, 1.0) : *progress - std::floor (*progress);
             grid.setPlayhead ((float) position, synthProcessor.getLfoValue (lfo));
         }

@@ -69,18 +69,20 @@ void WaveGrid::setOscillator (int number, bool isOn)
         sourceNumber = number;
         on = isOn;
         lfoPeriod.reset();
+        runsOnce = false;
         playhead.reset();
         repaint();
     }
 }
 
-void WaveGrid::setLfo (int number, bool isOn, double periodSeconds)
+void WaveGrid::setLfo (int number, bool isOn, double periodSeconds, bool once)
 {
-    if (number != sourceNumber || isOn != on || lfoPeriod != periodSeconds)
+    if (number != sourceNumber || isOn != on || lfoPeriod != periodSeconds || once != runsOnce)
     {
         sourceNumber = number;
         on = isOn;
         lfoPeriod = periodSeconds;
+        runsOnce = once;
         repaint();
     }
 }
@@ -316,8 +318,8 @@ juce::Path WaveGrid::makeShapeCurve() const
     for (int i = 1; i < waveform::numPoints; ++i)
         curve.lineTo (toX ((double) i / waveform::numPoints), toY (shape[(size_t) i]));
 
-    // The wave repeats, so it ends where it began.
-    curve.lineTo (toX (1.0), toY (shape[0]));
+    // A wave that repeats ends where it began. An LFO that runs once holds its last value instead.
+    curve.lineTo (toX (1.0), toY (runsOnce ? shape.back() : shape[0]));
     return curve;
 }
 

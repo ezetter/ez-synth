@@ -140,6 +140,6 @@ namespace modulation
         if (once && periodsGone >= 1.0)
             return shape.back();
 
-        return waveform::valueAt (shape, periodsGone - std::floor (periodsGone));
+        return waveform::valueAt (shape, periodsGone - std::floor (periodsGone), ! once);
     }
 }

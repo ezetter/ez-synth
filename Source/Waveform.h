@@ -64,8 +64,10 @@ namespace waveform
     */
     Decomposition decompose (const Shape&);
 
-    /** A shape's value at a point in its cycle, from 0 to 1, read along the straight line between its points. */
-    float valueAt (const Shape&, double position) noexcept;
+    /** A shape's value at a point in its cycle, from 0 to 1, read along the straight line between its points. A wave
+        that repeats heads from its last point back to its first; one played only once holds its last point's value.
+    */
+    float valueAt (const Shape&, double position, bool repeats = true) noexcept;
 
     /** Adds a sine wave at one of a shape's harmonics. As harmonics are independent of each other, this changes
         that harmonic of the shape and no other. A negative amplitude takes the sine wave away.
