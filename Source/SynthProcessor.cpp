@@ -325,6 +325,15 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     const auto numSamples = buffer.getNumSamples();
 
+    // MIDI that's played, rather than a device's clock or the like, counts as arriving.
+    if (std::any_of (midi.begin(), midi.end(), [] (const juce::MidiMessageMetadata& metadata)
+                     {
+                         const auto message = metadata.getMessage();
+                         return message.isNoteOnOrOff() || message.isController() || message.isPitchWheel()
+                             || message.isAftertouch() || message.isChannelPressure() || message.isProgramChange();
+                     }))
+        ++midiReceived;
+
     // Adds the notes played on the on-screen keyboard, and lights its keys for notes played from elsewhere.
     keyboardState.processNextMidiBuffer (midi, 0, numSamples, true);
 

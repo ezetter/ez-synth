@@ -81,6 +81,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     addAndMakeVisible (presetBar);
     addAndMakeVisible (keyboard);
 
+    if (MidiInputs::get() != nullptr)
+    {
+        midiPanel = std::make_unique<MidiPanel>();
+        addAndMakeVisible (*midiPanel);
+    }
+
     setResizable (true, true);
     setResizeLimits (1240, 900, 2000, 1400);
     setSize (1320, 960);
@@ -198,11 +204,20 @@ void SynthEditor::resized()
 
     area.removeFromTop (14);
 
-    // Along the bottom, the keyboard, and above it the volume, the envelopes and the filters.
-    keyboard.setBounds (area.removeFromBottom (juce::jlimit (90, 130, getHeight() / 8)));
+    // Along the bottom, the keyboard, with the MIDI devices beside it in the standalone app, and above them the volume,
+    // the envelopes and the filters.
+    constexpr auto rowGap = 12;
+    auto keys = area.removeFromBottom (juce::jlimit (90, 130, getHeight() / 8));
+
+    if (midiPanel != nullptr)
+    {
+        midiPanel->setBounds (keys.removeFromLeft (120));
+        keys.removeFromLeft (rowGap);
+    }
+
+    keyboard.setBounds (keys);
     area.removeFromBottom (12);
 
-    constexpr auto rowGap = 12;
     auto controls = area.removeFromBottom (FilterPanel::preferredHeight);
     volumePanel = controls.removeFromLeft (120);
     controls.removeFromLeft (rowGap);
@@ -394,6 +409,9 @@ void SynthEditor::refresh()
         panel->refresh();
 
     presetBar.refresh();
+
+    if (midiPanel != nullptr)
+        midiPanel->refresh (synthProcessor.getMidiReceived());
 
     // The harmonics' pitches are those of the note, raised by as much as the oscillator is tuned up.
     if (const auto note = synthProcessor.getLastNote(); note != shownNote || changed)

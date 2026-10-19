@@ -6,6 +6,7 @@
 #include "HarmonicSliders.h"
 #include "Keyboard.h"
 #include "LfoPanel.h"
+#include "MidiPanel.h"
 #include "ModulatableControls.h"
 #include "PresetBar.h"
 #include "SourceCard.h"
@@ -78,6 +79,9 @@ private:
     ModulatableSlider volumeKnob;
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;
     Keyboard keyboard;
+
+    /** Only in the standalone app, which plays from MIDI devices itself. */
+    std::unique_ptr<MidiPanel> midiPanel;
 
     juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, tuneDivider, volumePanel, volumeCaption, volumeValue;
 

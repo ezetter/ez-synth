@@ -52,9 +52,19 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   250 Hz that change the sound clearly when you switch them in. Double-click a dial to reset it.
 - **Play.** Each key plays the wave with the key's pitch as its fundamental frequency. The header shows the
   last note and its frequency. Click the on-screen keys, or in the standalone app type on the computer
-  keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. A MIDI
-  keyboard works too. In the standalone app, choose it under *Options › Audio/MIDI Settings*. The pitch
-  wheel bends two semitones either way.
+  keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. Or play a
+  MIDI keyboard: see below. The pitch wheel bends two semitones either way, and the sustain pedal holds
+  notes. How hard you play can move any control: see *Giving an LFO, envelope or velocity something to
+  move*.
+- **Play from a MIDI keyboard in the standalone app.** Plug it in, before or after opening EZ Synth, and
+  it plays straight away, with no setting up: the app plays from every MIDI device plugged in, noticing a
+  new one within half a second. The **MIDI In** panel beside the keys names the device it's playing from,
+  or says how many, and its light flashes as notes, controllers and the pitch wheel arrive. Notes played
+  on a MIDI keyboard light up the on-screen keys too. Click the panel to switch each device plugged in on
+  or off, or to open the *Audio/MIDI Settings*, which the *Options* button at the top of the window opens
+  too. A device you switch off, here or in the settings, stays off, even unplugged and plugged in again or
+  after the app quits, until you switch it back on. As a plugin, EZ Synth plays whatever MIDI its host
+  sends it, so it has no MIDI In panel.
 - **Volume** is the knob at the left of the row above the keys. Double-click it to reset it.
 
 ### LFOs
@@ -229,6 +239,8 @@ as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
 the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
 the grid shows harmonics where LFOs, envelopes and velocity have moved them, as strong as they're heard, that
+the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
+virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
 clipping, that the arrows step through the factory presets, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
@@ -297,5 +309,8 @@ save pictures of the window showing several waves.
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
 | `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
+| `Source/StandaloneApp.cpp` | The standalone app, which only the standalone build includes, playing from every MIDI device plugged in |
+| `Source/MidiInputs.*` | The standalone app's MIDI devices: switching them on as they're plugged in, and remembering those switched off |
+| `Source/MidiPanel.*` | The standalone app's MIDI In panel, beside the keys |
 | `Source/SynthLookAndFeel.*` | Colours, fonts, the knobs, sliders, switches and buttons |
 | `Tests/Tests.cpp` | The tests and the window pictures |

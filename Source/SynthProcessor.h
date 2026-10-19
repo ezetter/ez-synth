@@ -239,6 +239,11 @@ public:
     /** The note most recently started, or -1 if none has been. */
     int getLastNote() const noexcept   { return lastNote.load(); }
 
+    /** Goes up with each block that brings notes, controllers or the pitch wheel from a MIDI device or the host, but
+        not from the on-screen keyboard, so the window can show MIDI arriving.
+    */
+    int getMidiReceived() const noexcept   { return midiReceived.load(); }
+
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboardState;
 
@@ -381,6 +386,7 @@ private:
 
     juce::Synthesiser synth;
     std::atomic<int> lastNote { -1 };
+    std::atomic<int> midiReceived { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SynthProcessor)
 };

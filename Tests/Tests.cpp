@@ -1,10 +1,14 @@
 // Checks that waves break down into the right harmonics, that the synth plays them, and that the LFOs move what
 // they're given to move. If asked with --snapshots <folder>, it also saves pictures of the window.
 
+#include "../Source/MidiInputs.h"
+#include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
 #include "../Source/SynthEditor.h"
 #include "../Source/SynthProcessor.h"
 #include "../Source/Waveform.h"
+
+#include <CoreFoundation/CoreFoundation.h>
 
 #include <iostream>
 
@@ -1187,6 +1191,7 @@ namespace
             check (isNear (shown.getTune (0), 7.0, 1.0e-6) && juce::exactlyEqual (shown.getTune (1), 0.0f)
                      && isNear (shown.getTune (2), 3.4, 1.0e-6),
                    "choosing one oscillator after another in the window leaves each one's tune as it was");
+            shown.editorBeingDeleted (editor.get());
         }
 
         // Saving and loading.
@@ -1207,6 +1212,242 @@ namespace
         juce::AudioProcessor::copyXmlToBinary (*xml, state);
         restored.setStateInformation (state.getData(), (int) state.getSize());
         check (juce::exactlyEqual (restored.getTune (1), 0.0f), "a save from before oscillators could be tuned loads them in tune");
+    }
+
+    /** Stands in for the standalone app's MIDI devices: those plugged in, and those switched on. */
+    struct StandInMidiDevices
+    {
+        juce::Array<juce::MidiDeviceInfo> pluggedIn;
+        juce::StringArray on;
+
+        AutoMidiInputs::Devices get()
+        {
+            AutoMidiInputs::Devices devices;
+            devices.list = [this] { return pluggedIn; };
+            devices.isOn = [this] (const juce::String& identifier) { return on.contains (identifier); };
+            devices.setOn = [this] (const juce::String& identifier, bool switchOn)
+            {
+                if (switchOn)
+                    on.addIfNotAlreadyThere (identifier);
+                else
+                    on.removeString (identifier);
+            };
+
+            return devices;
+        }
+    };
+
+    /** The standalone app's MIDI inputs, for the window to show, without any devices behind them. */
+    struct ShownMidiInputs final : public MidiInputs
+    {
+        std::vector<Input> inputs;
+
+        std::vector<Input> getInputs() const override               { return inputs; }
+        void setOn (const juce::String&, bool) override             {}
+        void showSettings() override                                {}
+    };
+
+    void testMidiInputs()
+    {
+        std::cout << "MIDI devices in the standalone app" << std::endl;
+
+        StandInMidiDevices devices;
+        const juce::MidiDeviceInfo keys ("KeyStep 37", "keystep"), pads ("MPD218", "pads");
+        devices.pluggedIn = { keys };
+        juce::PropertySet settings;
+
+        {
+            AutoMidiInputs inputs (devices.get(), settings);
+            check (devices.on.contains ("keystep"), "a MIDI device plugged in when the app starts is played from");
+
+            devices.pluggedIn.add (pads);
+            inputs.update();
+            check (devices.on.contains ("pads"), "...as is one plugged in while it runs, as soon as it's noticed");
+            check (inputs.getInputs() == std::vector<MidiInputs::Input> { { "keystep", "KeyStep 37", true }, { "pads", "MPD218", true } },
+                   "the devices plugged in are listed, with whether each is played from");
+
+            inputs.setOn ("pads", false);
+            devices.pluggedIn.removeFirstMatchingValue (pads);
+            inputs.update();
+            devices.pluggedIn.add (pads);
+            inputs.update();
+            check (! devices.on.contains ("pads") && devices.on.contains ("keystep"),
+                   "a device switched off stays off when it's unplugged and plugged in again");
+
+            devices.pluggedIn.removeFirstMatchingValue (keys);
+            inputs.update();
+            check (! devices.on.contains ("keystep"), "a device that's unplugged is let go");
+            devices.pluggedIn.insert (0, keys);
+            inputs.update();
+            check (devices.on.contains ("keystep"), "...and played from again when it's plugged back in");
+
+            // Switched off in the audio and MIDI settings.
+            devices.on.removeString ("keystep");
+            inputs.devicesSwitched();
+        }
+
+        // Starting again, as the app does each time it's opened.
+        devices.on.clear();
+
+        {
+            AutoMidiInputs inputs (devices.get(), settings);
+            check (devices.on.isEmpty(), "devices switched off, here or in the audio and MIDI settings, stay off when the app starts again");
+            inputs.setOn ("keystep", true);
+        }
+
+        devices.on.clear();
+
+        {
+            AutoMidiInputs inputs (devices.get(), settings);
+            check (devices.on == juce::StringArray { "keystep" }, "...until they're switched on again");
+        }
+
+        check (MidiPanel::describe ({}) == "No MIDI devices plugged in"
+                 && MidiPanel::describe ({ { "keystep", "KeyStep 37", true }, { "pads", "MPD218", false } }) == "KeyStep 37"
+                 && MidiPanel::describe ({ { "keystep", "KeyStep 37", true }, { "pads", "MPD218", true } }) == "2 devices"
+                 && MidiPanel::describe ({ { "pads", "MPD218", false } }).startsWith ("Off"),
+               "the window names the device played from, or says how many, or that none is");
+
+        // Through the Mac's own MIDI system: a virtual MIDI keyboard appears, is played from, and its notes arrive.
+        {
+            struct Received final : public juce::MidiInputCallback
+            {
+                void handleIncomingMidiMessage (juce::MidiInput*, const juce::MidiMessage& message) override
+                {
+                    if (message.isNoteOn())
+                        note = message.getNoteNumber();
+                }
+
+                std::atomic<int> note { -1 };
+            };
+
+            juce::AudioDeviceManager deviceManager;
+            Received received;
+            deviceManager.addMidiInputDeviceCallback ({}, &received);
+            juce::PropertySet realSettings;
+            AutoMidiInputs inputs (AutoMidiInputs::getDevices (deviceManager, {}), realSettings);
+
+            const juce::String name ("EZ Synth Test Keyboard");
+            // The Mac's MIDI system tells a program about devices coming and going through its main run loop, which
+            // runs all the time in the app, but here only when it's asked to.
+            const auto letMidiSystemCatchUp = [] { CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.5, false); };
+
+            auto virtualKeyboard = juce::MidiOutput::createNewDevice (name);
+            letMidiSystemCatchUp();
+            inputs.update();
+
+            const auto listed = [&inputs, &name]
+            {
+                const auto all = inputs.getInputs();
+                const auto found = std::find_if (all.begin(), all.end(), [&name] (const MidiInputs::Input& input) { return input.name == name; });
+                return found != all.end() ? std::optional (*found) : std::nullopt;
+            };
+
+            check (virtualKeyboard != nullptr && listed().has_value() && listed()->on,
+                   "a MIDI keyboard plugged in is noticed and played from");
+
+            if (virtualKeyboard != nullptr)
+            {
+                virtualKeyboard->sendMessageNow (juce::MidiMessage::noteOn (1, 64, 0.8f));
+
+                for (int wait = 0; wait < 200 && received.note.load() < 0; ++wait)
+                    juce::Thread::sleep (10);
+
+                virtualKeyboard->sendMessageNow (juce::MidiMessage::noteOff (1, 64));
+            }
+
+            check (received.note.load() == 64, "a note played on it arrives");
+
+            const auto wasListed = listed().has_value();
+            virtualKeyboard = nullptr;
+            letMidiSystemCatchUp();
+            inputs.update();
+            check (wasListed && ! listed().has_value(), "a keyboard unplugged leaves the list");
+            deviceManager.removeMidiInputDeviceCallback ({}, &received);
+        }
+
+        // The processor counts MIDI arriving from a device or the host, so the window can show it, but not the
+        // on-screen keys' notes, nor a device's clock.
+        {
+            SynthProcessor synth;
+            synth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+
+            const auto playBlock = [&synth, &buffer] (std::initializer_list<juce::MidiMessage> messages)
+            {
+                juce::MidiBuffer midi;
+
+                for (const auto& message : messages)
+                    midi.addEvent (message, 0);
+
+                synth.processBlock (buffer, midi);
+                return synth.getMidiReceived();
+            };
+
+            const auto before = synth.getMidiReceived();
+            const auto afterNote = playBlock ({ juce::MidiMessage::noteOn (1, 60, 0.5f) });
+            const auto afterClock = playBlock ({ juce::MidiMessage::midiClock() });
+            synth.keyboardState.noteOn (1, 64, 1.0f);
+            const auto afterOnScreen = playBlock ({});
+            const auto afterWheel = playBlock ({ juce::MidiMessage::pitchWheel (1, 9000) });
+
+            check (afterNote == before + 1 && afterClock == afterNote && afterOnScreen == afterNote && afterWheel == afterNote + 1,
+                   "MIDI played from a device counts as arriving, but not the on-screen keys or a device's clock");
+            playBlock ({ juce::MidiMessage::allNotesOff (1) });
+        }
+
+        // A MIDI keyboard's sustain pedal holds notes after their keys are let go, until the pedal is.
+        {
+            SynthProcessor synth;
+            synth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> output;
+            const auto at = [] (double seconds) { return (int) (seconds * sampleRate); };
+
+            for (int start = 0; start < at (1.2); start += blockSize)
+            {
+                juce::MidiBuffer midi;
+                const auto add = [&midi, start] (int sample, const juce::MidiMessage& message)
+                {
+                    if (sample >= start && sample < start + blockSize)
+                        midi.addEvent (message, sample - start);
+                };
+
+                add (0, juce::MidiMessage::noteOn (1, 69, 1.0f));
+                add (at (0.1), juce::MidiMessage::controllerEvent (1, 64, 127));
+                add (at (0.2), juce::MidiMessage::noteOff (1, 69));
+                add (at (0.6), juce::MidiMessage::controllerEvent (1, 64, 0));
+
+                synth.processBlock (buffer, midi);
+                output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            check (isNear (loudness (output, 0.4, 0.55), loudness (output, 0.05, 0.1), 0.02) && loudness (output, 1.0, 1.2) < 1.0e-4,
+                   "the sustain pedal holds a note after its key is let go, until the pedal is");
+        }
+
+        // The window shows the MIDI devices only in the standalone app.
+        {
+            SynthProcessor synth;
+            const auto hasMidiPanel = [] (juce::Component& window)
+            {
+                return std::any_of (window.getChildren().begin(), window.getChildren().end(),
+                                    [] (juce::Component* child) { return dynamic_cast<MidiPanel*> (child) != nullptr; });
+            };
+
+            std::unique_ptr<juce::AudioProcessorEditor> pluginWindow (synth.createEditorAndMakeActive());
+            check (! hasMidiPanel (*pluginWindow), "a plugin's window, which takes MIDI from its host, has no MIDI devices");
+            synth.editorBeingDeleted (pluginWindow.get());
+            pluginWindow = nullptr;
+
+            ShownMidiInputs shown;
+            MidiInputs::set (&shown);
+            std::unique_ptr<juce::AudioProcessorEditor> appWindow (synth.createEditorAndMakeActive());
+            check (hasMidiPanel (*appWindow), "the standalone app's window shows its MIDI devices");
+            synth.editorBeingDeleted (appWindow.get());
+            appWindow = nullptr;
+            MidiInputs::set (nullptr);
+        }
     }
 
     void testPresets()
@@ -1567,6 +1808,33 @@ namespace
         saveModulationEditor (modulation::filterCutoffTarget (modulation::lowPass), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
 
+        // The standalone app's window, playing from a MIDI keyboard, as a note arrives.
+        {
+            ShownMidiInputs shown;
+            shown.inputs = { { "keystep", "Arturia KeyStep 37", true }, { "pads", "Akai MPD218", false } };
+            MidiInputs::set (&shown);
+
+            SynthProcessor app;
+            std::unique_ptr<juce::AudioProcessorEditor> appEditor (app.createEditorAndMakeActive());
+            auto& appWindow = dynamic_cast<SynthEditor&> (*appEditor);
+
+            app.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            juce::MidiBuffer midi;
+            midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.8f), 0);
+            app.processBlock (buffer, midi);
+            appWindow.refresh();
+
+            const auto file = folder.getChildFile ("12-standalone-midi.png");
+            file.deleteFile();
+            juce::FileOutputStream stream (file);
+            juce::PNGImageFormat().writeImageToStream (appEditor->createComponentSnapshot (appEditor->getLocalBounds(), true, 2.0f), stream);
+
+            app.editorBeingDeleted (appEditor.get());
+            appEditor = nullptr;
+            MidiInputs::set (nullptr);
+        }
+
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
         synth.editedSource = 2;
@@ -1590,6 +1858,7 @@ int main (int argc, char* argv[])
     testVelocity();
     testShowingMovedHarmonics();
     testTuning();
+    testMidiInputs();
     testPresets();
     testFactoryPresets();
     testSavingAndLoading();

@@ -31,6 +31,11 @@ juce_add_plugin(EZSynth
     VST3_CATEGORIES Instrument Synth
     AU_MAIN_TYPE kAudioUnitType_MusicDevice)
 
+# The standalone app is EZ Synth's own (Source/StandaloneApp.cpp), so it can play from MIDI devices as soon as they're
+# plugged in. The plugins take their MIDI from their hosts.
+target_sources(EZSynth_Standalone PRIVATE Source/StandaloneApp.cpp)
+target_compile_definitions(EZSynth_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+
 # JUCE makes the app's icon from Resources/Icon.png while configuring, so a new icon has the next build configure
 # again. It also has the app and plugins linked again, so they're signed and installed with it.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Resources/Icon.png)
@@ -49,6 +54,8 @@ target_sources(EZSynth
         Source/HarmonicVoice.cpp
         Source/Keyboard.cpp
         Source/LfoPanel.cpp
+        Source/MidiInputs.cpp
+        Source/MidiPanel.cpp
         Source/ModulatableControls.cpp
         Source/Modulation.cpp
         Source/ModulationEditor.cpp
