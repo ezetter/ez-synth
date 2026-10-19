@@ -1,5 +1,5 @@
-// Draws EZ Synth's icon: three sine waves, the 1st, 2nd and 3rd harmonics over one wavelength, in the colours the
-// grid gives them, on a dark tile shaped like a Mac app icon. It saves it as Resources/Icon.png, in the current
+// Draws EZ Synth's icon: three sine waves of the same height, the 1st, 2nd and 3rd harmonics over one wavelength, in
+// red, yellow and cyan, on a dark tile shaped like a Mac app icon. It saves it as Resources/Icon.png, in the current
 // folder, unless another file is named. Run it from the repository's folder after changing the drawing, then build
 // again, to build the new icon into EZ Synth:
 //
@@ -13,8 +13,10 @@ namespace
 {
     constexpr int size = 1024;
 
-    /** Each harmonic's height, as a share of the fundamental's, smaller the higher it is, so each stays in sight. */
-    constexpr std::array<float, 3> amplitudes { 1.0f, 0.7f, 0.45f };
+    /** The harmonics' colours, from the 1st up, taken from the grid's, but far apart so they stand out from each
+        other: those of its 1st, 3rd and 5th harmonics.
+    */
+    const std::array<juce::Colour, 3> waveColours { colours::forPartial (0), colours::forPartial (2), colours::forPartial (4) };
 
     juce::Image drawIcon()
     {
@@ -50,7 +52,7 @@ namespace
 
         // The fundamental is drawn last, over the higher harmonics. Each has a dark edge, so it stands clear of any it
         // crosses.
-        for (auto i = amplitudes.size(); i-- > 0;)
+        for (auto i = waveColours.size(); i-- > 0;)
         {
             const auto harmonic = (double) (i + 1);
             juce::Path wave;
@@ -59,7 +61,7 @@ namespace
             {
                 const auto t = point / 600.0;
                 const juce::Point<float> at { plot.getX() + (float) t * plot.getWidth(),
-                                              middle - height * amplitudes[i] * (float) std::sin (juce::MathConstants<double>::twoPi * harmonic * t) };
+                                              middle - height * (float) std::sin (juce::MathConstants<double>::twoPi * harmonic * t) };
 
                 if (point == 0)
                     wave.startNewSubPath (at);
@@ -69,7 +71,7 @@ namespace
 
             g.setColour (colours::plot);
             g.strokePath (wave, juce::PathStrokeType (46.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            g.setColour (colours::forPartial ((int) i));
+            g.setColour (waveColours[i]);
             g.strokePath (wave, juce::PathStrokeType (28.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
 

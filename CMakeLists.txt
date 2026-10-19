@@ -31,6 +31,12 @@ juce_add_plugin(EZSynth
     VST3_CATEGORIES Instrument Synth
     AU_MAIN_TYPE kAudioUnitType_MusicDevice)
 
+# JUCE makes the app's icon from Resources/Icon.png while configuring, so a new icon has the next build configure
+# again. It also has the app and plugins linked again, so they're signed and installed with it.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS Resources/Icon.png)
+set_property(TARGET EZSynth_Standalone EZSynth_VST3 EZSynth_AU APPEND
+             PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Icon.png")
+
 target_sources(EZSynth
     PRIVATE
         Source/ChoiceButtons.cpp

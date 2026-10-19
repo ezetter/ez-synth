@@ -207,11 +207,12 @@ Restart your DAW, or rescan its plugins, to find EZ Synth among its instruments,
 and Logic use the Audio Unit; Cubase uses the VST3. To check the Audio Unit with Apple's validator, run
 `auval -v aumu Ezs1 Ezsy`.
 
-The app's icon is three sine waves, the 1st, 2nd and 3rd harmonics over one wavelength, in the colours the
-grid gives them. `Tools/MakeIcon.cpp` draws it into `Resources/Icon.png`, which the build turns into the
+The app's icon is three sine waves of the same height, the 1st, 2nd and 3rd harmonics over one wavelength,
+in red, yellow and cyan. `Tools/MakeIcon.cpp` draws it into `Resources/Icon.png`, which the build turns into the
 app's icon, and the plugins' too. To change it, edit the drawing, run `./build/EZSynthMakeIcon` from the
-repository's folder, and build again. If the Finder or the Dock still shows the old icon, quit the app and
-open it again.
+repository's folder, and build again: a new icon has the build configure again, as JUCE makes the icon then,
+and sign and install the app and plugins with it. If the Finder or the Dock still shows the old icon, quit
+the app and open it again.
 
 ## Testing
 
