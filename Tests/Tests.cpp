@@ -1017,6 +1017,92 @@ namespace
         folder.deleteRecursively();
     }
 
+    juce::Button* findButton (juce::Component& parent, const juce::String& name)
+    {
+        for (auto* child : parent.getChildren())
+        {
+            if (auto* button = dynamic_cast<juce::Button*> (child); button != nullptr && button->getName() == name)
+                return button;
+
+            if (auto* found = findButton (*child, name))
+                return found;
+        }
+
+        return nullptr;
+    }
+
+    void testFactoryPresets()
+    {
+        std::cout << "Factory presets" << std::endl;
+
+        const auto names = SynthProcessor::getFactoryPresetNames();
+        check (names.size() >= 6, "EZ Synth comes with factory presets");
+
+        auto sorted = names;
+        sorted.sortNatural();
+        check (names == sorted, "...in order of name");
+
+        for (const auto& name : names)
+        {
+            SynthProcessor synth;
+            check (synth.loadFactoryPreset (name) && synth.getPresetName() == name && synth.isFactoryPreset()
+                     && ! synth.isPresetEdited() && synth.getPresetFile() == juce::File(),
+                   name + " loads, under its name, unedited");
+
+            const auto signal = play (synth, 60, 2.5, 3.0);
+            check (std::all_of (signal.begin(), signal.end(), [] (float sample) { return std::isfinite (sample); })
+                     && peakOf (signal) > 0.05f && peakOf (signal) < 1.0f,
+                   "...and plays a note that's clearly heard, without clipping");
+        }
+
+        SynthProcessor synth;
+        check (! synth.loadFactoryPreset ("No such preset") && synth.getPresetName() == "Init",
+               "a factory preset that doesn't exist isn't loaded, leaving the sound alone");
+
+        // A host's project remembers that the sound came from a factory preset.
+        synth.loadFactoryPreset (names[0]);
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor reopened;
+        reopened.setStateInformation (state.getData(), (int) state.getSize());
+        check (reopened.getPresetName() == names[0] && reopened.isFactoryPreset() && ! reopened.isPresetEdited(),
+               "a host's project remembers the factory preset");
+
+        // Saving a factory preset saves a copy of it, which is the user's own.
+        const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                .getChildFile ("EZ Synth tests " + juce::String (juce::Time::currentTimeMillis()));
+        check (synth.savePreset (folder.getChildFile (names[0])) && ! synth.isFactoryPreset()
+                 && synth.getPresetFile() == folder.getChildFile (names[0] + SynthProcessor::presetExtension),
+               "a factory preset saved is a copy of it, among the user's own");
+
+        SynthProcessor copy;
+        check (copy.loadPreset (synth.getPresetFile()) && ! copy.isFactoryPreset() && copy.getPresetName() == names[0],
+               "...which loads as the user's own");
+        folder.deleteRecursively();
+
+        // The arrows in the window step through the factory presets, starting from Init.
+        SynthProcessor stepped;
+        std::unique_ptr<juce::AudioProcessorEditor> editor (stepped.createEditorAndMakeActive());
+        auto* previous = findButton (*editor, "Previous preset");
+        auto* next = findButton (*editor, "Next preset");
+
+        if (previous != nullptr && next != nullptr && names.size() >= 2)
+        {
+            next->onClick();
+            const auto first = stepped.getPresetName();
+            next->onClick();
+            const auto second = stepped.getPresetName();
+            previous->onClick();
+
+            check (first == names[0] && second == names[1] && stepped.getPresetName() == names[0] && stepped.isFactoryPreset(),
+                   "the arrows step through the factory presets, from Init");
+        }
+        else
+        {
+            check (false, "the window has arrows to step through the presets");
+        }
+    }
+
     void testSavingAndLoading()
     {
         std::cout << "Saving and loading" << std::endl;
@@ -1224,6 +1310,7 @@ int main (int argc, char* argv[])
     testEnvelopes();
     testVelocity();
     testPresets();
+    testFactoryPresets();
     testSavingAndLoading();
 
     for (int i = 1; i + 1 < argc; ++i)

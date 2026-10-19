@@ -112,12 +112,42 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Save** in the header saves the whole sound as a preset: every oscillator's and LFO's wave and settings,
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
   suggests the current preset's name, so saving again over it is quick.
-- **The preset's name** opens a menu of your presets, to load one, as well as **Init**, the sound EZ Synth
-  starts with, a way to open a preset file from anywhere, and a way to show the presets folder in Finder.
-- **The arrows** either side of the name step back and forth through your presets, in order of name.
+- **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
+  then the factory presets, then your own. It also has a way to open a preset file from anywhere, and a way
+  to show the presets folder in Finder.
+- **The arrows** either side of the name step back and forth through the factory presets, then your own,
+  each in order of name.
 - A dot after the name means the sound has changed since the preset was loaded or saved.
 - Presets are kept in `~/Documents/EZ Synth/Presets`, as `.ezsynth` files. They're readable XML, so they
   can be copied, shared or renamed in Finder; a preset is named after its file.
+
+#### Factory presets
+
+EZ Synth comes with ten presets, built into the app and the plugins. Each one shows off something different:
+
+| Preset | What it shows |
+| --- | --- |
+| Bell | A wave made from its harmonics, an envelope on the 9th harmonic that lights it up for a moment as each note strikes, and an envelope on the volume for a long ring |
+| Brass | An envelope opening the low pass filter with each note, and velocity on the cutoff, so softer notes are darker |
+| Electric Keys | Velocity alongside envelopes: softer notes are quieter, darker and lose the triangle's bark, while the volume dies away and the 4th harmonic pings |
+| Harmonic Sweep | One LFO moving two controls: the number of harmonics of a sawtooth, drawn falling, and of a square, inverted, so one brightens as the other darkens |
+| Organ | A sine with raised harmonics, like drawbars, a tremolo, a click on each key, and velocity taken off the volume |
+| Pluck | An oscillator at no level that an envelope plucks, with a low pass filter that snaps shut after it |
+| Soft Pad | All three oscillators swelling in through a low pass filter that one LFO slowly opens and closes, while another makes one shimmer |
+| Square Lead | Both filters, and an LFO run once per note, drawn to wait and then rise, bringing a sawtooth in under held notes |
+| Step Filter | An LFO drawn as eight steps, moving a resonant low pass filter like a step sequencer |
+| Wobble Bass | A square and a sine through a resonant low pass filter that an LFO wobbles |
+
+A factory preset can't be saved over. **Save** suggests saving a copy, under the same name, among your own
+presets, where you can change it as you like.
+
+The factory presets are made by `Tools/MakeFactoryPresets.cpp`, which builds each one up from Init with the
+same calls the window makes, and saves it into `Presets/`. To change one, change its recipe, run the tool
+from the repository's folder, and build again:
+
+```bash
+./build/EZSynthMakeFactoryPresets
+```
 
 Everything is also saved with your DAW project, including which preset the sound came from and whether it's
 been edited since. Everything except the waves and what moves what can be automated.
@@ -165,7 +195,8 @@ together at their levels, that the filters cut and boost each harmonic by as muc
 move each kind of control by the range and in the direction they're set to, looping or once per note, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
 the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
-presets save and load the whole sound, that high notes leave out harmonics too high to play cleanly, that changing the
+presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
+clipping, that the arrows step through the factory presets, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -219,6 +250,8 @@ save pictures of the window showing several waves.
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/PresetBar.*` | Loading, stepping through and saving presets |
+| `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
+| `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
 | `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |
 | `Source/FilterStage.*` | A low or high pass filter that switches and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on |

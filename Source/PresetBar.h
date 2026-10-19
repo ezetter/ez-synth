@@ -4,8 +4,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** Loads and saves presets: arrows to step through those saved, the preset's name, which opens a menu of them, and
-    a button to save the sound as a preset. A dot after the name shows the sound has been changed since.
+/** Loads and saves presets: arrows to step through the factory presets and those saved, the preset's name, which
+    opens a menu of them, and a button to save the sound as a preset. A dot after the name shows the sound has been
+    changed since.
 */
 class PresetBar final : public juce::Component
 {
@@ -36,6 +37,7 @@ private:
     void showMenu();
     void step (int direction);
     void load (const juce::File&);
+    void loadFactory (const juce::String& name);
     void open();
     void save();
 

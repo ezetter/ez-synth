@@ -186,10 +186,19 @@ public:
     /** Goes back to the sound the synth starts with. */
     void loadInitPreset();
 
+    /** The presets that come with EZ Synth, which are built into it, in order of name. */
+    static juce::StringArray getFactoryPresetNames();
+
+    /** Loads one of the factory presets. Returns false, and leaves the sound alone, if there's none by that name. */
+    bool loadFactoryPreset (const juce::String& name);
+
+    /** Whether the preset last loaded is a factory preset. A factory preset has no file, so it can't be saved over. */
+    bool isFactoryPreset() const noexcept   { return factoryPreset; }
+
     /** The name of the preset last loaded or saved, or Init. */
     juce::String getPresetName() const   { return presetName; }
 
-    /** The file of the preset last loaded or saved, or none for Init. */
+    /** The file of the preset last loaded or saved, or none for Init or a factory preset. */
     juce::File getPresetFile() const   { return presetFile; }
 
     /** Whether the sound has been changed since its preset was loaded or saved. */
@@ -215,6 +224,9 @@ private:
     /** The whole sound, and the preset it came from, as saved with a host's project or in a preset file. */
     juce::ValueTree createState();
     void loadState (juce::ValueTree);
+
+    /** Loads a preset's XML under a name. Returns false, and leaves the sound alone, if it isn't a preset. */
+    bool loadPresetXml (const juce::XmlElement*, const juce::String& name, bool isFactory);
 
     struct Oscillator
     {
@@ -303,6 +315,7 @@ private:
 
     juce::String presetName { initPresetName };
     juce::File presetFile;
+    bool factoryPreset = false;
     std::atomic<bool> presetEdited { false };   // set from whichever thread changes a parameter
     int presetVersion = 0;
     juce::ValueTree initState;

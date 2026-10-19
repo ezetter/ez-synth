@@ -142,6 +142,13 @@ void PresetBar::showMenu()
     });
 
     menu.addSeparator();
+    menu.addSectionHeader ("Factory");
+
+    for (const auto& name : SynthProcessor::getFactoryPresetNames())
+        menu.addItem (name, true, synthProcessor.isFactoryPreset() && name == synthProcessor.getPresetName(), [this, name] { loadFactory (name); });
+
+    menu.addSeparator();
+    menu.addSectionHeader ("Your presets");
 
     const auto presets = SynthProcessor::findPresets();
 
@@ -167,16 +174,29 @@ void PresetBar::showMenu()
 
 void PresetBar::step (int direction)
 {
-    const auto presets = SynthProcessor::findPresets();
+    // Stepping goes through the factory presets, then the user's own, and round again.
+    const auto factory = SynthProcessor::getFactoryPresetNames();
+    const auto saved = SynthProcessor::findPresets();
+    const auto count = factory.size() + saved.size();
 
-    if (presets.isEmpty())
+    if (count == 0)
         return;
 
+    auto index = -1;
+
+    if (synthProcessor.isFactoryPreset())
+        index = factory.indexOf (synthProcessor.getPresetName());
+    else if (const auto savedIndex = saved.indexOf (synthProcessor.getPresetFile()); savedIndex >= 0)
+        index = factory.size() + savedIndex;
+
     // From Init, or a preset that isn't among them, stepping starts at one end of the list.
-    const auto index = presets.indexOf (synthProcessor.getPresetFile());
-    const auto nextIndex = index < 0 ? (direction > 0 ? 0 : presets.size() - 1)
-                                     : (index + direction + presets.size()) % presets.size();
-    load (presets[nextIndex]);
+    const auto nextIndex = index < 0 ? (direction > 0 ? 0 : count - 1)
+                                     : (index + direction + count) % count;
+
+    if (nextIndex < factory.size())
+        loadFactory (factory[nextIndex]);
+    else
+        load (saved[nextIndex - factory.size()]);
 }
 
 void PresetBar::load (const juce::File& file)
@@ -185,6 +205,12 @@ void PresetBar::load (const juce::File& file)
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't load the preset",
                                                 file.getFullPathName() + " isn't an EZ Synth preset.");
 
+    refresh();
+}
+
+void PresetBar::loadFactory (const juce::String& name)
+{
+    synthProcessor.loadFactoryPreset (name);
     refresh();
 }
 
@@ -206,7 +232,8 @@ void PresetBar::save()
     const auto folder = SynthProcessor::getPresetFolder();
     folder.createDirectory();
 
-    // Saving suggests the current preset's name, so saving again over it is quick. Init isn't saved over.
+    // Saving suggests the current preset's name, so saving again over it is quick. Init isn't saved over, and a
+    // factory preset, which has no file, is saved as a copy among the user's own, under its name.
     const auto name = shownName == SynthProcessor::initPresetName ? juce::String ("New preset") : shownName;
     const auto suggested = synthProcessor.getPresetFile() != juce::File() ? synthProcessor.getPresetFile()
                                                                           : folder.getChildFile (name + SynthProcessor::presetExtension);

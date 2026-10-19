@@ -53,6 +53,21 @@ target_sources(EZSynth
         Source/WaveGrid.cpp
         Source/Waveform.cpp)
 
+# The factory presets are built into the app and plugins, so they come wherever EZ Synth goes. They're made by
+# Tools/MakeFactoryPresets.cpp.
+juce_add_binary_data(EZSynthFactoryPresets
+    SOURCES
+        "Presets/Bell.ezsynth"
+        "Presets/Brass.ezsynth"
+        "Presets/Electric Keys.ezsynth"
+        "Presets/Harmonic Sweep.ezsynth"
+        "Presets/Organ.ezsynth"
+        "Presets/Pluck.ezsynth"
+        "Presets/Soft Pad.ezsynth"
+        "Presets/Square Lead.ezsynth"
+        "Presets/Step Filter.ezsynth"
+        "Presets/Wobble Bass.ezsynth")
+
 target_compile_definitions(EZSynth
     PUBLIC
         JUCE_WEB_BROWSER=0
@@ -61,6 +76,7 @@ target_compile_definitions(EZSynth
 
 target_link_libraries(EZSynth
     PRIVATE
+        EZSynthFactoryPresets
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
@@ -91,3 +107,8 @@ add_custom_command(TARGET EZSynth_Standalone POST_BUILD
 add_executable(EZSynthTests Tests/Tests.cpp)
 target_include_directories(EZSynthTests PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
 target_link_libraries(EZSynthTests PRIVATE EZSynth)
+
+# Makes the factory presets in Presets/ from their recipes. Run it after changing one, then build again.
+add_executable(EZSynthMakeFactoryPresets Tools/MakeFactoryPresets.cpp)
+target_include_directories(EZSynthMakeFactoryPresets PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
+target_link_libraries(EZSynthMakeFactoryPresets PRIVATE EZSynth)

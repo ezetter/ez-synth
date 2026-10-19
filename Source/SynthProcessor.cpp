@@ -2,6 +2,8 @@
 
 #include "SynthEditor.h"
 
+#include <BinaryData.h>
+
 namespace
 {
     constexpr int numVoices = 16;
@@ -175,6 +177,42 @@ namespace
         }
 
         return layout;
+    }
+
+    /** Presets are listed in order of name, with numbers counted as numbers. */
+    bool comesBefore (const juce::String& name, const juce::String& other)
+    {
+        return name.compareNatural (other) < 0;
+    }
+
+    /** A factory preset: its name, and its XML, which is built into EZ Synth. */
+    struct FactoryPreset
+    {
+        juce::String name;
+        juce::String xml;
+    };
+
+    std::vector<FactoryPreset> getFactoryPresets()
+    {
+        std::vector<FactoryPreset> presets;
+        const juce::String extension (SynthProcessor::presetExtension);
+
+        for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+        {
+            const juce::String filename (BinaryData::originalFilenames[i]);
+            auto size = 0;
+
+            if (const auto* data = BinaryData::getNamedResource (BinaryData::namedResourceList[i], size);
+                data != nullptr && filename.endsWith (extension))
+                presets.push_back ({ filename.dropLastCharacters (extension.length()), juce::String::fromUTF8 (data, size) });
+        }
+
+        std::sort (presets.begin(), presets.end(), [] (const FactoryPreset& a, const FactoryPreset& b)
+        {
+            return comesBefore (a.name, b.name);
+        });
+
+        return presets;
     }
 }
 
@@ -652,6 +690,7 @@ juce::ValueTree SynthProcessor::createState()
     auto state = parameters.copyState();
     state.setProperty ("presetName", presetName, nullptr);
     state.setProperty ("presetEdited", presetEdited.load(), nullptr);
+    state.setProperty ("presetFactory", factoryPreset, nullptr);
 
     const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
                                    std::optional<waveform::Preset> preset)
@@ -704,8 +743,10 @@ void SynthProcessor::loadState (juce::ValueTree state)
 {
     const auto name = state.getProperty ("presetName", initPresetName).toString();
     const auto edited = (bool) state.getProperty ("presetEdited", false);
+    const auto factory = (bool) state.getProperty ("presetFactory", false);
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
+    state.removeProperty ("presetFactory", nullptr);
 
     std::vector<juce::ValueTree> waves, modulations;
 
@@ -794,6 +835,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
     // Loading changed everything, which on its own would count as editing the preset.
     presetName = name;
     presetEdited = edited;
+    factoryPreset = factory;
     ++presetVersion;
 }
 
@@ -809,7 +851,7 @@ juce::Array<juce::File> SynthProcessor::findPresets (const juce::File& folder)
 
     std::sort (presets.begin(), presets.end(), [] (const juce::File& a, const juce::File& b)
     {
-        return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+        return comesBefore (a.getFileNameWithoutExtension(), b.getFileNameWithoutExtension());
     });
 
     return presets;
@@ -823,30 +865,27 @@ bool SynthProcessor::savePreset (const juce::File& file)
     auto state = createState();
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
+    state.removeProperty ("presetFactory", nullptr);
 
     const auto xml = state.createXml();
 
     if (xml == nullptr || ! named.getParentDirectory().createDirectory() || ! xml->writeTo (named))
         return false;
 
+    // Saved, a factory preset becomes one of the user's own.
     presetName = named.getFileNameWithoutExtension();
     presetFile = named;
     presetEdited = false;
+    factoryPreset = false;
     ++presetVersion;
     return true;
 }
 
 bool SynthProcessor::loadPreset (const juce::File& file)
 {
-    const auto xml = juce::XmlDocument::parse (file);
-
-    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+    if (! loadPresetXml (juce::XmlDocument::parse (file).get(), file.getFileNameWithoutExtension(), false))
         return false;
 
-    auto state = juce::ValueTree::fromXml (*xml);
-    state.setProperty ("presetName", file.getFileNameWithoutExtension(), nullptr);
-    state.setProperty ("presetEdited", false, nullptr);
-    loadState (state);
     presetFile = file;
     return true;
 }
@@ -855,6 +894,43 @@ void SynthProcessor::loadInitPreset()
 {
     loadState (initState);
     presetFile = juce::File();
+}
+
+juce::StringArray SynthProcessor::getFactoryPresetNames()
+{
+    juce::StringArray names;
+
+    for (const auto& preset : getFactoryPresets())
+        names.add (preset.name);
+
+    return names;
+}
+
+bool SynthProcessor::loadFactoryPreset (const juce::String& name)
+{
+    for (const auto& preset : getFactoryPresets())
+    {
+        if (preset.name == name && loadPresetXml (juce::XmlDocument::parse (preset.xml).get(), name, true))
+        {
+            presetFile = juce::File();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::String& name, bool isFactory)
+{
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+        return false;
+
+    auto state = juce::ValueTree::fromXml (*xml);
+    state.setProperty ("presetName", name, nullptr);
+    state.setProperty ("presetEdited", false, nullptr);
+    state.setProperty ("presetFactory", isFactory, nullptr);
+    loadState (state);
+    return true;
 }
 
 void SynthProcessor::parameterChanged (const juce::String&, float)
