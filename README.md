@@ -41,6 +41,16 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   envelope, to sweep the pitch with each note.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
+- **Draw in steps.** **Draw** at the top right of the grid switches between **Smooth**, freehand drawing,
+  and **Steps**, which splits the wave into a number of equal steps, each held at one level, for stepped
+  LFOs like the Step Filter preset's, or stepped oscillator waves. Set how many steps, from 2 to 20, with
+  the arrows beside it, or the mouse wheel over it. Faint lines mark the steps, and the one under the mouse
+  is lit. A click in a step sets its level to where the mouse is, and holding the button down and dragging
+  sets each step the mouse passes through, the one it's in following it up and down. A quick drag that
+  skips steps sets them along the line between where it was and where it is. Switching to steps, or
+  changing how many, leaves the wave as it is until you draw on it. Each oscillator and LFO keeps its own
+  way of drawing and number of steps, which are saved with the sound, so the Step Filter preset's LFO opens
+  in its 8 steps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
 - **Pick how many harmonics to play**, 1 to 9, with the numbered buttons under *Harmonics* (3 to start
   with). The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
@@ -293,7 +303,8 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that the arrows step through the factory presets, that high notes leave out harmonics too high to play cleanly, that changing the
+clipping, that the arrows step through the factory presets, that a click or a drag on the grid sets steps, and
+that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
 
@@ -363,7 +374,8 @@ save pictures of the window showing several waves.
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
 | `Source/FilterPanel.*` | The filters' switches, types, cutoff dials, and resonance, width, or Q and depth dials |
 | `Source/FilterStage.*` | A low, mid or high pass or notch filter that switches, changes type and sweeps without clicks |
-| `Source/WaveGrid.*` | The grid you draw on |
+| `Source/WaveGrid.*` | The grid you draw on, smoothly or in steps |
+| `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
 | `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |

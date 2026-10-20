@@ -56,6 +56,7 @@ target_sources(EZSynth
         Source/LfoPanel.cpp
         Source/MidiInputs.cpp
         Source/MidiPanel.cpp
+        Source/NumberStepper.cpp
         Source/ModulatableControls.cpp
         Source/Modulation.cpp
         Source/ModulationEditor.cpp

@@ -36,6 +36,11 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     }
 
     grid.onDraw = [this] (const waveform::Shape& shape) { setEditedWave (shape, std::nullopt); };
+    grid.onDrawingChange = [this] (const waveform::Drawing& drawing)
+    {
+        synthProcessor.setDrawing (synthProcessor.editedSource, drawing);
+        refresh();
+    };
 
     harmonicSliders.onAmplitudeChange = [this] (int harmonic, float amplitude)
     {
@@ -307,6 +312,9 @@ void SynthEditor::refresh()
     for (int i = 0; i < SynthProcessor::numLfos; ++i)
         now.on[(size_t) (SynthProcessor::numOscillators + i)] = synthProcessor.isLfoOn (i);
 
+    for (int i = 0; i < SynthProcessor::numSources; ++i)
+        now.drawings[(size_t) i] = synthProcessor.getDrawing (i);
+
     const auto edited = now.editedSource;
     const auto editingLfo = SynthProcessor::isLfo (edited);
     const auto lfo = edited - SynthProcessor::numOscillators;
@@ -329,6 +337,7 @@ void SynthEditor::refresh()
         for (size_t i = 0; i < presetButtons.size(); ++i)
             presetButtons[i].setToggleState (preset == waveform::allPresets[i], juce::dontSendNotification);
 
+        grid.setDrawing (synthProcessor.getDrawing (edited));
         harmonicSelector.setVisible (! editingLfo);
         harmonicSliders.setVisible (! editingLfo);
         tuneSlider.setVisible (! editingLfo);

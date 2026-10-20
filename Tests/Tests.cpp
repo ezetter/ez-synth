@@ -297,6 +297,122 @@ namespace
         check (largestJump < 0.05f, "the note glides to the new wave without a click");
     }
 
+    /** Sends the grid a press, moves and a release of the mouse at positions through the wave, from 0 to 1, and
+        levels, as a user drawing on it would.
+    */
+    void drawOnGrid (WaveGrid& grid, const std::vector<std::pair<double, float>>& stroke)
+    {
+        // Where the grid plots a position and a level, at its scale for a wave between -1 and 1.
+        const auto plot = grid.getLocalBounds().toFloat().withTrimmedLeft (46.0f).withTrimmedRight (20.0f)
+                                                         .withTrimmedTop (40.0f).withTrimmedBottom (32.0f);
+        const auto at = [plot] (const std::pair<double, float>& point)
+        {
+            return juce::Point<float> (plot.getX() + (float) point.first * plot.getWidth(),
+                                       plot.getCentreY() - point.second / 1.35f * plot.getHeight() / 2.0f);
+        };
+
+        const auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        const auto event = [&] (juce::Point<float> position)
+        {
+            return juce::MouseEvent (source, position, juce::ModifierKeys::leftButtonModifier, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                     &grid, &grid, now, at (stroke.front()), now, 1, stroke.size() > 1);
+        };
+
+        grid.mouseDown (event (at (stroke.front())));
+
+        for (size_t i = 1; i < stroke.size(); ++i)
+            grid.mouseDrag (event (at (stroke[i])));
+
+        grid.mouseUp (event (at (stroke.back())));
+    }
+
+    void testDrawingInSteps()
+    {
+        std::cout << "Drawing in steps" << std::endl;
+
+        check (waveform::getStep (0.0, 8) == 0 && waveform::getStep (0.124, 8) == 0 && waveform::getStep (0.125, 8) == 1
+                 && waveform::getStep (0.999, 8) == 7 && waveform::getStep (1.0, 8) == 7 && waveform::getStep (-0.1, 8) == 0,
+               "the cycle is split into equal steps");
+
+        waveform::Shape shape {};
+        waveform::setSteps (shape, 8, 1, 0.5f, 1, 0.5f);
+        const auto stepOnly = std::all_of (shape.begin(), shape.end(), [&shape] (const float& value)
+        {
+            const auto point = (int) (&value - shape.data());
+            return juce::exactlyEqual (value, point >= 64 && point < 128 ? 0.5f : 0.0f);
+        });
+        check (stepOnly, "setting a step holds every point in it, and only those, at its level");
+
+        waveform::setSteps (shape, 4, 0, -1.0f, 3, 1.0f);
+        check (juce::exactlyEqual (shape[10], -1.0f) && isNear (shape[200], -1.0 / 3.0, 1.0e-5) && isNear (shape[300], 1.0 / 3.0, 1.0e-5)
+                 && juce::exactlyEqual (shape[500], 1.0f),
+               "a stroke across steps sets those between along the line from the first to the last");
+
+        // Drawing on the grid with the mouse.
+        WaveGrid grid;
+        grid.setBounds (0, 0, 820, 520);
+        waveform::Shape drawn {};
+        grid.setShape (drawn);
+        grid.onDraw = [&drawn] (const waveform::Shape& changed) { drawn = changed; };
+        std::optional<waveform::Drawing> chosen;
+        grid.onDrawingChange = [&chosen] (const waveform::Drawing& drawing) { chosen = drawing; };
+
+        check (! grid.getDrawing().stepped && grid.getDrawing().numSteps == 8, "a wave starts being drawn smoothly, with 8 steps ready");
+
+        grid.setDrawing ({ true, 4 });
+        drawOnGrid (grid, { { 0.6, 0.5f } });
+        const auto isLevel = [&drawn] (int from, int to, float level)
+        {
+            return std::all_of (drawn.begin() + from, drawn.begin() + to, [level] (float value) { return isNear (value, level, 0.02); });
+        };
+
+        check (isLevel (256, 384, 0.5f) && isLevel (0, 256, 0.0f) && isLevel (384, 512, 0.0f),
+               "in steps, a click sets the step it's in to where the mouse is, and nothing else");
+
+        drawOnGrid (grid, { { 0.1, 0.9f }, { 0.12, 0.6f }, { 0.95, -0.6f } });
+        check (isLevel (0, 128, 0.6f) && isLevel (128, 256, 0.2f) && isLevel (256, 384, -0.2f) && isLevel (384, 512, -0.6f),
+               "dragging across the steps sets each one the mouse passes through, the step it's in following it up and down");
+
+        grid.setDrawing ({ false, 4 });
+        drawOnGrid (grid, { { 0.5, 0.8f } });
+        check (isNear (drawn[256], 0.8, 0.02) && isNear (drawn[250], 0.2, 0.02) && isNear (drawn[262], -0.2, 0.02),
+               "drawing smoothly sets only the points under the mouse, as before");
+
+        check (! chosen.has_value(), "showing a way of drawing doesn't count as the user choosing it");
+
+        // Each oscillator and LFO keeps its own way of drawing, which is saved with the sound.
+        SynthProcessor synth;
+        check (! synth.getDrawing (0).stepped && ! synth.getDrawing (SynthProcessor::numOscillators).stepped,
+               "every wave starts being drawn smoothly");
+
+        synth.setDrawing (1, { true, 12 });
+        synth.setDrawing (SynthProcessor::numOscillators + 2, { true, 5 });
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (restored.getDrawing (1) == waveform::Drawing { true, 12 } && restored.getDrawing (SynthProcessor::numOscillators + 2) == waveform::Drawing { true, 5 }
+                 && ! restored.getDrawing (0).stepped,
+               "how each wave is drawn is saved and restored");
+
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), (int) state.getSize());
+
+        for (auto* wave : xml->getChildWithTagNameIterator ("WAVE"))
+        {
+            wave->removeAttribute ("stepped");
+            wave->removeAttribute ("steps");
+        }
+
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (! restored.getDrawing (1).stepped && restored.getDrawing (1).numSteps == 8,
+               "a save from before waves could be drawn in steps has them drawn smoothly");
+
+        check (synth.loadFactoryPreset ("Step Filter") && synth.getDrawing (SynthProcessor::numOscillators + 1) == waveform::Drawing { true, 8 },
+               "the Step Filter preset's LFO opens in its 8 steps");
+    }
+
     void testEditingHarmonics()
     {
         std::cout << "Raising and lowering harmonics" << std::endl;
@@ -2138,6 +2254,40 @@ namespace
         saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
 
+        // Waves drawn in steps: the Step Filter preset's LFO, in its 8 steps, and an oscillator drawn in 12.
+        {
+            SynthProcessor stepped;
+            stepped.loadFactoryPreset ("Step Filter");
+            stepped.editedSource = SynthProcessor::numOscillators + 1;
+            std::unique_ptr<juce::AudioProcessorEditor> steppedEditor (stepped.createEditorAndMakeActive());
+            auto& steppedWindow = dynamic_cast<SynthEditor&> (*steppedEditor);
+
+            const auto saveWindow = [&folder, &steppedEditor, &steppedWindow] (const juce::String& name)
+            {
+                steppedWindow.refresh();
+                const auto file = folder.getChildFile (name + ".png");
+                file.deleteFile();
+                juce::FileOutputStream stream (file);
+                juce::PNGImageFormat().writeImageToStream (steppedEditor->createComponentSnapshot (steppedEditor->getLocalBounds(), true, 2.0f), stream);
+            };
+
+            saveWindow ("14-lfo-in-steps");
+
+            waveform::Shape staircase {};
+            constexpr std::array levels { -0.9f, -0.6f, -0.3f, 0.0f, 0.3f, 0.6f, 0.9f, 0.6f, 0.3f, 0.0f, -0.3f, -0.6f };
+
+            for (int step = 0; step < (int) levels.size(); ++step)
+                waveform::setSteps (staircase, (int) levels.size(), step, levels[(size_t) step], step, levels[(size_t) step]);
+
+            stepped.setShape (0, staircase);
+            setNumHarmonics (stepped, 9);
+            stepped.setDrawing (0, { true, (int) levels.size() });
+            stepped.editedSource = 0;
+            saveWindow ("14a-oscillator-in-steps");
+
+            stepped.editorBeingDeleted (steppedEditor.get());
+        }
+
         // The tune slider on its own: zoomed right out, a 5th below the note, then zoomed in on a slight detune, with
         // an LFO swinging it, and partway in on a 5th above.
         {
@@ -2225,6 +2375,7 @@ int main (int argc, char* argv[])
     testPlaying();
     testChangingTheWaveMidNote();
     testEditingHarmonics();
+    testDrawingInSteps();
     testOscillators();
     testFilters();
     testLfos();

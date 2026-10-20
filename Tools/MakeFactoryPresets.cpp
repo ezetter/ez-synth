@@ -264,6 +264,7 @@ namespace
                 constexpr std::array steps { -0.8, 0.6, -0.2, 1.0, -0.6, 0.3, -1.0, 0.8 };
                 return steps[(size_t) (t * (double) steps.size())];
             }));
+            synth.setDrawing (SynthProcessor::numOscillators + lfo2, { true, 8 });
             assign (synth, filterCutoffTarget (0), lfo2, 0.6f);
         } },
 

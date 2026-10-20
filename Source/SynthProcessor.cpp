@@ -839,20 +839,22 @@ juce::ValueTree SynthProcessor::createState()
     state.setProperty ("presetFactory", factoryPreset, nullptr);
 
     const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
-                                   std::optional<waveform::Preset> preset)
+                                   std::optional<waveform::Preset> preset, const waveform::Drawing& drawing)
     {
         juce::ValueTree wave ("WAVE");
         wave.setProperty (source, index, nullptr);
         wave.setProperty ("points", juce::MemoryBlock (shape.data(), sizeof (shape)).toBase64Encoding(), nullptr);
         wave.setProperty ("preset", preset.has_value() ? waveform::getName (*preset) : juce::String(), nullptr);
+        wave.setProperty ("stepped", drawing.stepped, nullptr);
+        wave.setProperty ("steps", drawing.numSteps, nullptr);
         state.appendChild (wave, nullptr);
     };
 
     for (int i = 0; i < numOscillators; ++i)
-        addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset);
+        addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset, drawings[(size_t) i]);
 
     for (int i = 0; i < numLfos; ++i)
-        addWave ("lfo", i, lfos[(size_t) i].shape, lfos[(size_t) i].preset);
+        addWave ("lfo", i, lfos[(size_t) i].shape, lfos[(size_t) i].preset, drawings[(size_t) (numOscillators + i)]);
 
     for (int target = 0; target < modulation::numTargets; ++target)
     {
@@ -937,8 +939,13 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     parameters.replaceState (state);
 
+    // Waves saved before they could be drawn in steps were drawn smoothly.
+    drawings = {};
+
     for (const auto& wave : waves)
     {
+        const waveform::Drawing drawing { (bool) wave.getProperty ("stepped", false),
+                                          juce::jlimit (waveform::fewestSteps, waveform::mostSteps, (int) wave.getProperty ("steps", 8)) };
         juce::MemoryBlock points;
 
         if (! points.fromBase64Encoding (wave["points"].toString()) || points.getSize() != sizeof (waveform::Shape))
@@ -961,12 +968,14 @@ void SynthProcessor::loadState (juce::ValueTree state)
                     value = juce::jlimit (-1.0f, 1.0f, value);
 
                 setLfoShape (lfo, restored, preset);
+                drawings[(size_t) (numOscillators + lfo)] = drawing;
             }
         }
         else if (const auto oscillator = (int) wave.getProperty ("oscillator", 0); oscillator >= 0 && oscillator < numOscillators)
         {
             // Saves from before there were three oscillators have one wave, with no number.
             setShape (oscillator, restored, preset);
+            drawings[(size_t) oscillator] = drawing;
         }
     }
 

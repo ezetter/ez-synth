@@ -50,6 +50,26 @@ namespace waveform
         return {};
     }
 
+    int getStep (double position, int numSteps)
+    {
+        return juce::jlimit (0, numSteps - 1, (int) std::floor (position * numSteps));
+    }
+
+    void setSteps (Shape& shape, int numSteps, int fromStep, float fromValue, int toStep, float toValue)
+    {
+        const auto first = std::min (fromStep, toStep);
+        const auto last = std::max (fromStep, toStep);
+
+        for (int point = 0; point < numPoints; ++point)
+        {
+            if (const auto step = getStep ((double) point / numPoints, numSteps); step >= first && step <= last)
+            {
+                const auto proportion = fromStep == toStep ? 1.0f : (float) (step - fromStep) / (float) (toStep - fromStep);
+                shape[(size_t) point] = fromValue + proportion * (toValue - fromValue);
+            }
+        }
+    }
+
     std::optional<Preset> findPreset (const juce::String& name)
     {
         for (const auto preset : allPresets)

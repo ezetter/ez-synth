@@ -35,6 +35,28 @@ namespace waveform
     juce::String getName (Preset);
     std::optional<Preset> findPreset (const juce::String& name);
 
+    /** How a wave is drawn on the grid: freehand, or in a number of equal steps, each held at one level. */
+    struct Drawing
+    {
+        bool stepped = false;
+        int numSteps = 8;
+
+        bool operator== (const Drawing&) const = default;
+    };
+
+    inline constexpr int fewestSteps = 2;
+    inline constexpr int mostSteps = 20;
+
+    /** Which of a number of equal steps, numbered from 0, a position through the wave, from 0 to 1, falls in. Point
+        i of a shape is in step getStep (i / numPoints, numSteps).
+    */
+    int getStep (double position, int numSteps);
+
+    /** Holds every point in each step, from one step to another, at a level. The levels go in a straight line from
+        the first step's to the last's, as a quick stroke across the steps between them would set them.
+    */
+    void setSteps (Shape&, int numSteps, int fromStep, float fromValue, int toStep, float toValue);
+
     /** One of the sine waves a shape is made of: amplitude * sin (2π * harmonic * t + phase), where t goes
         from 0 to 1 over the shape's wavelength.
     */

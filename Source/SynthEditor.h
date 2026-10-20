@@ -51,6 +51,7 @@ private:
         std::array<int, SynthProcessor::numOscillators> numHarmonics {};
         std::array<int, SynthProcessor::numOscillators> tuneCents {};
         std::array<bool, SynthProcessor::numSources> on {};
+        std::array<waveform::Drawing, SynthProcessor::numSources> drawings {};
 
         bool operator== (const Shown&) const = default;
     };

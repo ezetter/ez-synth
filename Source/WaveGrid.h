@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ChoiceButtons.h"
+#include "NumberStepper.h"
 #include "Waveform.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -11,6 +13,10 @@
 /** The grid a wave is drawn on, one cycle wide. For an oscillator it shows the drawn wave, the sine waves it
     breaks down into, and their sum, which is what the synth plays. For an LFO, which plays its wave just as it's
     drawn, it shows the wave and where the LFO has got to.
+
+    A wave is drawn smoothly, following the mouse, or in steps: the cycle split into a number of equal steps, from 2
+    to 20, each held at one level. Clicking in a step sets it to where the mouse is, and dragging across the steps
+    sets each one the mouse passes through.
 */
 class WaveGrid final : public juce::Component
 {
@@ -19,6 +25,13 @@ public:
 
     /** Called as the user draws, with the changed wave. */
     std::function<void (const waveform::Shape&)> onDraw;
+
+    /** Shows how the wave is drawn, smoothly or in steps, without calling onDrawingChange. */
+    void setDrawing (const waveform::Drawing&);
+    const waveform::Drawing& getDrawing() const noexcept   { return drawing; }
+
+    /** Called when the user changes how the wave is drawn. */
+    std::function<void (const waveform::Drawing&)> onDrawingChange;
 
     void setShape (const waveform::Shape&);
 
@@ -44,9 +57,12 @@ public:
     void setPlayhead (std::optional<float> position, float value = 0.0f);
 
     void paint (juce::Graphics&) override;
+    void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
 
 private:
     juce::Rectangle<float> getPlotArea() const;
@@ -59,10 +75,15 @@ private:
     static float getHighestValue (const std::vector<waveform::Partial>&);
     void paintGrid (juce::Graphics&, juce::Rectangle<float> plot) const;
     void paintHarmonics (juce::Graphics&, float opacity) const;
-    void paintHeader (juce::Graphics&, juce::Rectangle<float> bounds) const;
+    void paintSteps (juce::Graphics&, juce::Rectangle<float> plot) const;
+    void paintHeader (juce::Graphics&) const;
+    juce::Rectangle<float> getHeaderArea() const;
     juce::Path makeCurve (const std::function<float (double position)>& valueAt) const;
     juce::Path makeShapeCurve() const;
     void drawTo (juce::Point<float>);
+    void drawStepTo (juce::Point<float>);
+    bool isDrawing() const noexcept   { return lastDrawn.has_value() || lastStep.has_value(); }
+    void changeDrawing (const waveform::Drawing&);
 
     waveform::Shape shape {};
     std::vector<waveform::Partial> partials;
@@ -75,8 +96,15 @@ private:
     std::optional<float> playhead;
     float playheadValue = 0.0f;
 
-    // Where the mouse last drew: a point number, which can fall between points, and a value.
+    // Where the mouse last drew: a point number, which can fall between points, and a value. In steps, the step it
+    // last set, and the level.
     std::optional<std::pair<double, float>> lastDrawn;
+    std::optional<std::pair<int, float>> lastStep;
+
+    waveform::Drawing drawing;
+    int hoveredStep = -1;
+    ChoiceButtons drawMode { { "Smooth", "Steps" } };
+    NumberStepper stepCount { waveform::fewestSteps, waveform::mostSteps };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WaveGrid)
 };

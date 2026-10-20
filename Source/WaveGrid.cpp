@@ -18,6 +18,37 @@ WaveGrid::WaveGrid()
 {
     setMouseCursor (juce::MouseCursor::CrosshairCursor);
     setMouseClickGrabsKeyboardFocus (false);
+
+    drawMode.setTitle ("Draw smoothly or in steps");
+    drawMode.onChoose = [this] (int index) { changeDrawing ({ index == 1, drawing.numSteps }); };
+    addAndMakeVisible (drawMode);
+
+    stepCount.setTitle ("Number of steps");
+    stepCount.onChange = [this] (int numSteps) { changeDrawing ({ drawing.stepped, numSteps }); };
+    addAndMakeVisible (stepCount);
+
+    setDrawing (drawing);
+}
+
+void WaveGrid::setDrawing (const waveform::Drawing& newDrawing)
+{
+    drawing = { newDrawing.stepped, juce::jlimit (waveform::fewestSteps, waveform::mostSteps, newDrawing.numSteps) };
+    drawMode.setChosen (drawing.stepped ? 1 : 0);
+    stepCount.setValue (drawing.numSteps);
+
+    // The number of steps is kept for drawing smoothly too, ready for going back to steps.
+    stepCount.setEnabled (drawing.stepped);
+    stepCount.setAlpha (drawing.stepped ? 1.0f : 0.5f);
+    hoveredStep = -1;
+    repaint();
+}
+
+void WaveGrid::changeDrawing (const waveform::Drawing& newDrawing)
+{
+    setDrawing (newDrawing);
+
+    if (onDrawingChange != nullptr)
+        onDrawingChange (drawing);
 }
 
 void WaveGrid::setShape (const waveform::Shape& newShape)
@@ -41,7 +72,7 @@ void WaveGrid::setMovedPartials (std::optional<std::vector<waveform::Partial>> n
 
     // The grid stretches to fit sine waves moved beyond it, but doesn't shrink back as they fall, so it holds
     // steady as they swing. It fits the harmonics as set again when they change.
-    if (movedPartials.has_value() && ! lastDrawn.has_value())
+    if (movedPartials.has_value() && ! isDrawing())
         valueRange = std::max (valueRange, getHighestValue (*movedPartials) * 1.12f);
 
     repaint();
@@ -70,7 +101,7 @@ float WaveGrid::getHighestValue (const std::vector<waveform::Partial>& sineWaves
 void WaveGrid::updateValueRange()
 {
     // The scale stays put while the user draws, so the line keeps up with the mouse.
-    if (lastDrawn.has_value())
+    if (isDrawing())
         return;
 
     // Raising harmonics can take a wave, or its sine waves, past -1 to 1, so the grid stretches to fit them.
@@ -120,6 +151,20 @@ void WaveGrid::setPlayhead (std::optional<float> position, float value)
     }
 }
 
+juce::Rectangle<float> WaveGrid::getHeaderArea() const
+{
+    return getLocalBounds().toFloat().reduced (16.0f, 0.0f).removeFromTop (34.0f);
+}
+
+void WaveGrid::resized()
+{
+    // How the wave is drawn, at the right of the header.
+    auto header = getHeaderArea().toNearestInt();
+    stepCount.setBounds (header.removeFromRight (80).withSizeKeepingCentre (80, 22));
+    header.removeFromRight (8);
+    drawMode.setBounds (header.removeFromRight (132).withSizeKeepingCentre (132, 22));
+}
+
 juce::Rectangle<float> WaveGrid::getPlotArea() const
 {
     return getLocalBounds().toFloat().withTrimmedLeft (46.0f).withTrimmedRight (20.0f)
@@ -160,6 +205,7 @@ void WaveGrid::paint (juce::Graphics& g)
 
     const auto plot = getPlotArea();
     paintGrid (g, plot);
+    paintSteps (g, plot);
 
     {
         const juce::Graphics::ScopedSaveState state (g);
@@ -195,7 +241,7 @@ void WaveGrid::paint (juce::Graphics& g)
         }
     }
 
-    paintHeader (g, bounds);
+    paintHeader (g);
 }
 
 void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
@@ -227,9 +273,29 @@ void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
     g.strokePath (sumCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
-void WaveGrid::paintHeader (juce::Graphics& g, juce::Rectangle<float> bounds) const
+void WaveGrid::paintSteps (juce::Graphics& g, juce::Rectangle<float> plot) const
 {
-    const auto header = bounds.reduced (16.0f, 0.0f).removeFromTop (34.0f);
+    if (! drawing.stepped)
+        return;
+
+    const auto stepX = [this] (int step) { return toX ((double) step / drawing.numSteps); };
+
+    // The step under the mouse, which a click sets, is lit faintly.
+    if (hoveredStep >= 0 && on)
+    {
+        g.setColour (colours::drawn.withAlpha (0.07f));
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (stepX (hoveredStep), plot.getY(), stepX (hoveredStep + 1), plot.getBottom()));
+    }
+
+    g.setColour (colours::drawn.withAlpha (0.22f));
+
+    for (int step = 1; step < drawing.numSteps; ++step)
+        g.drawVerticalLine (juce::roundToInt (stepX (step)), plot.getY(), plot.getBottom());
+}
+
+void WaveGrid::paintHeader (juce::Graphics& g) const
+{
+    const auto header = getHeaderArea();
     const auto name = (lfoPeriod.has_value() ? "LFO " : "OSC ") + juce::String (sourceNumber);
 
     g.setFont (fonts::caption());
@@ -246,18 +312,30 @@ void WaveGrid::paintHeader (juce::Graphics& g, juce::Rectangle<float> bounds) co
         g.setColour (colours::dimText);
     }
 
-    g.setFont (fonts::body (12.5f));
+    // How the wave is drawn, with its caption.
+    const auto drawControls = drawMode.getBounds().toFloat();
+    g.drawText ("DRAW", header.withRight (drawControls.getX() - 10.0f), juce::Justification::centredRight);
 
-    if (on)
+    // Between the caption and the controls, a hint for drawing, or that the source is off: the longest that fits.
+    const auto drawCaptionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), "DRAW");
+    const auto hintArea = header.withRight (drawControls.getX() - 10.0f - drawCaptionWidth - 20.0f)
+                                .withTrimmedLeft (juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f);
+    const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");
+    const auto hints = ! on ? juce::StringArray { sourceName + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
+                                                  sourceName + " is off" }
+                            : drawing.stepped ? juce::StringArray { "Click a step to set it, or drag across them", "Drag to set steps" }
+                                              : juce::StringArray { "Click and drag to draw a wave", "Drag to draw" };
+
+    g.setFont (fonts::body (12.5f));
+    g.setColour (on ? colours::dimText : colours::accent);
+
+    for (const auto& hint : hints)
     {
-        g.drawText ("Click and drag to draw a wave", header, juce::Justification::centredRight);
-    }
-    else
-    {
-        g.setColour (colours::accent);
-        g.drawText (name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO")
-                        + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
-                    header, juce::Justification::centredRight);
+        if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), hint) <= hintArea.getWidth())
+        {
+            g.drawText (hint, hintArea, juce::Justification::centredRight);
+            break;
+        }
     }
 }
 
@@ -358,19 +436,67 @@ juce::Path WaveGrid::makeShapeCurve() const
 void WaveGrid::mouseDown (const juce::MouseEvent& e)
 {
     lastDrawn.reset();
-    drawTo (e.position);
+    lastStep.reset();
+
+    if (drawing.stepped)
+        drawStepTo (e.position);
+    else
+        drawTo (e.position);
 }
 
 void WaveGrid::mouseDrag (const juce::MouseEvent& e)
 {
-    drawTo (e.position);
+    if (drawing.stepped)
+        drawStepTo (e.position);
+    else
+        drawTo (e.position);
 }
 
 void WaveGrid::mouseUp (const juce::MouseEvent&)
 {
     lastDrawn.reset();
+    lastStep.reset();
     updateValueRange();
     repaint();
+}
+
+void WaveGrid::mouseMove (const juce::MouseEvent& e)
+{
+    const auto step = drawing.stepped && getPlotArea().contains (e.position)
+                          ? waveform::getStep (toPosition (e.position.x), drawing.numSteps)
+                          : -1;
+
+    if (step != hoveredStep)
+    {
+        hoveredStep = step;
+        repaint();
+    }
+}
+
+void WaveGrid::mouseExit (const juce::MouseEvent&)
+{
+    if (hoveredStep >= 0)
+    {
+        hoveredStep = -1;
+        repaint();
+    }
+}
+
+void WaveGrid::drawStepTo (juce::Point<float> position)
+{
+    const auto step = waveform::getStep (toPosition (position.x), drawing.numSteps);
+    const auto value = juce::jlimit (-1.0f, 1.0f, toValue (position.y));
+    const auto [fromStep, fromValue] = lastStep.value_or (std::pair (step, value));
+
+    // The step the mouse is in follows it up and down. Steps the mouse skipped over, moving quickly, are set along
+    // the line between where it was and where it is.
+    waveform::setSteps (shape, drawing.numSteps, fromStep, fromValue, step, value);
+    lastStep = std::pair (step, value);
+    hoveredStep = step;
+    repaint();
+
+    if (onDraw != nullptr)
+        onDraw (shape);
 }
 
 void WaveGrid::drawTo (juce::Point<float> position)

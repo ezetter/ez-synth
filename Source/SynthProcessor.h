@@ -258,6 +258,13 @@ public:
     /** The oscillator or LFO shown on the editor's grid. It's kept here so it's still shown when the editor reopens. */
     int editedSource = 0;
 
+    /** How each source's wave is drawn on the grid, smoothly or in steps, numbered as the sources are: the
+        oscillators, then the LFOs. It doesn't change the sound, but it's saved with it, so a wave drawn in steps
+        opens in steps.
+    */
+    const waveform::Drawing& getDrawing (int source) const noexcept   { return drawings[(size_t) source]; }
+    void setDrawing (int source, const waveform::Drawing& drawing)   { drawings[(size_t) source] = drawing; }
+
 private:
     juce::AudioProcessorEditor* createEditor() override;
     void parameterChanged (const juce::String& parameterId, float newValue) override;
@@ -400,6 +407,7 @@ private:
     juce::Synthesiser synth;
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
+    std::array<waveform::Drawing, numSources> drawings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SynthProcessor)
 };
