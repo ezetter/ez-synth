@@ -27,7 +27,51 @@ WaveGrid::WaveGrid()
     stepCount.onChange = [this] (int numSteps) { changeDrawing ({ drawing.stepped, numSteps }); };
     addAndMakeVisible (stepCount);
 
+    randomSwitch.setTitle ("Play a new random wave every cycle");
+    randomSwitch.setClickingTogglesState (true);
+    randomSwitch.onClick = [this]
+    {
+        setRandom (randomSwitch.getToggleState());
+
+        if (onRandomChange != nullptr)
+            onRandomChange (random);
+    };
+    addChildComponent (randomSwitch);
+
     setDrawing (drawing);
+}
+
+WaveGrid::Switch::Switch (const juce::String& name)
+    : Button (name)
+{
+    setMouseClickGrabsKeyboardFocus (false);
+    setWantsKeyboardFocus (false);
+}
+
+void WaveGrid::Switch::paintButton (juce::Graphics& g, bool highlighted, bool pressed)
+{
+    const auto bounds = getLocalBounds().toFloat().reduced (0.5f);
+    const auto corner = juce::jmin (6.0f, bounds.getHeight() / 2.0f);
+    const auto switchedOn = getToggleState();
+
+    g.setColour (switchedOn ? colours::accent : colours::panel.brighter (highlighted || pressed ? 0.16f : 0.08f));
+    g.fillRoundedRectangle (bounds, corner);
+    g.setColour (switchedOn ? colours::accent.brighter (0.25f) : colours::outline);
+    g.drawRoundedRectangle (bounds, corner, 1.0f);
+
+    g.setColour (switchedOn ? colours::background : colours::dimText);
+    g.setFont (juce::FontOptions (juce::jmin (13.0f, (float) getHeight() * 0.62f), juce::Font::bold));
+    g.drawText (getName(), getLocalBounds(), juce::Justification::centred);
+}
+
+void WaveGrid::setRandom (std::optional<bool> newRandom)
+{
+    randomSwitch.setVisible (newRandom.has_value());
+    randomSwitch.setToggleState (newRandom.value_or (false), juce::dontSendNotification);
+    random = newRandom.value_or (false);
+    setMouseCursor (canDraw() ? juce::MouseCursor::CrosshairCursor : juce::MouseCursor::NormalCursor);
+    hoveredStep = -1;
+    repaint();
 }
 
 void WaveGrid::setDrawing (const waveform::Drawing& newDrawing)
@@ -51,9 +95,10 @@ void WaveGrid::changeDrawing (const waveform::Drawing& newDrawing)
         onDrawingChange (drawing);
 }
 
-void WaveGrid::setShape (const waveform::Shape& newShape)
+void WaveGrid::setShape (const waveform::Shape& newShape, std::optional<float> end)
 {
     shape = newShape;
+    shapeEnd = end;
     updateValueRange();
     repaint();
 }
@@ -163,6 +208,10 @@ void WaveGrid::resized()
     stepCount.setBounds (header.removeFromRight (80).withSizeKeepingCentre (80, 22));
     header.removeFromRight (8);
     drawMode.setBounds (header.removeFromRight (132).withSizeKeepingCentre (132, 22));
+
+    // An LFO's random switch is to the left of the drawing's caption.
+    header.removeFromRight (64);
+    randomSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
 }
 
 juce::Rectangle<float> WaveGrid::getPlotArea() const
@@ -318,13 +367,15 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
 
     // Between the caption and the controls, a hint for drawing, or that the source is off: the longest that fits.
     const auto drawCaptionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), "DRAW");
-    const auto hintArea = header.withRight (drawControls.getX() - 10.0f - drawCaptionWidth - 20.0f)
+    const auto controlsLeft = randomSwitch.isVisible() ? (float) randomSwitch.getX() : drawControls.getX() - 10.0f - drawCaptionWidth;
+    const auto hintArea = header.withRight (controlsLeft - 20.0f)
                                 .withTrimmedLeft (juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f);
     const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");
     const auto hints = ! on ? juce::StringArray { sourceName + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
                                                   sourceName + " is off" }
-                            : drawing.stepped ? juce::StringArray { "Click a step to set it, or drag across them", "Drag to set steps" }
-                                              : juce::StringArray { "Click and drag to draw a wave", "Drag to draw" };
+                     : random ? juce::StringArray { runsOnce ? "A new random wave with each key" : "A new random wave every cycle", "Random" }
+                     : drawing.stepped ? juce::StringArray { "Click a step to set it, or drag across them", "Drag to set steps" }
+                                       : juce::StringArray { "Click and drag to draw a wave", "Drag to draw" };
 
     g.setFont (fonts::body (12.5f));
     g.setColour (on ? colours::dimText : colours::accent);
@@ -428,8 +479,9 @@ juce::Path WaveGrid::makeShapeCurve() const
     for (int i = 1; i < waveform::numPoints; ++i)
         curve.lineTo (toX ((double) i / waveform::numPoints), toY (shape[(size_t) i]));
 
-    // A wave that repeats ends where it began. An LFO that runs once holds its last value instead.
-    curve.lineTo (toX (1.0), toY (runsOnce ? shape.back() : shape[0]));
+    // A wave that repeats ends where it began, or a random one where its next cycle begins. An LFO that runs once
+    // holds its last value instead.
+    curve.lineTo (toX (1.0), toY (shapeEnd.value_or (runsOnce ? shape.back() : shape[0])));
     return curve;
 }
 
@@ -437,6 +489,9 @@ void WaveGrid::mouseDown (const juce::MouseEvent& e)
 {
     lastDrawn.reset();
     lastStep.reset();
+
+    if (! canDraw())
+        return;
 
     if (drawing.stepped)
         drawStepTo (e.position);
@@ -446,6 +501,9 @@ void WaveGrid::mouseDown (const juce::MouseEvent& e)
 
 void WaveGrid::mouseDrag (const juce::MouseEvent& e)
 {
+    if (! canDraw())
+        return;
+
     if (drawing.stepped)
         drawStepTo (e.position);
     else
@@ -462,7 +520,7 @@ void WaveGrid::mouseUp (const juce::MouseEvent&)
 
 void WaveGrid::mouseMove (const juce::MouseEvent& e)
 {
-    const auto step = drawing.stepped && getPlotArea().contains (e.position)
+    const auto step = drawing.stepped && canDraw() && getPlotArea().contains (e.position)
                           ? waveform::getStep (toPosition (e.position.x), drawing.numSteps)
                           : -1;
 
@@ -504,6 +562,8 @@ void WaveGrid::drawTo (juce::Point<float> position)
     const auto point = juce::jlimit (0.0, (double) waveform::numPoints - 1.0, toPosition (position.x) * waveform::numPoints);
     const auto value = juce::jlimit (-1.0f, 1.0f, toValue (position.y));
     const auto [fromPoint, fromValue] = lastDrawn.value_or (std::pair (point, value));
+
+    shapeEnd.reset();
 
     // Every point between where the mouse was and where it is now is set along the line between the two, so a
     // quick stroke leaves no gaps.

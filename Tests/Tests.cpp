@@ -4,6 +4,7 @@
 #include "../Source/MidiInputs.h"
 #include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
+#include "../Source/RandomWave.h"
 #include "../Source/SynthEditor.h"
 #include "../Source/SynthProcessor.h"
 #include "../Source/Waveform.h"
@@ -1055,6 +1056,259 @@ namespace
         setParameter (synth, SynthProcessor::decayId (envelope), settings.decay);
         setParameter (synth, SynthProcessor::sustainId (envelope), settings.sustain);
         setParameter (synth, SynthProcessor::releaseId (envelope), settings.release);
+    }
+
+    void testRandomLfos()
+    {
+        std::cout << "Random LFOs" << std::endl;
+
+        constexpr std::uint32_t seed = 12345;
+        const waveform::Drawing smooth { false, 8 }, eightSteps { true, 8 };
+
+        // The smooth random wave.
+        {
+            auto withinRange = true, joined = true, deterministic = true;
+            auto turns = 0;
+            std::vector<double> stretches;   // how long each rise and fall lasts, in cycles
+            constexpr int cycles = 200, pointsPerCycle = 2000;
+            auto lastTurn = 0.0;
+            auto previous = randomwave::valueAt (seed, 0.0, smooth);
+            auto previousSlope = 0.0;
+
+            for (int i = 1; i <= cycles * pointsPerCycle; ++i)
+            {
+                const auto t = (double) i / pointsPerCycle;
+                const auto value = randomwave::valueAt (seed, t, smooth);
+                const auto slope = (double) (value - previous) * pointsPerCycle;
+                withinRange = withinRange && value >= -1.0f && value <= 1.0f;
+
+                if (slope * previousSlope < 0.0)
+                {
+                    ++turns;
+                    stretches.push_back (t - lastTurn);
+                    lastTurn = t;
+                }
+
+                previous = value;
+                previousSlope = juce::approximatelyEqual (slope, 0.0) ? previousSlope : slope;
+            }
+
+            for (int cycle = 1; cycle < 50; ++cycle)
+            {
+                // Where each cycle meets the next, the value and the slope carry straight on.
+                const auto before = randomwave::valueAt (seed, cycle - 1.0e-5, smooth), at = randomwave::valueAt (seed, (double) cycle, smooth);
+                const auto after = randomwave::valueAt (seed, cycle + 1.0e-5, smooth);
+                joined = joined && std::abs (at - before) < 1.0e-3 && std::abs ((after - at) - (at - before)) < 1.0e-5;
+                deterministic = deterministic && juce::exactlyEqual (at, randomwave::valueAt (seed, (double) cycle, smooth));
+            }
+
+            const auto [shortest, longest] = std::minmax_element (stretches.begin(), stretches.end());
+            const auto turnsPerCycle = (double) turns / cycles;
+
+            check (withinRange, "a smooth random wave stays between -1 and 1");
+            check (joined, "...and each cycle starts where the last one ended, at the same slope, so it runs on smoothly");
+            check (turnsPerCycle > 2.0 && turnsPerCycle < 8.0,
+                   "...turning " + juce::String (turnsPerCycle, 1) + " times a cycle, so it rises and falls without being jagged");
+            check (*shortest < 0.15 && *longest > 0.5,
+                   "...over stretches of different lengths, from " + juce::String (*shortest, 2) + " to " + juce::String (*longest, 2) + " of a cycle");
+            check (deterministic, "...and the same seed gives the same wave");
+
+            const auto first = randomwave::getCycle (seed, 0, smooth), second = randomwave::getCycle (seed, 1, smooth);
+            auto difference = 0.0;
+
+            for (size_t i = 0; i < first.size(); ++i)
+                difference += std::abs (first[i] - second[i]) / (double) first.size();
+
+            check (difference > 0.2, "each cycle is a new wave");
+        }
+
+        // The random wave in steps.
+        {
+            std::array<int, 10> counts {};
+            auto flat = true;
+            auto lowest = 1.0f, highest = -1.0f;
+            constexpr int numSteps = 40000;
+
+            for (int step = 0; step < numSteps; ++step)
+            {
+                const auto start = randomwave::valueAt (seed, (step + 0.01) / 8.0, eightSteps);
+                flat = flat && juce::exactlyEqual (start, randomwave::valueAt (seed, (step + 0.99) / 8.0, eightSteps));
+                ++counts[(size_t) juce::jlimit (0, 9, (int) ((start + 1.0f) * 5.0f))];
+                lowest = std::min (lowest, start);
+                highest = std::max (highest, start);
+            }
+
+            check (flat, "a random wave in steps holds each step at one level");
+            check (std::all_of (counts.begin(), counts.end(), [] (int count) { return count > 0.09 * numSteps && count < 0.11 * numSteps; })
+                     && lowest < -0.999f && highest > 0.999f,
+                   "...each level from -1 to 1 as likely as any other");
+
+            // The last step of each cycle and the first of the next have nothing to do with each other.
+            auto sumLast = 0.0, sumFirst = 0.0, sumProduct = 0.0, sumLastSquared = 0.0, sumFirstSquared = 0.0;
+            constexpr int numCycles = 5000;
+
+            for (int cycle = 0; cycle < numCycles; ++cycle)
+            {
+                const double last = randomwave::valueAt (seed, cycle + 0.95, eightSteps), next = randomwave::valueAt (seed, cycle + 1.05, eightSteps);
+                sumLast += last;
+                sumFirst += next;
+                sumProduct += last * next;
+                sumLastSquared += last * last;
+                sumFirstSquared += next * next;
+            }
+
+            const auto n = (double) numCycles;
+            const auto correlation = (sumProduct - sumLast * sumFirst / n)
+                                   / std::sqrt ((sumLastSquared - sumLast * sumLast / n) * (sumFirstSquared - sumFirst * sumFirst / n));
+            check (std::abs (correlation) < 0.05, "...the first and last steps as random as the others, even where the cycles meet");
+
+            check (juce::exactlyEqual (randomwave::onceValueAt (seed, 1.5, eightSteps), randomwave::valueAt (seed, 0.95, eightSteps))
+                     && juce::exactlyEqual (randomwave::onceValueAt (seed, -0.3, eightSteps), randomwave::valueAt (seed, 0.05, eightSteps)),
+                   "an LFO that runs once holds its random wave's first step before it starts, and its last after it ends");
+        }
+
+        // Played: a random LFO swinging an oscillator's level.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 0.25f, false, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::lfoRandomId (0), 1.0f);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+
+        // How loud each eighth of a cycle is, through a stretch of cycles.
+        const auto profile = [] (const std::vector<float>& signal, double from, int numCycles)
+        {
+            std::vector<double> levels;
+
+            for (int i = 0; i < numCycles * 8; ++i)
+                levels.push_back (loudness (signal, from + i * 0.25 / 8.0, from + (i + 1) * 0.25 / 8.0));
+
+            return levels;
+        };
+
+        const auto differenceBetween = [] (const std::vector<double>& a, size_t aFrom, const std::vector<double>& b, size_t bFrom)
+        {
+            auto total = 0.0, size = 0.0;
+
+            for (size_t i = 0; i < 8; ++i)
+            {
+                total += std::abs (a[aFrom + i] - b[bFrom + i]);
+                size += std::abs (a[aFrom + i]);
+            }
+
+            return total / size;
+        };
+
+        auto signal = play (synth, 69, 1.4, 1.6);
+        auto levels = profile (signal, 0.25, 4);
+        check (differenceBetween (levels, 0, levels, 8) > 0.2 && differenceBetween (levels, 8, levels, 16) > 0.2,
+               "a looping random LFO plays a new wave every cycle");
+
+        auto largestJump = 0.0f;
+
+        for (auto i = (size_t) (0.1 * sampleRate); i < (size_t) (1.3 * sampleRate); ++i)
+            largestJump = std::max (largestJump, std::abs (signal[i] - signal[i - 1]));
+
+        check (largestJump < 0.03f, "...and runs on smoothly from one cycle to the next, without a click");
+
+        setParameter (synth, SynthProcessor::lfoRandomId (0), 0.0f);
+        signal = play (synth, 69, 1.4, 1.6);
+        levels = profile (signal, 0.25, 4);
+        check (differenceBetween (levels, 0, levels, 8) < 0.02, "(switched off, it plays its drawn wave, the same every cycle)");
+
+        // In steps, a looping random LFO holds the level through each step.
+        setParameter (synth, SynthProcessor::lfoRandomId (0), 1.0f);
+        synth.setDrawing (SynthProcessor::numOscillators, eightSteps);
+        signal = play (synth, 69, 1.4, 1.6);
+        auto steady = true;
+        const auto loudest = loudness (signal, 0.25, 1.25) * 3.0;
+
+        // Each step glides to its level over its first 20 ms or so, so as not to click, then holds it.
+        for (int step = 8; step < 40; ++step)
+        {
+            const auto start = 0.25 * step / 8.0;
+            const auto earlier = loudness (signal, start + 0.020, start + 0.025), later = loudness (signal, start + 0.025, start + 0.030);
+            steady = steady && std::abs (later - earlier) < 0.02 * loudest;
+        }
+
+        check (steady, "in steps, a random LFO holds each step's level");
+        synth.setDrawing (SynthProcessor::numOscillators, smooth);
+
+        // Run once, a random LFO plays a new wave with each key.
+        setParameter (synth, SynthProcessor::lfoModeId (0), 1.0f);
+        const auto firstNote = profile (play (synth, 69, 0.4, 0.7), 0.0, 1);
+        const auto secondNote = profile (play (synth, 69, 0.4, 0.7), 0.0, 1);
+        check (differenceBetween (firstNote, 0, secondNote, 0) > 0.2, "an LFO that runs once plays a new random wave with each key");
+        setParameter (synth, SynthProcessor::lfoModeId (0), 0.0f);
+
+        // The window shows the cycle that's playing.
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+
+        for (int block = 0; block < 60; ++block)
+        {
+            juce::MidiBuffer nothing;
+            synth.processBlock (buffer, nothing);
+        }
+
+        const auto playing = synth.getRandomCycle (0);
+        const auto progress = synth.getLfoProgress (0).value_or (0.0);
+        const auto shown = synth.getPlayedLfoShape (0);
+        check (playing.cycle == (std::int64_t) (60.0 * blockSize / (0.25 * sampleRate))
+                 && shown == randomwave::getCycle (playing.seed, playing.cycle, smooth)
+                 && isNear (synth.getLfoValue (0), randomwave::valueAt (playing.seed, (double) playing.cycle + progress, smooth), 1.0e-6),
+               "the window shows the random wave's cycle that's playing, and where it is in it");
+
+        // Saved and restored, with its drawing.
+        synth.setDrawing (SynthProcessor::numOscillators, eightSteps);
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (restored.isLfoRandom (0) && ! restored.isLfoRandom (1) && restored.getDrawing (SynthProcessor::numOscillators) == eightSteps,
+               "whether each LFO plays a random wave is saved and restored");
+
+        // The grid shows a switch for an LFO, and can't be drawn on while it plays a random wave.
+        WaveGrid grid;
+        grid.setBounds (0, 0, 820, 520);
+        waveform::Shape drawn {};
+        grid.setShape (drawn);
+        auto drewSomething = false;
+        grid.onDraw = [&drewSomething] (const waveform::Shape&) { drewSomething = true; };
+
+        grid.setRandom (true);
+        drawOnGrid (grid, { { 0.5, 0.5f }, { 0.7, -0.5f } });
+        check (! drewSomething, "a random wave can't be drawn on");
+
+        grid.setRandom (false);
+        drawOnGrid (grid, { { 0.5, 0.5f } });
+        check (drewSomething, "...but the LFO's own wave can, once random is off");
+
+        const auto randomSwitchShown = [&grid]
+        {
+            return std::any_of (grid.getChildren().begin(), grid.getChildren().end(),
+                                [] (juce::Component* child) { return child->getName() == "Random" && child->isVisible(); });
+        };
+
+        check (randomSwitchShown(), "an LFO's grid has a switch for its random wave");
+        grid.setRandom (std::nullopt);
+        check (! randomSwitchShown(), "...and an oscillator's has none");
+
+        // In the window, choosing a wave for an LFO that's playing a random one has it play that wave instead.
+        {
+            SynthProcessor app;
+            setParameter (app, SynthProcessor::lfoRandomId (1), 1.0f);
+            app.editedSource = SynthProcessor::numOscillators + 1;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (app.createEditorAndMakeActive());
+
+            for (auto* child : editor->getChildren())
+                if (auto* button = dynamic_cast<juce::TextButton*> (child); button != nullptr && button->getButtonText() == "Square")
+                    button->onClick();
+
+            check (! app.isLfoRandom (1) && app.getLfoPreset (1) == waveform::Preset::square,
+                   "choosing a wave for an LFO playing a random one plays that wave instead");
+            app.editorBeingDeleted (editor.get());
+        }
     }
 
     void testEnvelopes()
@@ -2288,6 +2542,39 @@ namespace
             stepped.editorBeingDeleted (steppedEditor.get());
         }
 
+        // A random LFO, drawn smoothly and then in 12 steps, a few cycles in.
+        {
+            SynthProcessor randomSynth;
+            setParameter (randomSynth, SynthProcessor::lfoRandomId (0), 1.0f);
+            randomSynth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
+            randomSynth.editedSource = SynthProcessor::numOscillators;
+            randomSynth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+
+            for (int block = 0; block < 250; ++block)
+            {
+                juce::MidiBuffer nothing;
+                randomSynth.processBlock (buffer, nothing);
+            }
+
+            std::unique_ptr<juce::AudioProcessorEditor> randomEditor (randomSynth.createEditorAndMakeActive());
+            auto& randomWindow = dynamic_cast<SynthEditor&> (*randomEditor);
+
+            const auto saveWindow = [&folder, &randomEditor, &randomWindow] (const juce::String& name)
+            {
+                randomWindow.refresh();
+                const auto file = folder.getChildFile (name + ".png");
+                file.deleteFile();
+                juce::FileOutputStream stream (file);
+                juce::PNGImageFormat().writeImageToStream (randomEditor->createComponentSnapshot (randomEditor->getLocalBounds(), true, 2.0f), stream);
+            };
+
+            saveWindow ("15-random-lfo");
+            randomSynth.setDrawing (SynthProcessor::numOscillators, { true, 12 });
+            saveWindow ("15a-random-lfo-in-steps");
+            randomSynth.editorBeingDeleted (randomEditor.get());
+        }
+
         // The tune slider on its own: zoomed right out, a 5th below the note, then zoomed in on a slight detune, with
         // an LFO swinging it, and partway in on a 5th above.
         {
@@ -2379,6 +2666,7 @@ int main (int argc, char* argv[])
     testOscillators();
     testFilters();
     testLfos();
+    testRandomLfos();
     testEnvelopes();
     testEnvelopeReleases();
     testVelocity();

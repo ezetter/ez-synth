@@ -73,7 +73,10 @@ class LfoCard final : public SourceCard
 public:
     LfoCard (int lfo, juce::AudioProcessorValueTreeState&);
 
-    void setWave (const waveform::Shape&, const juce::String& waveName);
+    /** Shows a wave, which ends where it began, unless it's given an end, such as a random wave's, which runs on
+        into its next cycle, and the name of the wave.
+    */
+    void setWave (const waveform::Shape&, const juce::String& waveName, std::optional<float> end = std::nullopt);
 
     void resized() override;
 

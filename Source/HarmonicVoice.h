@@ -55,6 +55,9 @@ public:
     /** How hard the note's key was played, from 0 to 1. */
     float getVelocity() const noexcept   { return noteVelocity; }
 
+    /** The seed of the random wave an LFO that runs once plays for this note, new with each note. */
+    std::uint32_t getRandomSeed (int lfo) const noexcept   { return randomSeeds[(size_t) lfo]; }
+
 private:
     /** Each oscillator's harmonics, from the 1st up, as the amplitudes of the cosine and sine waves that make them. */
     using Harmonics = std::array<std::array<float, waveform::maxHarmonics + 1>, modulation::numOscillators>;
@@ -103,6 +106,8 @@ private:
     int pitchWheel = 8192;
     float noteVelocity = 1.0f;
     juce::ADSR ownEnvelope;   // the voice's own, which keeps notes from clicking as they start and stop
+    std::array<std::uint32_t, modulation::numLfos> randomSeeds {};
+    juce::Random random;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicVoice)
 };

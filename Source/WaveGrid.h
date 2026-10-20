@@ -17,6 +17,9 @@
     A wave is drawn smoothly, following the mouse, or in steps: the cycle split into a number of equal steps, from 2
     to 20, each held at one level. Clicking in a step sets it to where the mouse is, and dragging across the steps
     sets each one the mouse passes through.
+
+    An LFO can play a random wave instead, drawn smoothly or in steps, which the grid shows as it plays, and which
+    can't be drawn on.
 */
 class WaveGrid final : public juce::Component
 {
@@ -33,7 +36,18 @@ public:
     /** Called when the user changes how the wave is drawn. */
     std::function<void (const waveform::Drawing&)> onDrawingChange;
 
-    void setShape (const waveform::Shape&);
+    /** Shows whether an LFO plays a random wave, with a switch for it, or for an oscillator, nothing, which hides the
+        switch. A random wave can't be drawn on.
+    */
+    void setRandom (std::optional<bool>);
+
+    /** Called when the user switches an LFO's random wave on or off. */
+    std::function<void (bool)> onRandomChange;
+
+    /** Sets the wave to show. A wave that repeats ends where it began, unless it's given an end, such as a random
+        wave's, which runs on into its next cycle.
+    */
+    void setShape (const waveform::Shape&, std::optional<float> end = std::nullopt);
 
     /** The sine waves to show, from the 1st harmonic up, as they're set. */
     void setPartials (std::vector<waveform::Partial>);
@@ -86,6 +100,7 @@ private:
     void changeDrawing (const waveform::Drawing&);
 
     waveform::Shape shape {};
+    std::optional<float> shapeEnd;
     std::vector<waveform::Partial> partials;
     std::optional<std::vector<waveform::Partial>> movedPartials;
     float valueRange = 1.35f;   // how far above and below zero the grid shows
@@ -101,10 +116,22 @@ private:
     std::optional<std::pair<double, float>> lastDrawn;
     std::optional<std::pair<int, float>> lastStep;
 
+    /** A switch drawn like the buttons beside it, lit when it's on. */
+    class Switch final : public juce::Button
+    {
+    public:
+        explicit Switch (const juce::String& name);
+        void paintButton (juce::Graphics&, bool highlighted, bool pressed) override;
+    };
+
+    bool canDraw() const noexcept   { return ! random; }
+
     waveform::Drawing drawing;
     int hoveredStep = -1;
+    bool random = false;
     ChoiceButtons drawMode { { "Smooth", "Steps" } };
     NumberStepper stepCount { waveform::fewestSteps, waveform::mostSteps };
+    Switch randomSwitch { "Random" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WaveGrid)
 };

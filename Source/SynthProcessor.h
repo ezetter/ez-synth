@@ -52,6 +52,7 @@ public:
     static juce::String lfoOnId (int lfo);
     static juce::String lfoPeriodId (int lfo);
     static juce::String lfoModeId (int lfo);
+    static juce::String lfoRandomId (int lfo);
 
     /** The IDs of each envelope's parameters: its attack, decay and release in seconds, and its sustain level. */
     static juce::String attackId (int envelope);
@@ -127,6 +128,32 @@ public:
         it's moving with a phase.
     */
     float getLfoValue (int lfo, float phase = 0.0f) const;
+
+    /** Whether the LFO plays a new random wave every cycle, or with each key if it runs once, rather than its drawn
+        wave.
+    */
+    bool isLfoRandom (int lfo) const noexcept;
+
+    /** The random wave an LFO is playing: its seed, and the cycle it's in. A looping LFO's is its own seed, and the
+        cycle it's in now. One that runs once plays the first cycle of the newest note's seed.
+    */
+    struct RandomCycle
+    {
+        std::uint32_t seed = 0;
+        std::int64_t cycle = 0;
+
+        bool operator== (const RandomCycle&) const = default;
+    };
+
+    RandomCycle getRandomCycle (int lfo) const noexcept;
+
+    /** The wave an LFO is playing: the one drawn, or this cycle of its random wave. */
+    waveform::Shape getPlayedLfoShape (int lfo) const;
+
+    /** Where a looping LFO's random wave starts its next cycle, which is where this one ends, or nothing for a wave
+        that ends where it began.
+    */
+    std::optional<float> getPlayedLfoEnd (int lfo) const;
 
     //==============================================================================
     // The envelopes, which run with each note.
@@ -263,7 +290,7 @@ public:
         opens in steps.
     */
     const waveform::Drawing& getDrawing (int source) const noexcept   { return drawings[(size_t) source]; }
-    void setDrawing (int source, const waveform::Drawing& drawing)   { drawings[(size_t) source] = drawing; }
+    void setDrawing (int source, const waveform::Drawing&);
 
 private:
     juce::AudioProcessorEditor* createEditor() override;
@@ -298,6 +325,7 @@ private:
         std::array<waveform::Decomposition, numOscillators> decompositions;
         std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {};
         std::array<waveform::Shape, numLfos> lfoShapes {};
+        std::array<waveform::Drawing, numLfos> lfoDrawings {};
         modulation::Assignments assignments, velocityAssignments;
     };
 
@@ -325,6 +353,7 @@ private:
         std::atomic<float>* on = nullptr;
         std::atomic<float>* period = nullptr;
         std::atomic<float>* mode = nullptr;
+        std::atomic<float>* random = nullptr;
     };
 
     struct EnvelopeParameters
@@ -400,6 +429,14 @@ private:
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
     // for the editor to show.
     std::array<double, numLfos> lfoPhases {};
+
+    // How many periods each looping LFO has been through, which picks each cycle of a random wave, the seed each
+    // plays its random wave from, and for the window, the cycle each is in and the newest note's seed for those
+    // that run once.
+    std::array<std::int64_t, numLfos> lfoCycles {};
+    std::array<std::uint32_t, numLfos> randomSeeds {};
+    std::array<std::atomic<std::int64_t>, numLfos> lfoCyclesShown {};
+    std::array<std::atomic<std::uint32_t>, numLfos> newestOnceSeeds {};
     std::array<std::atomic<double>, numLfos> lfoProgress {};
     juce::int64 samplesPlayed = 0;
     juce::int64 lastNoteOnSample = -1;

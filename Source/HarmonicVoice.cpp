@@ -1,5 +1,6 @@
 #include "HarmonicVoice.h"
 
+#include "RandomWave.h"
 #include "Tuning.h"
 
 namespace
@@ -76,6 +77,10 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
 
     phases.fill (0.0);
     noteVelocity = velocity;
+
+    // Each note plays new random waves from the LFOs that run once.
+    for (auto& seed : randomSeeds)
+        seed = (std::uint32_t) random.nextInt();
     samplesSinceNoteOn = 0;
 
     for (auto& run : envelopeRuns)
@@ -170,7 +175,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     {
         const auto& lfo = patch.lfos[i];
         lfoPeriodsGone[i] = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
-                                     : lfo.phase + startSample / lfo.periodSamples;
+                                     : (double) lfo.cycle + lfo.phase + startSample / lfo.periodSamples;
     }
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
@@ -193,7 +198,11 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         if (assignment.isActive() && patch.lfos[(size_t) assignment.source].on)
         {
             const auto& lfo = patch.lfos[(size_t) assignment.source];
-            position += assignment.offset (lfoValue (lfo.shape, lfoPeriodsGone[(size_t) assignment.source] - assignment.phase, lfo.once));
+            const auto periodsGone = lfoPeriodsGone[(size_t) assignment.source] - assignment.phase;
+            const auto value = ! lfo.random ? lfoValue (lfo.shape, periodsGone, lfo.once)
+                             : lfo.once     ? randomwave::onceValueAt (randomSeeds[(size_t) assignment.source], periodsGone, lfo.drawing)
+                                            : randomwave::valueAt (lfo.seed, periodsGone, lfo.drawing);
+            position += assignment.offset (value);
         }
 
         return juce::jlimit (0.0f, 1.0f, position);

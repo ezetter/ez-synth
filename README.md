@@ -127,6 +127,21 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
   rises from −1 to +1 and holds there, for instance, to swell each note in.
 - An LFO that's switched off moves nothing. Giving one something to move switches it on.
+- **Random** plays a new random wave instead of the LFO's drawn one: every cycle when it loops, and with
+  every key when it runs once, separately for each note. Switch it on with **Random** at the top of the
+  grid, beside **Draw**, which sets what kind of random wave it plays:
+  - **Smooth** is a curve that rises and falls through random levels between −1 and +1, turning smoothly
+    at each, as a curve drawn by hand might. The levels come at random times, from 0.08 to 0.32 of a cycle
+    apart, so the rises and falls last different lengths, and the curve turns about three times a cycle.
+    When the LFO loops, each cycle carries straight on from where the last one ended, at the same slope, so
+    there's no jump between them.
+  - **Steps** holds each step at a random level from −1 to +1, every level as likely as any other, the
+    first and last steps as much as the others. Set how many steps with the number beside it.
+
+  The grid and the LFO's card show the random wave as it plays, a new one each cycle, or with each key.
+  A random wave can't be drawn on, but the LFO keeps its drawn wave, which it plays again when Random is
+  switched off, or when you choose a wave such as Sine for it. Phase works as usual: a control shifted
+  behind the LFO follows the random wave that much later, even into the cycle before.
 
 ### Envelopes
 
@@ -303,7 +318,8 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that the arrows step through the factory presets, that a click or a drag on the grid sets steps, and
+clipping, that the arrows step through the factory presets, that random LFOs stay smooth, joined up and natural,
+or spread their steps evenly, and play a new wave every cycle or key, that a click or a drag on the grid sets steps, and
 that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
 save pictures of the window showing several waves.
@@ -336,6 +352,13 @@ save pictures of the window showing several waves.
   clicks. A filter that's switched out is skipped
   entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at low sample rates, are lowered to 45% of
   the sample rate.
+- **Random waves.** A random LFO wave is worked out from a seed and the time, in cycles, so any moment of it
+  can be found at once, the same each time (`Source/RandomWave.cpp`). Its levels come from the SplitMix64
+  hash of the seed and their number. Smooth, level k is at a random time in the middle 60% of the k-th fifth
+  of a cycle, and the curve joins the levels with Fritsch and Carlson's monotone cubic, which turns flat at
+  each peak and trough and never overshoots, so it stays between −1 and 1. A looping LFO counts its cycles
+  and plays its own seed's wave at the cycle and phase it's at, so each cycle is new and runs on from the
+  last. One that runs once gives each note a new seed.
 - **Modulation.** Every 64 samples, each note works out where the LFOs and its envelopes are, and where
   they've moved its controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at
   the start of the block; one that runs once, and each envelope (`Source/Envelope.cpp`), counts from the
@@ -376,6 +399,7 @@ save pictures of the window showing several waves.
 | `Source/FilterStage.*` | A low, mid or high pass or notch filter that switches, changes type and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on, smoothly or in steps |
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
+| `Source/RandomWave.*` | Random LFO waves, smooth or in steps, worked out from a seed and the time |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
 | `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |

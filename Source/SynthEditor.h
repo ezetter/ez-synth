@@ -52,6 +52,7 @@ private:
         std::array<int, SynthProcessor::numOscillators> tuneCents {};
         std::array<bool, SynthProcessor::numSources> on {};
         std::array<waveform::Drawing, SynthProcessor::numSources> drawings {};
+        std::array<bool, SynthProcessor::numLfos> random {};
 
         bool operator== (const Shown&) const = default;
     };
@@ -62,6 +63,7 @@ private:
     void setEditedWave (const waveform::Shape&, std::optional<waveform::Preset>);
     std::vector<waveform::Partial> getPlayedHarmonics (int oscillator) const;
     static juce::String getWaveName (std::optional<waveform::Preset>);
+    juce::String getLfoWaveName (int lfo) const;
 
     SynthProcessor& synthProcessor;
     SynthLookAndFeel lookAndFeel;
@@ -91,6 +93,7 @@ private:
 
     Shown shown;
     std::array<SynthProcessor::LiveWave, SynthProcessor::numOscillators> liveWaves;
+    std::array<SynthProcessor::RandomCycle, SynthProcessor::numLfos> randomCycles;
     int shownNote = -2;
     bool focusGiven = false;
 

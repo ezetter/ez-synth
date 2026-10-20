@@ -42,6 +42,18 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         refresh();
     };
 
+    grid.onRandomChange = [this] (bool random)
+    {
+        if (! SynthProcessor::isLfo (synthProcessor.editedSource))
+            return;
+
+        auto& parameter = *synthProcessor.parameters.getParameter (SynthProcessor::lfoRandomId (synthProcessor.editedSource - SynthProcessor::numOscillators));
+        parameter.beginChangeGesture();
+        parameter.setValueNotifyingHost (random ? 1.0f : 0.0f);
+        parameter.endChangeGesture();
+        refresh();
+    };
+
     harmonicSliders.onAmplitudeChange = [this] (int harmonic, float amplitude)
     {
         synthProcessor.setHarmonicAmplitude (synthProcessor.editedSource, harmonic, amplitude);
@@ -276,9 +288,23 @@ void SynthEditor::setEditedWave (const waveform::Shape& shape, std::optional<wav
     const auto edited = synthProcessor.editedSource;
 
     if (SynthProcessor::isLfo (edited))
-        synthProcessor.setLfoShape (edited - SynthProcessor::numOscillators, shape, preset);
+    {
+        const auto lfo = edited - SynthProcessor::numOscillators;
+        synthProcessor.setLfoShape (lfo, shape, preset);
+
+        // Choosing a wave for an LFO playing a random one means it should play that wave instead.
+        if (synthProcessor.isLfoRandom (lfo))
+        {
+            auto& random = *synthProcessor.parameters.getParameter (SynthProcessor::lfoRandomId (lfo));
+            random.beginChangeGesture();
+            random.setValueNotifyingHost (0.0f);
+            random.endChangeGesture();
+        }
+    }
     else
+    {
         synthProcessor.setShape (edited, shape, preset);
+    }
 
     refresh();
 }
@@ -293,6 +319,14 @@ std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) 
 juce::String SynthEditor::getWaveName (std::optional<waveform::Preset> preset)
 {
     return preset.has_value() ? waveform::getName (*preset) : juce::String ("Custom");
+}
+
+juce::String SynthEditor::getLfoWaveName (int lfo) const
+{
+    if (synthProcessor.isLfoRandom (lfo))
+        return synthProcessor.getDrawing (SynthProcessor::numOscillators + lfo).stepped ? "Random steps" : "Random";
+
+    return getWaveName (synthProcessor.getLfoPreset (lfo));
 }
 
 void SynthEditor::refresh()
@@ -315,6 +349,9 @@ void SynthEditor::refresh()
     for (int i = 0; i < SynthProcessor::numSources; ++i)
         now.drawings[(size_t) i] = synthProcessor.getDrawing (i);
 
+    for (int i = 0; i < SynthProcessor::numLfos; ++i)
+        now.random[(size_t) i] = synthProcessor.isLfoRandom (i);
+
     const auto edited = now.editedSource;
     const auto editingLfo = SynthProcessor::isLfo (edited);
     const auto lfo = edited - SynthProcessor::numOscillators;
@@ -328,11 +365,13 @@ void SynthEditor::refresh()
 
         for (size_t i = 0; i < lfoCards.size(); ++i)
         {
-            lfoCards[i]->setWave (synthProcessor.getLfoShape ((int) i), getWaveName (synthProcessor.getLfoPreset ((int) i)));
+            lfoCards[i]->setWave (synthProcessor.getPlayedLfoShape ((int) i), getLfoWaveName ((int) i), synthProcessor.getPlayedLfoEnd ((int) i));
             lfoCards[i]->setSelected ((int) i == lfo);
         }
 
-        const auto preset = editingLfo ? synthProcessor.getLfoPreset (lfo) : synthProcessor.getPreset (edited);
+        // An LFO playing a random wave isn't playing any of these.
+        const auto preset = editingLfo ? (synthProcessor.isLfoRandom (lfo) ? std::nullopt : synthProcessor.getLfoPreset (lfo))
+                                       : synthProcessor.getPreset (edited);
 
         for (size_t i = 0; i < presetButtons.size(); ++i)
             presetButtons[i].setToggleState (preset == waveform::allPresets[i], juce::dontSendNotification);
@@ -345,7 +384,8 @@ void SynthEditor::refresh()
 
         if (editingLfo)
         {
-            grid.setShape (synthProcessor.getLfoShape (lfo));
+            grid.setRandom (synthProcessor.isLfoRandom (lfo));
+            grid.setShape (synthProcessor.getPlayedLfoShape (lfo), synthProcessor.getPlayedLfoEnd (lfo));
             grid.setPartials ({});
             lfoPanel.setLfo (lfo);
         }
@@ -360,6 +400,7 @@ void SynthEditor::refresh()
             }
 
             const auto harmonics = getPlayedHarmonics (edited);
+            grid.setRandom (std::nullopt);
             grid.setShape (synthProcessor.getShape (edited));
             grid.setPartials (harmonics);
             grid.setOscillator (edited + 1, now.on[(size_t) edited]);
@@ -378,6 +419,26 @@ void SynthEditor::refresh()
 
         // Controls may now set other targets, such as the harmonic sliders when another oscillator is chosen.
         showModulation();
+    }
+
+    // A random LFO plays a new wave every cycle, or with every key, which its card and the grid show.
+    for (int i = 0; i < SynthProcessor::numLfos; ++i)
+    {
+        if (! synthProcessor.isLfoRandom (i))
+            continue;
+
+        const auto cycle = synthProcessor.getRandomCycle (i);
+
+        if (! changed && cycle == randomCycles[(size_t) i])
+            continue;
+
+        randomCycles[(size_t) i] = cycle;
+        const auto shape = synthProcessor.getPlayedLfoShape (i);
+        const auto end = synthProcessor.getPlayedLfoEnd (i);
+        lfoCards[(size_t) i]->setWave (shape, getLfoWaveName (i), end);
+
+        if (editingLfo && i == lfo)
+            grid.setShape (shape, end);
     }
 
     // The oscillators' waves as the newest note plays them, which LFOs, envelopes and velocity can change all the time.

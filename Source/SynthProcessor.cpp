@@ -1,5 +1,6 @@
 #include "SynthProcessor.h"
 
+#include "RandomWave.h"
 #include "SynthEditor.h"
 
 #include <BinaryData.h>
@@ -194,7 +195,8 @@ namespace
                         })),
                 std::make_unique<juce::AudioParameterChoice> (
                     juce::ParameterID { SynthProcessor::lfoModeId (i), 1 }, name + " Mode",
-                    juce::StringArray { "Loop", "Once" }, 0)));
+                    juce::StringArray { "Loop", "Once" }, 0),
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoRandomId (i), 1 }, name + " Random", false)));
         }
 
         for (int i = 0; i < SynthProcessor::numEnvelopes; ++i)
@@ -267,6 +269,7 @@ SynthProcessor::FilterIds SynthProcessor::filterIds (int filter)
 juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
+juce::String SynthProcessor::lfoRandomId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Random"; }
 juce::String SynthProcessor::attackId (int envelope)        { return "env" + juce::String (envelope + 1) + "Attack"; }
 juce::String SynthProcessor::decayId (int envelope)         { return "env" + juce::String (envelope + 1) + "Decay"; }
 juce::String SynthProcessor::sustainId (int envelope)       { return "env" + juce::String (envelope + 1) + "Sustain"; }
@@ -299,7 +302,12 @@ SynthProcessor::SynthProcessor()
     for (int i = 0; i < numLfos; ++i)
         lfoParameters[(size_t) i] = { parameters.getRawParameterValue (lfoOnId (i)),
                                       parameters.getRawParameterValue (lfoPeriodId (i)),
-                                      parameters.getRawParameterValue (lfoModeId (i)) };
+                                      parameters.getRawParameterValue (lfoModeId (i)),
+                                      parameters.getRawParameterValue (lfoRandomId (i)) };
+
+    // Each looping LFO's random wave is its own.
+    for (auto& seed : randomSeeds)
+        seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
 
     for (int i = 0; i < numEnvelopes; ++i)
         envelopeParameters[(size_t) i] = { parameters.getRawParameterValue (attackId (i)),
@@ -358,6 +366,7 @@ void SynthProcessor::prepareToPlay (double sampleRate, int)
 
     // The looping LFOs start their periods afresh whenever playing starts.
     lfoPhases.fill (0.0);
+    lfoCycles.fill (0);
 }
 
 void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -396,7 +405,10 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     {
         const auto& lfo = patch.lfos[i];
         lfoPhases[i] += numSamples / lfo.periodSamples;
-        lfoPhases[i] -= std::floor (lfoPhases[i]);
+        const auto periodsDone = std::floor (lfoPhases[i]);
+        lfoPhases[i] -= periodsDone;
+        lfoCycles[i] += (std::int64_t) periodsDone;
+        lfoCyclesShown[i] = lfoCycles[i];
 
         if (! lfo.once)
             lfoProgress[i] = lfoPhases[i];
@@ -423,6 +435,9 @@ void SynthProcessor::shareNewestNote()
         return;
 
     newestVelocity = newest->getVelocity();
+
+    for (size_t i = 0; i < (size_t) numLfos; ++i)
+        newestOnceSeeds[i] = newest->getRandomSeed ((int) i);
 
     for (int i = 0; i < numEnvelopes; ++i)
     {
@@ -473,7 +488,10 @@ void SynthProcessor::updatePatch()
             }
 
             for (size_t i = 0; i < (size_t) numLfos; ++i)
+            {
                 patch.lfos[i].shape = received.lfoShapes[i];
+                patch.lfos[i].drawing = received.lfoDrawings[i];
+            }
 
             patch.assignments = received.assignments;
             patch.velocityAssignments = received.velocityAssignments;
@@ -509,6 +527,9 @@ void SynthProcessor::updatePatch()
         lfo.once = lfoParameters[i].mode->load() >= 0.5f;
         lfo.periodSamples = std::max (1.0, lfoParameters[i].period->load() * playingSampleRate);
         lfo.phase = lfoPhases[i];
+        lfo.cycle = lfoCycles[i];
+        lfo.random = lfoParameters[i].random->load() >= 0.5f;
+        lfo.seed = randomSeeds[i];
     }
 }
 
@@ -627,7 +648,52 @@ std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
 
 float SynthProcessor::getLfoValue (int lfo, float phase) const
 {
-    return modulation::lfoValue (getLfoShape (lfo), getLfoProgress (lfo).value_or (0.0) - phase, isLfoOnce (lfo));
+    const auto progress = getLfoProgress (lfo).value_or (0.0) - phase;
+
+    if (! isLfoRandom (lfo))
+        return modulation::lfoValue (getLfoShape (lfo), progress, isLfoOnce (lfo));
+
+    const auto random = getRandomCycle (lfo);
+    const auto& drawing = getDrawing (numOscillators + lfo);
+    return isLfoOnce (lfo) ? randomwave::onceValueAt (random.seed, progress, drawing)
+                           : randomwave::valueAt (random.seed, (double) random.cycle + progress, drawing);
+}
+
+bool SynthProcessor::isLfoRandom (int lfo) const noexcept
+{
+    return lfoParameters[(size_t) lfo].random->load() >= 0.5f;
+}
+
+SynthProcessor::RandomCycle SynthProcessor::getRandomCycle (int lfo) const noexcept
+{
+    if (isLfoOnce (lfo))
+        return { newestOnceSeeds[(size_t) lfo].load(), 0 };
+
+    return { randomSeeds[(size_t) lfo], lfoCyclesShown[(size_t) lfo].load() };
+}
+
+waveform::Shape SynthProcessor::getPlayedLfoShape (int lfo) const
+{
+    if (! isLfoRandom (lfo))
+        return getLfoShape (lfo);
+
+    const auto random = getRandomCycle (lfo);
+    return randomwave::getCycle (random.seed, random.cycle, getDrawing (numOscillators + lfo));
+}
+
+std::optional<float> SynthProcessor::getPlayedLfoEnd (int lfo) const
+{
+    if (! isLfoRandom (lfo) || isLfoOnce (lfo))
+        return std::nullopt;
+
+    const auto random = getRandomCycle (lfo);
+    return randomwave::valueAt (random.seed, (double) random.cycle + 1.0, getDrawing (numOscillators + lfo));
+}
+
+void SynthProcessor::setDrawing (int source, const waveform::Drawing& drawing)
+{
+    drawings[(size_t) source] = drawing;
+    share();
 }
 
 //==============================================================================
@@ -811,7 +877,10 @@ void SynthProcessor::share()
     }
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
+    {
         shared.lfoShapes[i] = lfos[i].shape;
+        shared.lfoDrawings[i] = drawings[(size_t) numOscillators + i];
+    }
 
     shared.assignments = assignments;
     shared.velocityAssignments = velocityAssignments;

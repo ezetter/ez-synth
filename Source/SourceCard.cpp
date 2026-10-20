@@ -201,15 +201,15 @@ LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
     modeAttachment.sendInitialUpdate();
 }
 
-void LfoCard::setWave (const waveform::Shape& shape, const juce::String& waveName)
+void LfoCard::setWave (const waveform::Shape& shape, const juce::String& waveName, std::optional<float> end)
 {
-    // Every few points is plenty for a picture this size. The last point leads back to the first.
+    // Every few points is plenty for a picture this size. The last point leads back to the first, or on to the end.
     std::vector<float> values;
 
     for (size_t i = 0; i < shape.size(); i += 4)
         values.push_back (shape[i]);
 
-    values.push_back (shape.front());
+    values.push_back (end.value_or (shape.front()));
     setWaveValues (std::move (values));
     setLines (waveName, {});
 }
