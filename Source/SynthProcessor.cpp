@@ -79,19 +79,26 @@ namespace
                 }));
     }
 
-    std::unique_ptr<juce::AudioProcessorParameterGroup> createFilterParameters (const juce::String& groupId,
-                                                                                const SynthProcessor::FilterIds& ids,
-                                                                                const juce::String& name,
+    std::unique_ptr<juce::AudioProcessorParameterGroup> createFilterParameters (int filter, FilterType defaultType,
                                                                                 float defaultCutoff)
     {
+        const auto ids = SynthProcessor::filterIds (filter);
+        const auto name = "Filter " + juce::String (filter + 1);
+        juce::StringArray typeNames;
+
+        for (const auto type : { FilterType::lowPass, FilterType::midPass, FilterType::highPass })
+            typeNames.add (FilterStage::getName (type));
+
         // Cutoffs are spread evenly by octave, as pitch is heard.
         const juce::NormalisableRange<float> cutoffRange (FilterStage::lowestCutoff, FilterStage::highestCutoff,
                                                           [] (float, float, float position) { return FilterStage::positionToCutoff (position); },
                                                           [] (float, float, float hertz) { return FilterStage::cutoffToPosition (hertz); });
 
         return std::make_unique<juce::AudioProcessorParameterGroup> (
-            groupId, name, " ",
+            "filter" + juce::String (filter + 1), name, " ",
             std::make_unique<juce::AudioParameterBool> (juce::ParameterID { ids.on, 1 }, name + " On", false),
+            std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { ids.type, 1 }, name + " Type", typeNames,
+                                                          (int) defaultType),
             std::make_unique<juce::AudioParameterFloat> (
                 juce::ParameterID { ids.cutoff, 1 }, name + " Cutoff", cutoffRange, defaultCutoff,
                 juce::AudioParameterFloatAttributes()
@@ -103,7 +110,15 @@ namespace
                     })),
             std::make_unique<juce::AudioParameterFloat> (
                 juce::ParameterID { ids.resonance, 1 }, name + " Resonance", juce::NormalisableRange<float> (0.0f, 1.0f),
-                0.0f, asPercentage()));
+                0.0f, asPercentage()),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { ids.width, 1 }, name + " Width", FilterStage::widthRange(), 2.0f,
+                juce::AudioParameterFloatAttributes()
+                    .withStringFromValueFunction ([] (float octaves, int) { return juce::String (octaves, 1) + " oct"; })
+                    .withValueFromStringFunction ([] (const juce::String& text)
+                    {
+                        return text.retainCharacters ("0123456789.").getFloatValue();
+                    })));
     }
 
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters()
@@ -142,9 +157,10 @@ namespace
                         }))));
         }
 
-        // Both filters start switched out, at cutoffs that change the sound clearly once they're switched in.
-        layout.add (createFilterParameters ("highPass", SynthProcessor::highPassIds, "High Pass", 250.0f));
-        layout.add (createFilterParameters ("lowPass", SynthProcessor::lowPassIds, "Low Pass", 1000.0f));
+        // Both filters start switched out, a low pass and a high pass, at cutoffs that change the sound clearly once
+        // they're switched in.
+        layout.add (createFilterParameters (0, FilterType::lowPass, 1000.0f));
+        layout.add (createFilterParameters (1, FilterType::highPass, 250.0f));
 
         // The LFOs start on, as they do nothing until a control is assigned to one.
         const juce::NormalisableRange<float> periodRange (modulation::shortestPeriod, modulation::longestPeriod,
@@ -231,6 +247,13 @@ juce::String SynthProcessor::onId (int oscillator)          { return modulation:
 juce::String SynthProcessor::levelId (int oscillator)       { return modulation::getKey (modulation::oscillatorLevelTarget (oscillator)); }
 juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation::getKey (modulation::oscillatorHarmonicsTarget (oscillator)); }
 juce::String SynthProcessor::tuneId (int oscillator)        { return modulation::getKey (modulation::oscillatorTuneTarget (oscillator)); }
+
+SynthProcessor::FilterIds SynthProcessor::filterIds (int filter)
+{
+    using namespace modulation;
+    return { getKey (filterOnTarget (filter)), "filter" + juce::String (filter + 1) + "Type", getKey (filterCutoffTarget (filter)),
+             getKey (filterResonanceTarget (filter)), getKey (filterWidthTarget (filter)) };
+}
 juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
@@ -251,10 +274,15 @@ SynthProcessor::SynthProcessor()
                                              parameters.getRawParameterValue (harmonicsId (i)),
                                              parameters.getRawParameterValue (tuneId (i)) };
 
-    for (auto [filter, ids] : { std::pair (modulation::lowPass, lowPassIds), std::pair (modulation::highPass, highPassIds) })
+    for (int filter = 0; filter < modulation::numFilters; ++filter)
+    {
+        const auto ids = filterIds (filter);
         filterParameters[(size_t) filter] = { parameters.getRawParameterValue (ids.on),
+                                              parameters.getRawParameterValue (ids.type),
                                               parameters.getRawParameterValue (ids.cutoff),
-                                              parameters.getRawParameterValue (ids.resonance) };
+                                              parameters.getRawParameterValue (ids.resonance),
+                                              parameters.getRawParameterValue (ids.width) };
+    }
 
     for (int i = 0; i < numLfos; ++i)
         lfoParameters[(size_t) i] = { parameters.getRawParameterValue (lfoOnId (i)),
@@ -451,8 +479,10 @@ void SynthProcessor::updatePatch()
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
-        patch.filters[i] = { filterParameters[i].on->load() >= 0.5f, filterParameters[i].cutoff->load(),
-                             filterParameters[i].resonance->load() };
+        patch.filters[i] = { filterParameters[i].on->load() >= 0.5f,
+                             (FilterType) juce::jlimit (0, 2, juce::roundToInt (filterParameters[i].type->load())),
+                             filterParameters[i].cutoff->load(), filterParameters[i].resonance->load(),
+                             filterParameters[i].width->load() };
 
     patch.volume = volume->load();
 
@@ -872,6 +902,12 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     const auto velocityTree = state.getChildWithName ("VELOCITY");
     state.removeChild (velocityTree, nullptr);
+
+    // A save from before the filters could each be any type names the first filter's parameters "lowPass", and the
+    // second's "highPass". The first was a low pass and the second a high pass, as the filters' types start.
+    for (auto parameter : state)
+        if (parameter.hasProperty ("id"))
+            parameter.setProperty ("id", modulation::updateKey (parameter["id"].toString()), nullptr);
 
     // A save from before a control existed, such as an oscillator's tune, gives it its default, rather than leaving
     // it as it was.

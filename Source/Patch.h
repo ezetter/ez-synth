@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Envelope.h"
+#include "FilterStage.h"
 #include "Modulation.h"
 
 /** Everything the voices need to play a block: the oscillators, filters and volume as they're set, the LFOs and
@@ -22,12 +23,7 @@ struct Patch
         std::array<float, waveform::maxHarmonics + 1> peaks {};
     };
 
-    struct Filter
-    {
-        bool on = false;
-        float cutoff = 1000.0f;
-        float resonance = 0.0f;
-    };
+    using Filter = FilterStage::Settings;
 
     struct Lfo
     {

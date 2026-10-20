@@ -65,7 +65,7 @@ void HarmonicVoice::setCurrentPlaybackSampleRate (double newRate)
     gain.reset (newRate, 0.02);
 
     for (auto& filter : filters)
-        filter.prepare ({ newRate, (juce::uint32) controlInterval, 1 }, false, 1000.0f, 0.0f);
+        filter.prepare (newRate, {});
 }
 
 void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition)
@@ -244,10 +244,13 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (int i = 0; i < numFilters; ++i)
     {
         const auto& filter = patch.filters[(size_t) i];
+        const auto& widths = FilterStage::widthRange();
         targets.filters[(size_t) i] = { modulate (filterOnTarget (i), filter.on ? 1.0f : 0.0f) >= 0.5f,
+                                        filter.type,
                                         FilterStage::positionToCutoff (modulate (filterCutoffTarget (i),
                                                                                  FilterStage::cutoffToPosition (filter.cutoff))),
-                                        modulate (filterResonanceTarget (i), filter.resonance) };
+                                        modulate (filterResonanceTarget (i), filter.resonance),
+                                        widths.convertFrom0to1 (modulate (filterWidthTarget (i), widths.convertTo0to1 (filter.width))) };
     }
 
     targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch.volume));
@@ -284,7 +287,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         gain.setCurrentAndTargetValue (targets.gain);
 
         for (size_t i = 0; i < filters.size(); ++i)
-            filters[i].jumpTo (targets.filters[i].on, targets.filters[i].cutoff, targets.filters[i].resonance);
+            filters[i].jumpTo (targets.filters[i]);
 
         startingNote = false;
     }
@@ -292,7 +295,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     gain.setTargetValue (targets.gain);
 
     for (size_t i = 0; i < filters.size(); ++i)
-        filters[i].setTargets (targets.filters[i].on, targets.filters[i].cutoff, targets.filters[i].resonance);
+        filters[i].setTargets (targets.filters[i]);
 
     // Each chunk moves the harmonics and tunings its share of the way to their targets, so they follow smoothly
     // however the targets move. A tuning holds steady through the chunk.
@@ -361,17 +364,16 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    auto& lowPass = filters[(size_t) modulation::lowPass];
-    auto& highPass = filters[(size_t) modulation::highPass];
-    const auto lowPassActive = lowPass.isActive();
-    const auto highPassActive = highPass.isActive();
-
     // A filter that's out starts afresh when it's switched back in.
-    if (! lowPassActive)
-        lowPass.reset();
+    std::array<bool, modulation::numFilters> filterActive {};
 
-    if (! highPassActive)
-        highPass.reset();
+    for (size_t i = 0; i < filters.size(); ++i)
+    {
+        filterActive[i] = filters[i].isActive();
+
+        if (! filterActive[i])
+            filters[i].reset();
+    }
 
     for (int s = 0; s < numSamples; ++s)
     {
@@ -390,17 +392,9 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             harmonic.sine += harmonic.sineStep;
         }
 
-        if (highPassActive)
-        {
-            highPass.advance();
-            value = highPass.process (0, value);
-        }
-
-        if (lowPassActive)
-        {
-            lowPass.advance();
-            value = lowPass.process (0, value);
-        }
+        for (size_t i = 0; i < filters.size(); ++i)
+            if (filterActive[i])
+                value = filters[i].process (value);
 
         const auto sample = value * noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
 

@@ -13,9 +13,16 @@
   <PARAM id="env3Decay" value="0.9999999403953552"/>
   <PARAM id="env3Release" value="1.99999988079071"/>
   <PARAM id="env3Sustain" value="1.0"/>
-  <PARAM id="highPassCutoff" value="250.0000152587891"/>
-  <PARAM id="highPassOn" value="0.0"/>
-  <PARAM id="highPassResonance" value="0.0"/>
+  <PARAM id="filter1Cutoff" value="1000.0"/>
+  <PARAM id="filter1On" value="0.0"/>
+  <PARAM id="filter1Resonance" value="0.0"/>
+  <PARAM id="filter1Type" value="0.0"/>
+  <PARAM id="filter1Width" value="1.999999761581421"/>
+  <PARAM id="filter2Cutoff" value="250.0000152587891"/>
+  <PARAM id="filter2On" value="0.0"/>
+  <PARAM id="filter2Resonance" value="0.0"/>
+  <PARAM id="filter2Type" value="2.0"/>
+  <PARAM id="filter2Width" value="1.999999761581421"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="3.999998569488525"/>
@@ -25,18 +32,18 @@
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="1.0"/>
   <PARAM id="lfo3Period" value="3.999999761581421"/>
-  <PARAM id="lowPassCutoff" value="1000.0"/>
-  <PARAM id="lowPassOn" value="0.0"/>
-  <PARAM id="lowPassResonance" value="0.0"/>
   <PARAM id="osc1Harmonics" value="5.0"/>
   <PARAM id="osc1Level" value="1.0"/>
   <PARAM id="osc1On" value="1.0"/>
+  <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc2Harmonics" value="5.0"/>
   <PARAM id="osc2Level" value="0.6000000238418579"/>
   <PARAM id="osc2On" value="1.0"/>
+  <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc3Harmonics" value="1.0"/>
   <PARAM id="osc3Level" value="0.5"/>
   <PARAM id="osc3On" value="1.0"/>
+  <PARAM id="osc3Tune" value="0.0"/>
   <PARAM id="volume" value="0.5"/>
   <WAVE oscillator="0" points="2048......B..+8C..32O..Pe+...78C..r2O..fd+...48C..f2O..vc+...18C..T2O...c+...y8C..H2O..Pb+...v8C..71O..fa+...s8C..v1O..vZ+...p8C..j1O...Z+...m8C..X1O..PY+...j8C..L1O..fX+...g8C...1O..vW+...d8C..z0O...W+...a8C..n0O..PV+...X8C..b0O..fU+...U8C..P0O..vT+...R8C..D0O...T+...O8C..3zO..PS+...L8C..rzO..fR+...I8C..fzO..vQ+...F8C..TzO...Q+...C8C..HzO..PP+....8C..7yO..fO+...87C..vyO..vN+...57C..jyO...N+...27C..XyO..PM+...z7C..LyO..fL+...w7C...yO..vK+...t7C..zxO...K+...q7C..nxO..PJ+...n7C..bxO..fI+...k7C..PxO..vH+...h7C..DxO...H+...e7C..3wO..PG+...b7C..rwO..fF+...Y7C..fwO..vE+...V7C..TwO...E+...S7C..HwO..PD+...P7C..7vO..fC+...M7C..vvO..vB+...J7C..jvO...B+...G7C..XvO..PA+...D7C..LvO..f.+...A7C...vO..f+9...76C..nuO...99...16C..PuO..f79...v6C..3tO...69...p6C..ftO..f49...j6C..HtO...39...d6C..vsO..f19...X6C..XsO...09...R6C...sO..fy9...L6C..nrO...x9...F6C..PrO..fv9....6C..3qO...u9...55C..fqO..fs9...z5C..HqO...r9...t5C..vpO..fp9...n5C..XpO...o9...h5C...pO..fm9...b5C..noO...l9...V5C..PoO..fj9...P5C..3nO...i9...J5C..fnO..fg9...D5C..HnO...f9...74C..fmO...c9...v4C..vlO...Z9...j4C...lO...W9...X4C..PkO...T9...L4C..fjO...Q9....4C..viO...N9...z3C...iO...K9...n3C..PhO...H9...b3C..fgO...E9...P3C..vfO...B9...D3C...fO...98...v2C..fdO...38...X2C...cO...x8....2C..faO...r8...n1C...ZO...l8...P1C..fXO...f8...v0C...VO...T8....0C...SO...H8...PzC...PO...37....yC...JO...f7....wC....O...f6.....H...3t....7B...wK...Hu...n7B...yK...Nu....8B..PzK...Ru...L8B...0K...Uu...X8B..v0K...Xu...h8B..P1K..fYu...n8B..n1K...au...t8B...2K..fbu...z8B..X2K...du...58B..v2K..feu....9B..D3K..ffu...C9B..P3K..Pgu...F9B..b3K...hu...I9B..n3K..vhu...L9B..z3K..fiu...O9B...4K..Pju...R9B..L4K...ku...U9B..X4K..vku...X9B..j4K..flu...a9B..v4K..Pmu...d9B..74K...nu..ff9B..D5K..Xnu...h9B..J5K..vnu..fi9B..P5K..Hou...k9B..V5K..fou..fl9B..b5K..3ou...n9B..h5K..Ppu..fo9B..n5K..npu...q9B..t5K...qu..fr9B..z5K..Xqu...t9B..55K..vqu..fu9B...6K..Hru...w9B..F6K..fru..fx9B..L6K..3ru...z9B..R6K..Psu..f09B..X6K..nsu...29B..d6K...tu..f39B..j6K..Xtu...59B..p6K..vtu..f69B..v6K..Huu...89B..16K..fuu..f99B..76K..3uu....+B..A7K..Hvu..v.+B..D7K..Tvu..fA+B..G7K..fvu..PB+B..J7K..rvu...C+B..M7K..3vu..vC+B..P7K..Dwu..fD+B..S7K..Pwu..PE+B..V7K..bwu...F+B..Y7K..nwu..vF+B..b7K..zwu..fG+B..e7K...xu..PH+B..h7K..Lxu...I+B..k7K..Xxu..vI+B..n7K..jxu..fJ+B..q7K..vxu..PK+B..t7K..7xu...L+B..w7K..Hyu..vL+B..z7K..Tyu..fM+B..27K..fyu..PN+B..57K..ryu...O+B..87K..3yu..vO+B...8K..Dzu..fP+B..C8K..Pzu..PQ+B..F8K..bzu...R+B..I8K..nzu..vR+B..L8K..zzu..fS+B..O8K...0u..PT+B..R8K..L0u...U+B..U8K..X0u..vU+B..X8K..j0u..fV+B..a8K..v0u..PW+B..d8K..70u...X+B..g8K..H1u..vX+B..j8K..T1u..fY+B..m8K..f1u..PZ+B..p8K..r1u...a+B..s8K..31u..va+B..v8K..D2u..fb+B..y8K..P2u..Pc+B..18K..b2u...d+B..48K..n2u..vd+B..78K..z2u..fe+B..+8K"
         preset=""/>

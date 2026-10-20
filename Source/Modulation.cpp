@@ -6,8 +6,8 @@ namespace modulation
 {
     namespace
     {
-        const std::array<const char*, numFilters> filterKeys { "lowPass", "highPass" };
-        const std::array<const char*, numFilters> filterNames { "Low pass", "High pass" };
+        /** What the filters' keys started with before each could be any type. */
+        const std::array<const char*, numFilters> oldFilterKeys { "lowPass", "highPass" };
     }
 
     juce::String getSourceName (int source)
@@ -24,6 +24,8 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= filterWidthTarget (0))
+            info = { Kind::filterWidth, 0, 1, target - filterWidthTarget (0) };
         else if (target >= oscillatorTuneTarget (0))
             info = { Kind::oscillatorTune, target - oscillatorTuneTarget (0) };
         else if (target < oscillatorLevelTarget (0))
@@ -49,7 +51,7 @@ namespace modulation
     {
         const auto info = describe (target);
         const auto oscillator = "Osc " + juce::String (info.oscillator + 1);
-        const juce::String filter (filterNames[(size_t) info.filter]);
+        const auto filter = "Filter " + juce::String (info.filter + 1);
 
         switch (info.kind)
         {
@@ -61,6 +63,7 @@ namespace modulation
             case Kind::filterOn:             return filter + " switch";
             case Kind::filterCutoff:         return filter + " cutoff";
             case Kind::filterResonance:      return filter + " resonance";
+            case Kind::filterWidth:          return filter + " width";
             case Kind::oscillatorTune:       return oscillator + " tune";
         }
 
@@ -71,7 +74,7 @@ namespace modulation
     {
         const auto info = describe (target);
         const auto oscillator = "osc" + juce::String (info.oscillator + 1);
-        const juce::String filter (filterKeys[(size_t) info.filter]);
+        const auto filter = "filter" + juce::String (info.filter + 1);
 
         switch (info.kind)
         {
@@ -83,16 +86,28 @@ namespace modulation
             case Kind::filterOn:             return filter + "On";
             case Kind::filterCutoff:         return filter + "Cutoff";
             case Kind::filterResonance:      return filter + "Resonance";
+            case Kind::filterWidth:          return filter + "Width";
             case Kind::oscillatorTune:       return oscillator + "Tune";
         }
 
         return {};
     }
 
+    juce::String updateKey (const juce::String& key)
+    {
+        for (size_t filter = 0; filter < oldFilterKeys.size(); ++filter)
+            if (key.startsWith (oldFilterKeys[filter]))
+                return "filter" + juce::String (filter + 1) + key.substring ((int) std::strlen (oldFilterKeys[filter]));
+
+        return key;
+    }
+
     std::optional<int> findTarget (const juce::String& key)
     {
+        const auto updated = updateKey (key);
+
         for (int target = 0; target < numTargets; ++target)
-            if (getKey (target) == key)
+            if (getKey (target) == updated)
                 return target;
 
         return std::nullopt;

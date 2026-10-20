@@ -13,9 +13,16 @@
   <PARAM id="env3Decay" value="0.9999999403953552"/>
   <PARAM id="env3Release" value="1.99999988079071"/>
   <PARAM id="env3Sustain" value="1.0"/>
-  <PARAM id="highPassCutoff" value="250.0000152587891"/>
-  <PARAM id="highPassOn" value="0.0"/>
-  <PARAM id="highPassResonance" value="0.0"/>
+  <PARAM id="filter1Cutoff" value="1000.0"/>
+  <PARAM id="filter1On" value="0.0"/>
+  <PARAM id="filter1Resonance" value="0.0"/>
+  <PARAM id="filter1Type" value="0.0"/>
+  <PARAM id="filter1Width" value="1.999999761581421"/>
+  <PARAM id="filter2Cutoff" value="250.0000152587891"/>
+  <PARAM id="filter2On" value="0.0"/>
+  <PARAM id="filter2Resonance" value="0.0"/>
+  <PARAM id="filter2Type" value="2.0"/>
+  <PARAM id="filter2Width" value="1.999999761581421"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="1.0"/>
@@ -25,18 +32,18 @@
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="1.0"/>
   <PARAM id="lfo3Period" value="3.999999761581421"/>
-  <PARAM id="lowPassCutoff" value="1000.0"/>
-  <PARAM id="lowPassOn" value="0.0"/>
-  <PARAM id="lowPassResonance" value="0.0"/>
   <PARAM id="osc1Harmonics" value="9.0"/>
   <PARAM id="osc1Level" value="1.0"/>
   <PARAM id="osc1On" value="1.0"/>
+  <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc2Harmonics" value="1.0"/>
   <PARAM id="osc2Level" value="0.300000011920929"/>
   <PARAM id="osc2On" value="1.0"/>
+  <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc3Harmonics" value="3.0"/>
   <PARAM id="osc3Level" value="1.0"/>
   <PARAM id="osc3On" value="0.0"/>
+  <PARAM id="osc3Tune" value="0.0"/>
   <PARAM id="volume" value="0.0"/>
   <WAVE oscillator="0" points="2048......v1go1CpsjhOZRNe9vBxm5CGsAsOUaC99XheO7C.KIxOS7FM+PG1E8yR1Y0OpiiY+bdD08CE5E3OBn9g+34zM9ijxL4OFM.l+PuPb9inu+4Okfvn+DBik9CB7c5OXjMp+TUoo9ihim5O2bYp+jIwn9ijvc5OrBZo+TvVi9SRlB5OllXm+rKCZ9Si2X4O2Igj+HhoM9yY6i3OSsAg+DgG98ya+N2OVzRZ+nSdd8yw0N0OKQOR+jcQ97C65NyOJMVJ+feSe7iDIVwONGBC+vDIC7iO2TuOgMR49PmGV6Cb2frOHq2t93k7u5CekVpOSiIm93myT5CEF4nOixOh9XM6D5C9NHnOajEf9zle+4COy.nOJUZf9.8.D5yr6bnOIhyh9bK4O5ypoToOY.ul9bAHg5CZgdpOetkq93kM05ChYvqOv0tv9.wlI6CJL.sOKth093R4a6CWlDtOY2c49n.+o6yBy0tORaC79PTOx6SR9MuOXO+79Xfly6yDuIuOXMG79.Vps6CwUntOF8a49noqf6ibtqsObsH09f5jM6CQWXrOndhu9r5005yX6zpOseFo9D0ba5CSzIoOqHXh9PIs.5ioFAmOnw7W9vXJP4CcLFjOIIBM9DqEn3iXS1gOt+KE9fTvM3ij4hfOBebA9P2AE3ClPZfOPcmB9v5xP3ClYlgOrhNI9.Bux3CqRLjOnZdU9HcKq4SwrEnOnsli9nxgb5yUxtpO5z8t9Xi8L6i5o6sOHMZ79rcgB7CmExvOKQrE+7KMg7yWIuxOzPmM+zuIA8iRSuzOZplU+nl2f8iSfr1OLHRc+Xa098S2VP3O.5Hh+z2xL9i1GC4O72Gk+PJ5W9CBCr4OEibm+jeMf9SPGI5O4l+n+rvRk9iZ4X5OaNro+vN5l9yOoZ5OBTfo+XS+j9CXSN5OPlbn+Xkne9yvfz4Ohgjl+XRGW9SciN4OR.9i+bA1K9S7Pd3ORAwf+fDt78iD0K2OJNNZ+7Fjd8CqHP0OsjUR+.ti97Cj1NyOQyMJ+7eCd7CDVMwOQBLB+7Rr76CRQgtOBUG09P4KA6CTQ5pODnJm9T5gK5CGsYmO9J3U9PgX53ieY7gOjOaA9HTbb2iYWEaOJsgh8.xaM0Cp.4POP5Pq7.YSXvCfSUktH48E7ZvPDxKLSAKuhtMz7pfolyKqFJOujtU87hVBvyK24MNuPlIz7hfU3xKhatIufVpc7B8uvvK3847t.rk25BnG.sC.6U+NfWuP7.esCxCD8MJO.3Dv7.9sYyCXa8NO.VG.8fhEGzCi6sPOvoYC8vMbMzCkErPOvdlA8fKW+yCnv2NOPZM17PvY.yCjETJO3.xg7fnVNwC9Ss.ODNFi6vzpEQBgiw3t3O0B7hnVNwKNfbHuPVPo7RvY.yKjViMufBe67hKW+yKrmYPuTVvB8xMbMzKbZ1PuLt2B8hhEGzKf0APufs067B9sYyK.NALuPz2n7BesCxK30KDu.rW86BnG.sK.a4sNf2my6.8uvvCnkZGOHt4l7ffU3xCjYBMObm237fVBvyCoaUOOrZn77nfolyinaCMOvLEr7XvPDxCRdeAO.NUU5.YSXvKjNzJunBjC8BxaM0qRanXulcUr8JTbb2K4yVfu9kwG9RgX53quBdkubzlc9V5gK5KApxouPEoq9R4KA6qP0QsuHEE599Rr76aj.ivuPX0D+9eCd7azbixuPZ6L+Bti97aKYkzurh.U+9Fjd8qhii1uRTub+hDt78qTPL3uwC4g+dA1K9qDf+3u0M5j+ZRGW9qXHo4uCCRm+Zkne9KjIG5ufM4n+ZS+j9q.EX5u+jpo+xN5l96lCa5upkio+tvRk9at4O5uAcjn+leMf9awH24uHLvl+RJ5W9K+8Q4uZeLj+12xL9KfNh3ucaAg+Za098KChT2uNAxZ+pl2f8qlpY0uJM8R+1uIA8KMzYyuek7J+9KMg76RDawubVHC+tcgB7KRiFuupmt29Zi8L6qNcuquWI6p9pxgb5KZq4nuEyVf9JcKq4KplWkurJwP9BBux3KqnShuXlYF9x5xP3KT2ofuXBoA9R2AE3qvGWfuRlKB9hTvM3q6+RguhMYG9FqEn3aRhPiuzwXP9xXJP4KZL+kulZDb9RIs.56JBlnuLQmj9F0ba5a6mQpuisSq9t5005Kpm3quDcgw9h5jM6KWKRsux4t19poqf6qQ+VtuDWg59BVps6KVyAuuS7l79Zfly6K1yOuuI4279RTOx6qz1.uuKLW69p.+o6a1cWtubYR395R4a66hqXsunv.z9BwlI6KbsKruHlAu95kM056ma4punE5o9dAHg5aFvqouqlRk9dK4O5ah3rnuytyg9B8.D5qRkFnu7LCf91le+46FYAnu36ff9ZM6D56n7inuTXji95myT56zXxou7UZo95k7u5Kx5squvcCx9RmGV6aXiTtu9bS89xDIC7qygvvuRjXE+heSe7qRikxurq6L+lcQ976RzizuGW6T+pSdd8qEsj1uu86b+FgG986TaP3umsOh+JhoM96cRH4uMdik+tKCZ9qoI14uIYJn+VvVi9KqfV5uRB2o+lIwn96MWl5uJNdp+VUoo9KFYi5uHv2o+FBik9aIHL5uh99m+RuPb9qQCf4uRJyj+54zM9q.pe3uTnWf+ddD08q53X1uKYmU+RG1E86DuQyu.rjH+ZheO7a01fuubzFz9xBxm5qljymun1RJ9x1go1K"
         preset=""/>

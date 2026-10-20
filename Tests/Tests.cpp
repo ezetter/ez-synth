@@ -62,6 +62,20 @@ namespace
         return (lowPass ? 1.0 : w * w) / denominator;
     }
 
+    /** How much a mid pass should pass at a frequency: the state variable filter's band, scaled to let its middle
+        through as it is.
+    */
+    double expectedMidPassGain (double frequency, double centre, double q)
+    {
+        const auto w = std::tan (pi * frequency / sampleRate) / std::tan (pi * centre / sampleRate);
+        return (w / q) / std::sqrt (std::pow (1.0 - w * w, 2.0) + std::pow (w / q, 2.0));
+    }
+
+    void setFilterType (SynthProcessor& synth, int filter, FilterType type)
+    {
+        setParameter (synth, SynthProcessor::filterIds (filter).type, (float) type);
+    }
+
     void setPreset (SynthProcessor& synth, int oscillator, waveform::Preset preset)
     {
         synth.setShape (oscillator, waveform::makePreset (preset), preset);
@@ -394,22 +408,22 @@ namespace
         };
         const auto flatQ = (double) FilterStage::resonanceToQ (0.0f);
 
-        check (synth.parameters.getRawParameterValue (SynthProcessor::lowPassIds.on)->load() < 0.5f
-                 && synth.parameters.getRawParameterValue (SynthProcessor::highPassIds.on)->load() < 0.5f,
+        check (synth.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() < 0.5f
+                 && synth.parameters.getRawParameterValue (SynthProcessor::filterIds (1).on)->load() < 0.5f,
                "both filters are out to begin with");
 
-        setFilter (synth, SynthProcessor::lowPassIds, true, 1000.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 1000.0f);
         const auto lowPassed = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (gainAt (lowPassed, 440.0), expectedGain (true, 440.0, 1000.0, flatQ), 0.02)
                  && isNear (gainAt (lowPassed, 3960.0), expectedGain (true, 3960.0, 1000.0, flatQ), 0.05),
                "a low pass at 1 kHz keeps the 1st harmonic and cuts the 9th by "
                  + juce::String (-juce::Decibels::gainToDecibels (expectedGain (true, 3960.0, 1000.0, flatQ)), 1) + " dB");
 
-        setFilter (synth, SynthProcessor::lowPassIds, false, 1000.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), false, 1000.0f);
         const auto switchedOut = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (gainAt (switchedOut, 3960.0), 1.0, 0.001), "switching it out restores the sound");
 
-        setFilter (synth, SynthProcessor::highPassIds, true, 1000.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 1000.0f);
         const auto highPassed = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (gainAt (highPassed, 440.0), expectedGain (false, 440.0, 1000.0, flatQ), 0.02)
                  && isNear (gainAt (highPassed, 3960.0), expectedGain (false, 3960.0, 1000.0, flatQ), 0.02),
@@ -417,20 +431,20 @@ namespace
                  + juce::String (-juce::Decibels::gainToDecibels (expectedGain (false, 440.0, 1000.0, flatQ)), 1)
                  + " dB and keeps the 9th");
 
-        setFilter (synth, SynthProcessor::highPassIds, true, 500.0f);
-        setFilter (synth, SynthProcessor::lowPassIds, true, 2000.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 500.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 2000.0f);
         const auto band = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (gainAt (band, 880.0), expectedGain (false, 880.0, 500.0, flatQ) * expectedGain (true, 880.0, 2000.0, flatQ), 0.02),
                "both filters at once shape the sound one after the other");
 
-        setFilter (synth, SynthProcessor::highPassIds, false, 500.0f);
-        setFilter (synth, SynthProcessor::lowPassIds, true, 1320.0f, 1.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), false, 500.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 1320.0f, 1.0f);
         const auto resonant = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (gainAt (resonant, 1320.0), FilterStage::resonanceToQ (1.0f), 0.03),
                "full resonance boosts the harmonic at the cutoff " + juce::String (FilterStage::resonanceToQ (1.0f), 1) + " times");
 
         // Switching a filter in during a note fades it in, rather than jumping.
-        setFilter (synth, SynthProcessor::lowPassIds, false, 300.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), false, 300.0f);
         synth.prepareToPlay (sampleRate, blockSize);
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
@@ -443,7 +457,7 @@ namespace
                 midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
 
             if (block == 20)
-                setParameter (synth, SynthProcessor::lowPassIds.on, 1.0f);
+                setParameter (synth, SynthProcessor::filterIds (0).on, 1.0f);
 
             synth.processBlock (buffer, midi);
             output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
@@ -463,9 +477,135 @@ namespace
         check (largestJump (switchPoint, output.size()) <= largestJump (1000, switchPoint) * 1.05f,
                "switching a filter in during a note doesn't click");
 
+        // Either filter can be a mid pass, which lets through a band around its cutoff, as wide as it's set, in octaves
+        // between the points where it lets through half the power, and lets the middle through as it is. Here it's
+        // centred on A4's 2nd harmonic and 2 octaves wide, so it lets through half the power of the 1st and the 4th.
+        setFilter (synth, SynthProcessor::filterIds (0), false, 1000.0f);
+        setFilterType (synth, 1, FilterType::midPass);
+        setParameter (synth, SynthProcessor::filterIds (1).width, 2.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 880.0f);
+        const auto midPassed = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        const auto halfPower = std::sqrt (0.5);
+        check (isNear (gainAt (midPassed, 880.0), 1.0, 0.02) && isNear (gainAt (midPassed, 440.0), halfPower, 0.03)
+                 && isNear (gainAt (midPassed, 1760.0), halfPower, 0.03),
+               "a mid pass 2 octaves wide lets its middle through as it is, and half the power an octave either side");
+        check (isNear (gainAt (midPassed, 3960.0), expectedMidPassGain (3960.0, 880.0, FilterStage::widthToQ (2.0f)), 0.05)
+                 && gainAt (midPassed, 3960.0) < 0.5 * halfPower,
+               "...and less further out, cutting the 9th harmonic by "
+                 + juce::String (-juce::Decibels::gainToDecibels (expectedMidPassGain (3960.0, 880.0, FilterStage::widthToQ (2.0f))), 1) + " dB");
+
+        setParameter (synth, SynthProcessor::filterIds (1).width, 0.5f);
+        const auto narrow = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (narrow, 880.0), 1.0, 0.02)
+                 && isNear (gainAt (narrow, 440.0), expectedMidPassGain (440.0, 880.0, FilterStage::widthToQ (0.5f)), 0.05)
+                 && gainAt (narrow, 440.0) < 0.5 * gainAt (midPassed, 440.0),
+               "a narrower mid pass lets through less either side, and its middle just as much");
+
+        // The first filter can be a high pass and the second a low pass, swapping them round.
+        setFilterType (synth, 0, FilterType::highPass);
+        setFilterType (synth, 1, FilterType::lowPass);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 500.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 2000.0f);
+        const auto swapped = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (swapped, 880.0), expectedGain (false, 880.0, 500.0, flatQ) * expectedGain (true, 880.0, 2000.0, flatQ), 0.02),
+               "either filter can be any type: here the first is a high pass and the second a low pass");
+        setFilter (synth, SynthProcessor::filterIds (1), false, 2000.0f);
+
+        // Changing a filter's type while a note plays fades from one to the other, rather than clicking.
+        setFilterType (synth, 0, FilterType::lowPass);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 1000.0f);
+        synth.prepareToPlay (sampleRate, blockSize);
+        output.clear();
+
+        for (int block = 0; block < 60; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+
+            if (block == 20)
+                setFilterType (synth, 0, FilterType::highPass);
+
+            synth.processBlock (buffer, midi);
+            output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        const auto settled = std::max (largestJump (1000, switchPoint), largestJump (switchPoint + 4800, output.size()));
+        check (largestJump (switchPoint, switchPoint + 4800) <= settled * 1.05f,
+               "changing a filter's type during a note doesn't click");
+
+        juce::MidiBuffer letGo;
+        letGo.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        synth.processBlock (buffer, letGo);
+        setFilter (synth, SynthProcessor::filterIds (0), false, 1000.0f);
+
+        // A save from before the filters could each be any type had a low pass and a high pass. They load as the
+        // first filter, a low pass, and the second, a high pass, with what moved them still moving them.
+        {
+            juce::XmlElement older ("EZSynth");
+            const auto addParameter = [&older] (const char* id, double value)
+            {
+                auto* parameter = older.createNewChildElement ("PARAM");
+                parameter->setAttribute ("id", id);
+                parameter->setAttribute ("value", value);
+            };
+
+            addParameter ("lowPassOn", 1.0);
+            addParameter ("lowPassCutoff", 1500.0);
+            addParameter ("lowPassResonance", 0.3);
+            addParameter ("highPassOn", 1.0);
+            addParameter ("highPassCutoff", 120.0);
+            addParameter ("highPassResonance", 0.0);
+
+            auto* lfoOnCutoff = older.createNewChildElement ("MODULATION");
+            lfoOnCutoff->setAttribute ("target", "lowPassCutoff");
+            lfoOnCutoff->setAttribute ("source", "LFO 1");
+            lfoOnCutoff->setAttribute ("range", 0.4);
+            auto* velocityOnCutoff = older.createNewChildElement ("VELOCITY")->createNewChildElement ("ASSIGNMENT");
+            velocityOnCutoff->setAttribute ("target", "highPassCutoff");
+            velocityOnCutoff->setAttribute ("range", 0.3);
+
+            juce::MemoryBlock state;
+            juce::AudioProcessor::copyXmlToBinary (older, state);
+
+            SynthProcessor loaded;
+            setFilterType (loaded, 0, FilterType::midPass);
+            setFilterType (loaded, 1, FilterType::midPass);
+            loaded.setStateInformation (state.getData(), (int) state.getSize());
+
+            const auto value = [&loaded] (const juce::String& id) { return (double) loaded.parameters.getRawParameterValue (id)->load(); };
+            const auto first = SynthProcessor::filterIds (0), second = SynthProcessor::filterIds (1);
+            check (juce::roundToInt (value (first.type)) == (int) FilterType::lowPass && value (first.on) > 0.5
+                     && isNear (value (first.cutoff), 1500.0, 1.0e-4) && isNear (value (first.resonance), 0.3, 1.0e-4)
+                     && juce::roundToInt (value (second.type)) == (int) FilterType::highPass && value (second.on) > 0.5
+                     && isNear (value (second.cutoff), 120.0, 1.0e-4),
+                   "a save from before the filters could be any type loads its low pass and high pass as they were");
+            check (loaded.getAssignment (modulation::filterCutoffTarget (0)).source == 0
+                     && loaded.getVelocityAssignment (modulation::filterCutoffTarget (1)).isActive(),
+                   "...with what moved them still moving them");
+        }
+
+        // The panel shows a resonance dial beside a low or high pass's cutoff, and a width dial beside a mid pass's.
+        {
+            SynthProcessor shown;
+            FilterPanel panel (shown.parameters);
+            const auto isShown = [&panel] (const juce::String& title)
+            {
+                return std::any_of (panel.getChildren().begin(), panel.getChildren().end(),
+                                    [&title] (juce::Component* child) { return child->isVisible() && child->getTitle() == title; });
+            };
+
+            check (isShown ("Filter 1 resonance") && ! isShown ("Filter 1 width") && isShown ("Filter 2 resonance"),
+                   "the filters start as a low pass and a high pass, with resonance dials");
+            setFilterType (shown, 0, FilterType::midPass);
+            check (isShown ("Filter 1 width") && ! isShown ("Filter 1 resonance") && isShown ("Filter 2 resonance"),
+                   "a mid pass shows a width dial instead");
+        }
+
         // At a low sample rate a 20 kHz cutoff is beyond the Nyquist frequency, where the filter can't work.
         SynthProcessor lowRate;
-        setFilter (lowRate, SynthProcessor::lowPassIds, true, 20000.0f);
+        setFilter (lowRate, SynthProcessor::filterIds (0), true, 20000.0f);
         lowRate.prepareToPlay (11025.0, blockSize);
         std::vector<float> lowRateOutput;
 
@@ -679,13 +819,13 @@ namespace
 
         setPreset (synth, 0, waveform::Preset::sawtooth);
         setNumHarmonics (synth, 9);
-        setFilter (synth, SynthProcessor::lowPassIds, true, 1000.0f);
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 1, 0.4f, false });
+        setFilter (synth, SynthProcessor::filterIds (0), true, 1000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (0), { 1, 0.4f, false });
         signal = play (synth, 69, 0.95, 1.3);
         check (amplitudeAt (slice (signal, 0.1, 0.4), 2200.0) > 10.0 * amplitudeAt (slice (signal, 0.6, 0.9), 2200.0),
                "an LFO on the low pass cutoff sweeps it up and down, letting the 5th harmonic through and then cutting it");
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
-        setFilter (synth, SynthProcessor::lowPassIds, false, 1000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (0), {});
+        setFilter (synth, SynthProcessor::filterIds (0), false, 1000.0f);
 
         setParameter (synth, SynthProcessor::levelId (0), 0.0f);
         setParameter (synth, SynthProcessor::onId (1), 0.0f);
@@ -729,10 +869,10 @@ namespace
             setParameter (busy, SynthProcessor::tuneId (i), 3.5f * (float) i);
         }
 
-        setFilter (busy, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
-        setFilter (busy, SynthProcessor::highPassIds, true, 100.0f);
-        busy.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.5f, false });
-        busy.setAssignment (modulation::filterCutoffTarget (modulation::highPass), { 1, 0.2f, true });
+        setFilter (busy, SynthProcessor::filterIds (0), true, 3000.0f, 0.5f);
+        setFilter (busy, SynthProcessor::filterIds (1), true, 100.0f);
+        busy.setAssignment (modulation::filterCutoffTarget (0), { 0, 0.5f, false });
+        busy.setAssignment (modulation::filterCutoffTarget (1), { 1, 0.2f, true });
         setParameter (busy, SynthProcessor::lfoModeId (2), 1.0f);
 
         std::vector<std::pair<double, int>> chord;
@@ -860,12 +1000,12 @@ namespace
 
         // An envelope on anything else doesn't make a note last longer.
         setEnvelope (synth, 1, { 0.0f, 0.0f, 1.0f, 5.0f });
-        setFilter (synth, SynthProcessor::lowPassIds, true, 2000.0f);
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.5f, true });
+        setFilter (synth, SynthProcessor::filterIds (0), true, 2000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (0), { modulation::envelopeSource (1), 0.5f, true });
         signal = play (synth, 69, 0.5, 1.2);
         check (loudness (signal, 0.9, 1.2) < 1.0e-5, "a long release on the filter's envelope doesn't keep a note sounding");
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
-        setFilter (synth, SynthProcessor::lowPassIds, false, 2000.0f);
+        synth.setAssignment (modulation::filterCutoffTarget (0), {});
+        setFilter (synth, SynthProcessor::filterIds (0), false, 2000.0f);
 
         // Inverted, an envelope moves a control down: the volume, set at 75%, down to 25%.
         const auto plain = loudness (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
@@ -923,7 +1063,7 @@ namespace
             using namespace modulation;
             const Assignment byEnvelope { envelopeSource (0), 0.4f, false };
             const EnvelopeState held { 0.5f, false, 0.0f, 1.0f }, halfReleased { 0.25f, true, 0.5f, 0.5f };
-            const auto cutoff = filterCutoffTarget (lowPass);
+            const auto cutoff = filterCutoffTarget (0);
             const auto tune = oscillatorTuneTarget (0);
 
             check (isNear (applyEnvelope (cutoff, byEnvelope, 0.3f, held), 0.5, 1.0e-5)
@@ -1016,14 +1156,14 @@ namespace
         // Velocity on the low pass cutoff: softer notes are darker.
         setPreset (synth, 0, waveform::Preset::sawtooth);
         setNumHarmonics (synth, 9);
-        setFilter (synth, SynthProcessor::lowPassIds, true, 4000.0f);
-        synth.setVelocityAssignment (modulation::filterCutoffTarget (modulation::lowPass), { modulation::velocitySource, 0.5f, false });
+        setFilter (synth, SynthProcessor::filterIds (0), true, 4000.0f);
+        synth.setVelocityAssignment (modulation::filterCutoffTarget (0), { modulation::velocitySource, 0.5f, false });
         const auto bright = slice (play (synth, 69, 0.5, 0.8), 0.2, 0.4);
         const auto dark = slice (play (synth, 69, 0.5, 0.8, soft), 0.2, 0.4);
         check (amplitudeAt (dark, 5 * 440.0) / amplitudeAt (dark, 440.0) < 0.2 * amplitudeAt (bright, 5 * 440.0) / amplitudeAt (bright, 440.0),
                "velocity on the low pass cutoff makes softer notes darker");
-        synth.setVelocityAssignment (modulation::filterCutoffTarget (modulation::lowPass), {});
-        setFilter (synth, SynthProcessor::lowPassIds, false, 4000.0f);
+        synth.setVelocityAssignment (modulation::filterCutoffTarget (0), {});
+        setFilter (synth, SynthProcessor::filterIds (0), false, 4000.0f);
 
         // Velocity and an LFO on the same control. A square LFO swings OSC 1's level, set at 50%, by 20% either way,
         // and velocity lowers it by up to 40% for the softest notes.
@@ -1614,7 +1754,7 @@ namespace
         drawn[100] = -0.75f;
         synth.setShape (1, drawn);
         setEnvelope (synth, 2, { 1.5f, 0.2f, 0.4f, 3.0f });
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::highPass), { modulation::envelopeSource (2), 0.6f, true });
+        synth.setAssignment (modulation::filterCutoffTarget (1), { modulation::envelopeSource (2), 0.6f, true });
         synth.setVelocityAssignment (modulation::volumeTarget, {});
         synth.setVelocityAssignment (modulation::harmonicTarget (0, 2), { modulation::velocitySource, 0.25f, false });
 
@@ -1631,7 +1771,7 @@ namespace
         check (loaded.getShape (1) == drawn && isNear (loaded.getEnvelopeSettings (2).release, 3.0, 1.0e-4)
                  && isNear (loaded.parameters.getRawParameterValue (SynthProcessor::levelId (0))->load(), 0.3, 1.0e-4),
                "loading a preset brings back its waves and settings");
-        check (loaded.getAssignment (modulation::filterCutoffTarget (modulation::highPass)) == modulation::Assignment { modulation::envelopeSource (2), 0.6f, true }
+        check (loaded.getAssignment (modulation::filterCutoffTarget (1)) == modulation::Assignment { modulation::envelopeSource (2), 0.6f, true }
                  && ! loaded.getVelocityAssignment (modulation::volumeTarget).isActive()
                  && loaded.getVelocityAssignment (modulation::harmonicTarget (0, 2)).isActive(),
                "...and what its LFOs, envelopes and velocity move");
@@ -1652,7 +1792,7 @@ namespace
         SynthProcessor fresh;
         check (loaded.getPresetName() == "Init" && ! loaded.isPresetEdited() && loaded.getShape (1) == fresh.getShape (1)
                  && loaded.getVelocityAssignment (modulation::volumeTarget) == modulation::startingVelocityOnVolume
-                 && ! loaded.getAssignment (modulation::filterCutoffTarget (modulation::highPass)).isActive(),
+                 && ! loaded.getAssignment (modulation::filterCutoffTarget (1)).isActive(),
                "Init goes back to the sound the synth starts with");
 
         // Presets are listed by name, with numbers counted as numbers.
@@ -1776,7 +1916,7 @@ namespace
         setNumHarmonics (original, 7, 1);
         setParameter (original, SynthProcessor::onId (1), 1.0f);
         setParameter (original, SynthProcessor::levelId (1), 0.4f);
-        setFilter (original, SynthProcessor::lowPassIds, true, 3000.0f, 0.5f);
+        setFilter (original, SynthProcessor::filterIds (0), true, 3000.0f, 0.5f);
 
         juce::MemoryBlock state;
         original.getStateInformation (state);
@@ -1792,9 +1932,9 @@ namespace
         check (restored.isOn (0) && restored.isOn (1) && ! restored.isOn (2), "which oscillators are on is restored");
         check (isNear (restored.parameters.getRawParameterValue (SynthProcessor::levelId (1))->load(), 0.4, 1.0e-6),
                "oscillator levels are restored");
-        check (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.on)->load() > 0.5f
-                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.cutoff)->load(), 3000.0, 1.0e-4)
-                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::lowPassIds.resonance)->load(), 0.5, 1.0e-4),
+        check (restored.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() > 0.5f
+                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::filterIds (0).cutoff)->load(), 3000.0, 1.0e-4)
+                 && isNear (restored.parameters.getRawParameterValue (SynthProcessor::filterIds (0).resonance)->load(), 0.5, 1.0e-4),
                "the filters' settings are restored");
 
         restored.setStateInformation ("not a saved state", 17);
@@ -1891,8 +2031,8 @@ namespace
         setParameter (synth, SynthProcessor::levelId (1), 0.6f);
         setParameter (synth, SynthProcessor::levelId (2), 0.35f);
         synth.editedSource = 1;
-        setFilter (synth, SynthProcessor::lowPassIds, true, 1800.0f, 0.4f);
-        setFilter (synth, SynthProcessor::highPassIds, true, 90.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 1800.0f, 0.4f);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 90.0f);
         save ("6-three-oscillators");
 
         setParameter (synth, SynthProcessor::onId (2), 0.0f);
@@ -1903,13 +2043,13 @@ namespace
         // on the 3rd harmonic.
         setParameter (synth, SynthProcessor::onId (2), 1.0f);
         synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
-        synth.setAssignment (modulation::filterCutoffTarget (modulation::lowPass), { 0, 0.4f, true, 0.25f });
+        synth.setAssignment (modulation::filterCutoffTarget (0), { 0, 0.4f, true, 0.25f });
         synth.setAssignment (modulation::harmonicTarget (0, 3), { 1, 0.5f, false });
         synth.setAssignment (modulation::harmonicTarget (0, 2), { 0, 0.8f, false, 0.5f });
         setParameter (synth, SynthProcessor::tuneId (0), 7.0f);
         setParameter (synth, SynthProcessor::tuneId (2), 3.4f);
         synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
-        synth.setAssignment (modulation::filterResonanceTarget (modulation::lowPass), { modulation::envelopeSource (1), 0.6f, false });
+        synth.setAssignment (modulation::filterResonanceTarget (0), { modulation::envelopeSource (1), 0.6f, false });
         setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
         synth.editedSource = SynthProcessor::numOscillators;
 
@@ -1950,7 +2090,7 @@ namespace
             modulationEditor.setLookAndFeel (nullptr);
         };
 
-        saveModulationEditor (modulation::filterCutoffTarget (modulation::lowPass), "11-modulation-editor");
+        saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
 
         // The tune slider on its own: zoomed right out, a 5th below the note, then zoomed in on a slight detune, with
@@ -2022,6 +2162,9 @@ namespace
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
         synth.editedSource = 2;
+        // With the second filter a mid pass.
+        setFilterType (synth, 1, FilterType::midPass);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 1200.0f);
         editor->setSize (1240, 900);
         save ("8-smallest");
     }

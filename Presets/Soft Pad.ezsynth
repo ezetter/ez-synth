@@ -13,9 +13,16 @@
   <PARAM id="env3Decay" value="0.9999999403953552"/>
   <PARAM id="env3Release" value="2.5"/>
   <PARAM id="env3Sustain" value="0.8500000238418579"/>
-  <PARAM id="highPassCutoff" value="250.0000152587891"/>
-  <PARAM id="highPassOn" value="0.0"/>
-  <PARAM id="highPassResonance" value="0.0"/>
+  <PARAM id="filter1Cutoff" value="900.000244140625"/>
+  <PARAM id="filter1On" value="1.0"/>
+  <PARAM id="filter1Resonance" value="0.1500000059604645"/>
+  <PARAM id="filter1Type" value="0.0"/>
+  <PARAM id="filter1Width" value="1.999999761581421"/>
+  <PARAM id="filter2Cutoff" value="250.0000152587891"/>
+  <PARAM id="filter2On" value="0.0"/>
+  <PARAM id="filter2Resonance" value="0.0"/>
+  <PARAM id="filter2Type" value="2.0"/>
+  <PARAM id="filter2Width" value="1.999999761581421"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="6.000000476837158"/>
@@ -25,18 +32,18 @@
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="1.0"/>
   <PARAM id="lfo3Period" value="3.999999761581421"/>
-  <PARAM id="lowPassCutoff" value="900.000244140625"/>
-  <PARAM id="lowPassOn" value="1.0"/>
-  <PARAM id="lowPassResonance" value="0.1500000059604645"/>
   <PARAM id="osc1Harmonics" value="5.0"/>
   <PARAM id="osc1Level" value="0.800000011920929"/>
   <PARAM id="osc1On" value="1.0"/>
+  <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc2Harmonics" value="9.0"/>
   <PARAM id="osc2Level" value="0.3499999940395355"/>
   <PARAM id="osc2On" value="1.0"/>
+  <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc3Harmonics" value="1.0"/>
   <PARAM id="osc3Level" value="0.5"/>
   <PARAM id="osc3On" value="1.0"/>
+  <PARAM id="osc3Tune" value="0.0"/>
   <PARAM id="volume" value="0.0"/>
   <WAVE oscillator="0" points="2048..........vC...HO...v7....zC...RO...P8...f0C...XO...j8...f1C...aO...v8...P2C...dO...78....3C..ffO...D9...X3C...hO...J9...v3C..fiO...P9...H4C...kO...V9...f4C..flO...b9...34C...nO...g9...H5C..vnO...j9...T5C..foO...m9...f5C..PpO...p9...r5C...qO...s9...35C..vqO...v9...D6C..frO...y9...P6C..PsO...19...b6C...tO...49...n6C..vtO...79...z6C..fuO...+9....7C..HvO...A+...F7C..fvO..fB+...L7C..3vO...D+...R7C..PwO..fE+...X7C..nwO...G+...d7C...xO..fH+...j7C..XxO...J+...p7C..vxO..fK+...v7C..HyO...M+...17C..fyO..fN+...77C..3yO...P+...B8C..PzO..fQ+...H8C..nzO...S+...N8C...0O..fT+...T8C..X0O...V+...Z8C..v0O..fW+...f8C..H1O...Y+...l8C..f1O..fZ+...r8C..31O...b+...x8C..P2O..fc+...38C..n2O...e+...98C...3O..fe+...78C..n2O...d+...18C..P2O..fb+...v8C..31O...a+...p8C..f1O..fY+...j8C..H1O...X+...d8C..v0O..fV+...X8C..X0O...U+...R8C...0O..fS+...L8C..nzO...R+...F8C..PzO..fP+....8C..3yO...O+...57C..fyO..fM+...z7C..HyO...L+...t7C..vxO..fJ+...n7C..XxO...I+...h7C...xO..fG+...b7C..nwO...F+...V7C..PwO..fD+...P7C..3vO...C+...J7C..fvO..fA+...D7C..HvO....+...76C..fuO...89...v6C..vtO...59...j6C...tO...29...X6C..PsO...z9...L6C..frO...w9....6C..vqO...t9...z5C...qO...q9...n5C..PpO...n9...b5C..foO...k9...P5C..vnO...h9...D5C...nO...d9...v4C..flO...X9...X4C...kO...R9....4C..fiO...L9...n3C...hO...F9...P3C..ffO....9...v2C...dO...z8....2C...aO...n8...P1C...XO...X8....0C...RO....8....yC...HO....7..........u...f7B...yK...Pu...H8B...0K...Vu...f8B..P1K...Zu...r8B...2K...cu...38B..v2K...fu...B9B..P3K..fgu...H9B..n3K...iu...N9B...4K..fju...T9B..X4K...lu...Z9B..v4K..fmu...f9B..D5K..fnu...i9B..P5K..Pou...l9B..b5K...pu...o9B..n5K..vpu...r9B..z5K..fqu...u9B...6K..Pru...x9B..L6K...su...09B..X6K..vsu...39B..j6K..ftu...69B..v6K..Puu...99B..76K...vu..f.+B..D7K..Xvu...B+B..J7K..vvu..fC+B..P7K..Hwu...E+B..V7K..fwu..fF+B..b7K..3wu...H+B..h7K..Pxu..fI+B..n7K..nxu...K+B..t7K...yu..fL+B..z7K..Xyu...N+B..57K..vyu..fO+B...8K..Hzu...Q+B..F8K..fzu..fR+B..L8K..3zu...T+B..R8K..P0u..fU+B..X8K..n0u...W+B..d8K...1u..fX+B..j8K..X1u...Z+B..p8K..v1u..fa+B..v8K..H2u...c+B..18K..f2u..fd+B..78K..32u...f+B..98K..v2u..fd+B..38K..X2u...c+B..x8K...2u..fa+B..r8K..n1u...Z+B..l8K..P1u..fX+B..f8K..30u...W+B..Z8K..f0u..fU+B..T8K..H0u...T+B..N8K..vzu..fR+B..H8K..Xzu...Q+B..B8K...zu..fO+B..77K..nyu...N+B..17K..Pyu..fL+B..v7K..3xu...K+B..p7K..fxu..fI+B..j7K..Hxu...H+B..d7K..vwu..fF+B..X7K..Xwu...E+B..R7K...wu..fC+B..L7K..nvu...B+B..F7K..Pvu..f.+B...7K..vuu...99B..z6K...uu...69B..n6K..Ptu...39B..b6K..fsu...09B..P6K..vru...x9B..D6K...ru...u9B..35K..Pqu...r9B..r5K..fpu...o9B..f5K..vou...l9B..T5K...ou...i9B..H5K..Pnu...f9B..34K...mu...Z9B..f4K..fku...T9B..H4K...ju...N9B..v3K..fhu...H9B..X3K...gu...B9B...3K...eu...38B..P2K...bu...r8B..f1K...Yu...f8B..f0K...Tu...H8B...zK...Lu...f7B...vK"
         preset="Triangle"/>
@@ -52,7 +59,7 @@
         preset="Sawtooth"/>
   <MODULATION target="volume" source="Env 3" range="0.6000000238418579" inverted="0"/>
   <MODULATION target="osc2Level" source="LFO 2" range="0.5" inverted="0"/>
-  <MODULATION target="lowPassCutoff" source="LFO 1" range="0.300000011920929"
+  <MODULATION target="filter1Cutoff" source="LFO 1" range="0.300000011920929"
               inverted="0"/>
   <VELOCITY>
     <ASSIGNMENT target="volume" range="0.3499999940395355"/>

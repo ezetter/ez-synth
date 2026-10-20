@@ -13,9 +13,16 @@
   <PARAM id="env3Decay" value="0.9999999403953552"/>
   <PARAM id="env3Release" value="1.99999988079071"/>
   <PARAM id="env3Sustain" value="1.0"/>
-  <PARAM id="highPassCutoff" value="180.0"/>
-  <PARAM id="highPassOn" value="1.0"/>
-  <PARAM id="highPassResonance" value="0.0"/>
+  <PARAM id="filter1Cutoff" value="2800.0"/>
+  <PARAM id="filter1On" value="1.0"/>
+  <PARAM id="filter1Resonance" value="0.3499999940395355"/>
+  <PARAM id="filter1Type" value="0.0"/>
+  <PARAM id="filter1Width" value="1.999999761581421"/>
+  <PARAM id="filter2Cutoff" value="180.0"/>
+  <PARAM id="filter2On" value="1.0"/>
+  <PARAM id="filter2Resonance" value="0.0"/>
+  <PARAM id="filter2Type" value="2.0"/>
+  <PARAM id="filter2Width" value="1.999999761581421"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="1.0"/>
@@ -25,18 +32,18 @@
   <PARAM id="lfo3Mode" value="1.0"/>
   <PARAM id="lfo3On" value="1.0"/>
   <PARAM id="lfo3Period" value="1.199999809265137"/>
-  <PARAM id="lowPassCutoff" value="2800.0"/>
-  <PARAM id="lowPassOn" value="1.0"/>
-  <PARAM id="lowPassResonance" value="0.3499999940395355"/>
   <PARAM id="osc1Harmonics" value="9.0"/>
   <PARAM id="osc1Level" value="0.8999999761581421"/>
   <PARAM id="osc1On" value="1.0"/>
+  <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc2Harmonics" value="9.0"/>
   <PARAM id="osc2Level" value="0.1500000059604645"/>
   <PARAM id="osc2On" value="1.0"/>
+  <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc3Harmonics" value="3.0"/>
   <PARAM id="osc3Level" value="1.0"/>
   <PARAM id="osc3On" value="0.0"/>
+  <PARAM id="osc3Tune" value="0.0"/>
   <PARAM id="volume" value="0.6000000238418579"/>
   <WAVE oscillator="0" points="2048..........9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+....9C...3O...f+.........3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K...3u...f+B...9K"
         preset="Square"/>

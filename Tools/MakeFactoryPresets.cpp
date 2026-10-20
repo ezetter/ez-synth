@@ -144,10 +144,10 @@ namespace
             setOscillator (synth, 0, waveform::Preset::sawtooth, 9, 1.0f);
             setParameter (synth, SynthProcessor::volumeId, 0.8f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 500.0f, 0.25f);
+            setFilter (synth, SynthProcessor::filterIds (0), 500.0f, 0.25f);
             setEnvelope (synth, 0, { 0.06f, 0.5f, 0.45f, 0.3f });
-            assign (synth, filterCutoffTarget (lowPass), env1, 0.35f);
-            assignVelocity (synth, filterCutoffTarget (lowPass), 0.25f);
+            assign (synth, filterCutoffTarget (0), env1, 0.35f);
+            assignVelocity (synth, filterCutoffTarget (0), 0.25f);
         } },
 
         // Velocity at work alongside the envelopes: softer notes are quieter, darker and lose the triangle's bark,
@@ -159,8 +159,8 @@ namespace
             setOscillator (synth, 1, waveform::Preset::triangle, 5, 0.45f);
             assignVelocity (synth, oscillatorLevelTarget (1), 0.45f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 3500.0f, 0.1f);
-            assignVelocity (synth, filterCutoffTarget (lowPass), 0.35f);
+            setFilter (synth, SynthProcessor::filterIds (0), 3500.0f, 0.1f);
+            assignVelocity (synth, filterCutoffTarget (0), 0.35f);
 
             setParameter (synth, SynthProcessor::volumeId, 0.0f);
             setEnvelope (synth, 0, { 0.005f, 3.0f, 0.3f, 0.5f });
@@ -208,10 +208,10 @@ namespace
             assign (synth, oscillatorLevelTarget (0), env2, 1.0f);
             setParameter (synth, SynthProcessor::volumeId, 0.9f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 400.0f, 0.3f);
+            setFilter (synth, SynthProcessor::filterIds (0), 400.0f, 0.3f);
             setEnvelope (synth, 0, { 0.0f, 0.2f, 0.0f, 0.2f });
-            assign (synth, filterCutoffTarget (lowPass), env1, 0.45f);
-            assignVelocity (synth, filterCutoffTarget (lowPass), 0.3f);
+            assign (synth, filterCutoffTarget (0), env1, 0.45f);
+            assignVelocity (synth, filterCutoffTarget (0), 0.3f);
         } },
 
         // All three oscillators, swelling in and fading slowly, through a low pass filter that one LFO slowly opens
@@ -226,9 +226,9 @@ namespace
             setEnvelope (synth, 2, { 1.5f, 1.0f, 0.85f, 2.5f });
             assign (synth, volumeTarget, env3, 0.6f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 900.0f, 0.15f);
+            setFilter (synth, SynthProcessor::filterIds (0), 900.0f, 0.15f);
             setLfo (synth, lfo1, 6.0f, false, waveform::Preset::sine);
-            assign (synth, filterCutoffTarget (lowPass), lfo1, 0.3f);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.3f);
 
             setLfo (synth, lfo2, 3.0f, false, waveform::Preset::triangle);
             assign (synth, oscillatorLevelTarget (1), lfo2, 0.5f);
@@ -242,8 +242,8 @@ namespace
             setOscillator (synth, 1, fallingSawtooth(), 9, 0.15f);
             setParameter (synth, SynthProcessor::volumeId, 0.6f);
 
-            setFilter (synth, SynthProcessor::highPassIds, 180.0f, 0.0f);
-            setFilter (synth, SynthProcessor::lowPassIds, 2800.0f, 0.35f);
+            setFilter (synth, SynthProcessor::filterIds (1), 180.0f, 0.0f);
+            setFilter (synth, SynthProcessor::filterIds (0), 2800.0f, 0.35f);
 
             setLfo (synth, lfo3, 1.2f, true, draw ([] (double t)
             {
@@ -258,13 +258,13 @@ namespace
             setOscillator (synth, 0, waveform::Preset::sawtooth, 9, 1.0f);
             setParameter (synth, SynthProcessor::volumeId, 0.7f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 700.0f, 0.55f);
+            setFilter (synth, SynthProcessor::filterIds (0), 700.0f, 0.55f);
             setLfo (synth, lfo2, 2.0f, false, draw ([] (double t)
             {
                 constexpr std::array steps { -0.8, 0.6, -0.2, 1.0, -0.6, 0.3, -1.0, 0.8 };
                 return steps[(size_t) (t * (double) steps.size())];
             }));
-            assign (synth, filterCutoffTarget (lowPass), lfo2, 0.6f);
+            assign (synth, filterCutoffTarget (0), lfo2, 0.6f);
         } },
 
         // A square and a sine together through a resonant low pass filter that an LFO wobbles.
@@ -274,9 +274,9 @@ namespace
             setOscillator (synth, 2, waveform::Preset::sine, 1, 0.6f);
             setParameter (synth, SynthProcessor::volumeId, 0.5f);
 
-            setFilter (synth, SynthProcessor::lowPassIds, 400.0f, 0.5f);
+            setFilter (synth, SynthProcessor::filterIds (0), 400.0f, 0.5f);
             setLfo (synth, lfo1, 0.25f, false, waveform::Preset::sine);
-            assign (synth, filterCutoffTarget (lowPass), lfo1, 0.5f);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.5f);
         } },
     };
 }

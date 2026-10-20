@@ -37,16 +37,16 @@ public:
     static juce::String harmonicsId (int oscillator);
     static juce::String tuneId (int oscillator);
 
-    /** The IDs of a filter's parameters: whether it's on, its cutoff frequency in hertz, and its resonance. */
+    /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
+        low or high pass, and its width in octaves, as a mid pass.
+    */
     struct FilterIds
     {
-        const char* on;
-        const char* cutoff;
-        const char* resonance;
+        juce::String on, type, cutoff, resonance, width;
     };
 
-    static constexpr FilterIds lowPassIds { "lowPassOn", "lowPassCutoff", "lowPassResonance" };
-    static constexpr FilterIds highPassIds { "highPassOn", "highPassCutoff", "highPassResonance" };
+    /** The IDs of a filter's parameters, numbered from 0. The first starts as a low pass, the second a high pass. */
+    static FilterIds filterIds (int filter);
 
     /** The IDs of each LFO's parameters: whether it's on, its period in seconds, and whether it loops or runs once. */
     static juce::String lfoOnId (int lfo);
@@ -305,8 +305,10 @@ private:
     struct FilterParameters
     {
         std::atomic<float>* on = nullptr;
+        std::atomic<float>* type = nullptr;
         std::atomic<float>* cutoff = nullptr;
         std::atomic<float>* resonance = nullptr;
+        std::atomic<float>* width = nullptr;
     };
 
     struct LfoParameters

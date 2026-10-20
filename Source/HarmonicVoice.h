@@ -12,7 +12,7 @@ struct HarmonicSound final : public juce::SynthesiserSound
 };
 
 /** Plays a note: the sine waves at the harmonics of every oscillator that's on, each oscillator tuned up from the
-    note by as much as it's set to, added together, then through the note's own high pass and low pass filters.
+    note by as much as it's set to, added together, then through the note's own two filters, in turn.
 
     Every few milliseconds the voice works out where the LFOs and envelopes have moved the controls, and glides
     there, so changes to the waves, the controls and the modulation never click. Each voice runs the envelopes, and
@@ -88,8 +88,7 @@ private:
     Harmonics cosines {}, sines {};
     std::array<double, modulation::numOscillators> tunes {};
 
-    std::array<FilterStage, modulation::numFilters> filters { FilterStage (juce::dsp::StateVariableTPTFilterType::lowpass),
-                                                              FilterStage (juce::dsp::StateVariableTPTFilterType::highpass) };
+    std::array<FilterStage, modulation::numFilters> filters;
     juce::SmoothedValue<float> gain;
 
     std::array<EnvelopeRun, modulation::numEnvelopes> envelopeRuns;

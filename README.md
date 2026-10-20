@@ -3,7 +3,7 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note, through a low pass and a high pass filter. Three LFOs, each with a drawn wave of its own, three
+each note, through two filters, each a low pass, mid pass or high pass. Three LFOs, each with a drawn wave of its own, three
 envelopes, which run with each key pressed, and how hard each key is played can move almost any control.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
@@ -55,12 +55,25 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
   phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
-- **Filter the sound** with the Filters panel, at the right of the row above the keys. It shapes all the
-  oscillators together.
-  The low pass filter cuts harmonics above its cutoff, and the high pass filter cuts those below. Each has
-  a switch, a cutoff dial from 20 Hz to 20 kHz, and a resonance dial that makes the filter peak at its
-  cutoff, boosting the harmonics there up to 8 times. Both start switched out, with cutoffs of 1 kHz and
-  250 Hz that change the sound clearly when you switch them in. Double-click a dial to reset it.
+- **Filter the sound** with the Filters panel, at the right of the row above the keys. It has two filters,
+  which shape all the oscillators together, the first and then the second. Each has a switch, a choice of
+  type, **Low**, **Mid** or **High**, and a cutoff dial from 20 Hz to 20 kHz.
+  - A **low pass** cuts the harmonics above its cutoff, and a **high pass** those below. Beside the cutoff
+    is a **resonance** dial, which makes the filter peak at its cutoff, boosting the harmonics there up to 8
+    times.
+  - A **mid pass** lets through a band of harmonics around its cutoff, and cuts those above and below.
+    Beside the cutoff is a **width** dial, from 0.2 to 6 octaves: how far apart the edges of the band are,
+    where it lets through half the power. The harmonics in the middle come through as they are, however
+    narrow the band. At 2 octaves wide, a mid pass at 880 Hz lets A4's 2nd harmonic through as it is, and
+    half the power of its 1st and 4th harmonics, an octave either side.
+
+  To begin with, the first filter is a low pass and the second a high pass, both switched out, with cutoffs
+  of 1 kHz and 250 Hz that change the sound clearly when you switch them in. Changing a filter's type keeps
+  its settings, and while a note plays it fades from the old type to the new over 20 ms, so it doesn't
+  click. Each filter keeps its resonance and its width, so switching to a mid pass and back leaves the
+  resonance as it was. Double-click a dial to reset it. Presets saved before the filters had types, which
+  had a low pass and a high pass, load with the first filter as that low pass and the second as that high
+  pass, so they sound as they did.
 - **Play.** Each key plays the wave with the key's pitch as its fundamental frequency. The header shows the
   last note and its frequency. Click the on-screen keys, or in the standalone app type on the computer
   keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. Or play a
@@ -123,7 +136,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Giving an LFO, envelope or velocity something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
-  the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff or resonance. A small window opens,
+  the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff, resonance or width. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
   switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
   the top part a **phase** and **polarity** too, and both can move the same control at once, their
@@ -253,7 +266,9 @@ the app and open it again.
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
 together at their levels, that a tuned oscillator plays as far above or below the note as it's tuned, glides there
-without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, that LFOs
+without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, as low, mid and high passes,
+that a filter's type can change during a note without a click, that saves from before the filters had types
+load as they were, that LFOs
 move each kind of control by the range and in the direction they're set to, looping or once per note, and
 as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
@@ -284,10 +299,13 @@ save pictures of the window showing several waves.
   When a wave, level, switch, tune or number of harmonics changes during a note, the voice glides to the
   new sound, most of the way in 5 ms and all of it in about 20, rather than clicking. Notes
   start in 8 ms and fade out over 250 ms when let go.
-- **Filtering.** Each note goes through its own high pass filter, then low pass filter
-  (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Both are
-  JUCE's state variable filters, 12 dB an octave. Switching a filter fades it in or out over 20 ms, and its
-  cutoff and resonance glide over 10 ms, so nothing clicks. A filter that's switched out is skipped
+- **Filtering.** Each note goes through its own two filters, the first and then the second
+  (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
+  state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
+  low pass, band pass and high pass at once, so changing type fades from one to the other over 20 ms. A mid
+  pass is the band pass, scaled down by its Q so its middle comes through as it is; its width of N octaves
+  sets its Q to √(2^N) / (2^N − 1). Switching a filter fades it in or out over 20 ms, and its cutoff,
+  resonance and width glide over 10 ms, so nothing clicks. A filter that's switched out is skipped
   entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at low sample rates, are lowered to 45% of
   the sample rate.
 - **Modulation.** Every 64 samples, each note works out where the LFOs and its envelopes are, and where
@@ -326,8 +344,8 @@ save pictures of the window showing several waves.
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
-| `Source/FilterPanel.*` | The filters' switches, cutoff dials and resonance dials |
-| `Source/FilterStage.*` | A low or high pass filter that switches and sweeps without clicks |
+| `Source/FilterPanel.*` | The filters' switches, types, cutoff dials, and resonance or width dials |
+| `Source/FilterStage.*` | A low, mid or high pass filter that switches, changes type and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
 | `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |

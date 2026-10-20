@@ -24,10 +24,8 @@ namespace modulation
     /** What a source is called, such as "LFO 2", "Env 1" or "Velocity". */
     juce::String getSourceName (int source);
 
-    /** The filters, in the order they're numbered: the low pass and the high pass. */
+    /** The two filters, numbered from 0, each of which can be a low pass, a mid pass or a high pass. */
     inline constexpr int numFilters = 2;
-    inline constexpr int lowPass = 0;
-    inline constexpr int highPass = 1;
 
     // Every control an LFO or envelope can move is a target, with a number.
     inline constexpr int volumeTarget = 0;
@@ -39,10 +37,11 @@ namespace modulation
     constexpr int filterCutoffTarget (int filter)                   { return 39 + filter; }
     constexpr int filterResonanceTarget (int filter)                { return 41 + filter; }
     constexpr int oscillatorTuneTarget (int oscillator)             { return 43 + oscillator; }
-    inline constexpr int numTargets = 46;
+    constexpr int filterWidthTarget (int filter)                    { return 46 + filter; }
+    inline constexpr int numTargets = 48;
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune };
+                      oscillatorTune, filterWidth };
 
     struct TargetInfo
     {
@@ -61,7 +60,16 @@ namespace modulation
         parameters use the parameter's ID.
     */
     juce::String getKey (int target);
+
+    /** The target with a key, including the keys saved before the filters could each be any type, when the first
+        was always a low pass and the second a high pass, such as "lowPassCutoff".
+    */
     std::optional<int> findTarget (const juce::String& key);
+
+    /** A key, or a parameter ID, as it's been since the filters could each be any type: "lowPassCutoff" becomes
+        "filter1Cutoff", and "highPassOn" becomes "filter2On". Any other key is left as it is.
+    */
+    juce::String updateKey (const juce::String& key);
 
     /** Whether a target is a plugin parameter, rather than one of a wave's harmonics. */
     bool isParameter (int target);

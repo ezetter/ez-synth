@@ -1,12 +1,14 @@
 #pragma once
 
+#include "ChoiceButtons.h"
 #include "ModulatableControls.h"
 #include "SynthProcessor.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The low pass and high pass filters' controls: a switch, a cutoff dial and a resonance dial for each. The filters
-    shape the sound of all the oscillators together.
+/** The two filters' controls. Each has a switch, a choice of type, low pass, mid pass or high pass, and a cutoff dial,
+    with a resonance dial for a low or high pass, or a width dial for a mid pass. The filters shape the sound of all
+    the oscillators together, the first and then the second.
 */
 class FilterPanel final : public juce::Component
 {
@@ -22,25 +24,36 @@ public:
 private:
     struct Filter
     {
-        Filter (juce::AudioProcessorValueTreeState&, const SynthProcessor::FilterIds&, int filterNumber,
-                const juce::String& filterName);
+        Filter (juce::AudioProcessorValueTreeState&, int filterNumber);
 
         bool isOn() const   { return onSwitch.getToggleState(); }
+        FilterType getType() const   { return (FilterType) type.getChosen(); }
 
-        juce::String name;
+        /** The dial beside the cutoff: the resonance, or for a mid pass, the width. */
+        ModulatableSlider& getSecondDial()   { return getType() == FilterType::midPass ? width : resonance; }
+
+        const SynthProcessor::FilterIds ids;
+        const juce::String name;
+
+        /** Called when the type changes, whether the user chose it, or a preset or the host set it. */
+        std::function<void()> onTypeChange;
+
         ModulatableToggle onSwitch;
-        ModulatableSlider cutoff, resonance;
+        ChoiceButtons type { { FilterStage::getShortName (FilterType::lowPass), FilterStage::getShortName (FilterType::midPass),
+                               FilterStage::getShortName (FilterType::highPass) } };
+        ModulatableSlider cutoff, resonance, width;
         juce::AudioProcessorValueTreeState::ButtonAttachment onAttachment;
-        juce::AudioProcessorValueTreeState::SliderAttachment cutoffAttachment, resonanceAttachment;
+        juce::ParameterAttachment typeAttachment;
+        juce::AudioProcessorValueTreeState::SliderAttachment cutoffAttachment, resonanceAttachment, widthAttachment;
 
-        juce::Rectangle<int> area, nameArea, cutoffCaption, cutoffValue, resonanceCaption, resonanceValue;
+        juce::Rectangle<int> area, cutoffCaption, cutoffValue, secondCaption, secondValue;
     };
 
-    void setUp (Filter&, juce::AudioProcessorValueTreeState&, const SynthProcessor::FilterIds&);
-    void showWhetherOn (Filter&);
+    void setUp (Filter&, juce::AudioProcessorValueTreeState&);
+    void showSettings (Filter&);
     void paintFilter (juce::Graphics&, Filter&);
 
-    Filter lowPass, highPass;
+    Filter first, second;
     juce::Rectangle<int> captionArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FilterPanel)
