@@ -98,18 +98,27 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   - **Decay**, 0 to 20 seconds: how long it then takes to fall to the sustain level.
   - **Sustain**, 0 to 100%: the level it holds while the key stays down.
   - **Release**, 0 to 20 seconds: how long it takes to fall to nothing once the key is let go, from wherever
-    it was.
+    it was. It takes that long even if the envelope had already fallen to nothing, as what it moves still
+    has to come down.
 
   Each stage is a straight line, and takes as long as it's set to. The picture above the dials shows the
   envelope's shape, with a light blue dot marking where the newest note is in it. Its title line says what
   it moves.
-- **An envelope moves a control one way from where it's set**, up by its range at the peak (or down, if
-  inverted), and back as it falls. To shape a note's loudness, for instance, turn an oscillator's level, or
-  the volume, down to 0 and give it an envelope with a range of 100%.
+- **While the key is held, an envelope moves a control one way from where it's set**, up by its range at
+  the peak (or down, if inverted), and back as it falls to the sustain level.
+- **Once the key is let go, the release brings the control steadily down to nothing**, from wherever it was
+  at that moment, reaching the bottom of its travel just as the release ends, and staying there. So an
+  envelope on the volume fades the note out over its release, whatever the volume knob is set to: with the
+  volume at 75% and an envelope on it, the note doesn't fall back to 75% and then stop, it fades all the
+  way. The same goes for every control: a filter's cutoff closes, a harmonic fades away, and an
+  oscillator's level fades out. An oscillator's tune is the one exception, as the bottom of its travel is an
+  octave down: its release brings it back into tune instead.
 - **An envelope on the loudness sets how long a note lasts.** While an envelope moves the volume, or an
   oscillator's switch or level, a note goes on sounding until that envelope's release is over, however long.
-  Otherwise a note fades over a quarter of a second once its key is let go. An envelope on anything else,
-  such as a filter's cutoff, is cut off when the note ends.
+  Otherwise a note fades over a quarter of a second once its key is let go. With an envelope on one
+  oscillator's level, the others, which no envelope shapes, fade over that quarter of a second too, rather
+  than playing on until the envelope's release ends. An envelope on anything else, such as a filter's
+  cutoff, is cut off when the note ends.
 
 ### Giving an LFO, envelope or velocity something to move
 
@@ -248,7 +257,8 @@ without a click and leaves out the harmonics too high for its pitch, that the fi
 move each kind of control by the range and in the direction they're set to, looping or once per note, and
 as far behind as their phase says, that
 envelopes run each stage for as long as it's set, separately for each note, that a note lasts through
-the release of an envelope on its loudness, that velocity moves controls by its range, alongside an LFO, that
+the release of an envelope on its loudness, that a release fades what it moves steadily to nothing from
+wherever it was, without a sudden stop, while oscillators no envelope shapes fade as usual, that velocity moves controls by its range, alongside an LFO, that
 the grid shows harmonics where LFOs, envelopes and velocity have moved them, as strong as they're heard, that
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
@@ -286,7 +296,9 @@ save pictures of the window showing several waves.
   note's start. A control given a phase takes the LFO's value that share of a period earlier; an LFO that
   runs once holds its first value until then. A control's position along its travel, from 0 to 1, moves by
   its range times half an LFO's value, or times an envelope's whole value, and by its velocity range times how far short of full velocity
-  the note was played. The two movements add up before the control is kept within its travel. Cutoffs travel by octave, and harmonic sliders give weak
+  the note was played. The two movements add up before the control is kept within its travel. Once the key is
+  let go, a control an envelope moves goes from where it was then to its rest, the bottom of its travel or in
+  tune for a tune, in proportion to how much of the release is left. Cutoffs travel by octave, and harmonic sliders give weak
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
   then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
   shows the same positions for the latest note, on the controls and in the grid's sine waves.

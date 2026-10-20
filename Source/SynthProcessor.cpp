@@ -391,6 +391,7 @@ void SynthProcessor::shareNewestNote()
         display.stage = (int) run.getStage();
         display.progress = run.getProgress (patch.envelopes[(size_t) i]);
         display.level = run.getLevel();
+        display.releaseFrom = run.getReleaseFrom();
     }
 }
 
@@ -600,7 +601,8 @@ std::optional<SynthProcessor::EnvelopeDisplay> SynthProcessor::getEnvelopeDispla
         return std::nullopt;
 
     const auto& display = envelopeDisplays[(size_t) envelope];
-    return EnvelopeDisplay { (EnvelopeRun::Stage) display.stage.load(), display.progress.load(), display.level.load() };
+    return EnvelopeDisplay { (EnvelopeRun::Stage) display.stage.load(), display.progress.load(), display.level.load(),
+                             display.releaseFrom.load() };
 }
 
 double SynthProcessor::getTailLengthSeconds() const
@@ -675,18 +677,34 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
 
 std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
-    // The LFO or envelope and the velocity moving the control add up.
-    std::optional<float> offset;
+    // Moved as the voices move it (HarmonicVoice::getTargets): by velocity, then by the LFO or envelope.
+    auto position = getPosition (target);
+    auto moved = false;
 
-    for (const auto* assignment : { &assignments[(size_t) target], &velocityAssignments[(size_t) target] })
-        if (assignment->isActive())
-            if (const auto sourceValue = getSourceValue (assignment->source, assignment->phase))
-                offset = offset.value_or (0.0f) + assignment->offset (*sourceValue);
+    if (const auto& byVelocity = velocityAssignments[(size_t) target]; byVelocity.isActive())
+    {
+        if (const auto velocity = getSourceValue (modulation::velocitySource))
+        {
+            position += byVelocity.offset (*velocity);
+            moved = true;
+        }
+    }
 
-    if (! offset.has_value())
-        return std::nullopt;
+    if (const auto& assignment = assignments[(size_t) target]; assignment.isActive())
+    {
+        if (modulation::isEnvelope (assignment.source))
+        {
+            if (const auto envelope = getEnvelopeDisplay (assignment.source - numLfos))
+                return modulation::applyEnvelope (target, assignment, position, envelope->getState());
+        }
+        else if (const auto lfo = getSourceValue (assignment.source, assignment.phase))
+        {
+            position += assignment.offset (*lfo);
+            moved = true;
+        }
+    }
 
-    return juce::jlimit (0.0f, 1.0f, getPosition (target) + *offset);
+    return moved ? std::optional (juce::jlimit (0.0f, 1.0f, position)) : std::nullopt;
 }
 
 bool SynthProcessor::LiveWave::operator== (const LiveWave& other) const noexcept

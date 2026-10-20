@@ -116,6 +116,26 @@ namespace modulation
         }
     };
 
+    /** Where an envelope is in a note: its level, and once the note's key has been let go, the level it was at then
+        and how much of its release is still to come, from 1 to 0, which is 0 once the release is over.
+    */
+    struct EnvelopeState
+    {
+        float level = 0.0f;
+        bool releasing = false;
+        float releaseFrom = 0.0f;
+        float releaseLeft = 1.0f;
+    };
+
+    /** Where an envelope's release takes a control: the bottom of its travel, or for an oscillator's tune, in tune. */
+    float getRestPosition (int target);
+
+    /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope
+        moves it by its range times its level. Once the key is let go, the control falls steadily from where it was
+        then to its rest, which it reaches as the release ends, so an envelope on the volume fades the note out.
+    */
+    float applyEnvelope (int target, const Assignment&, float position, const EnvelopeState&);
+
     /** The furthest an LFO's wave can be shifted for a control: a degree short of a whole period. */
     inline constexpr float latestPhase = 359.0f / 360.0f;
 

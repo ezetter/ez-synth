@@ -898,6 +898,97 @@ namespace
                "a save from before there were envelopes still has its LFOs moving what they moved");
     }
 
+    /** An envelope's release brings what it moves steadily down from where it was when the key was let go to rest,
+        which is the bottom of its travel, or in tune for an oscillator's tune.
+    */
+    void testEnvelopeReleases()
+    {
+        std::cout << "Envelope releases" << std::endl;
+
+        // The release takes its whole time, even from 0.
+        {
+            const EnvelopeSettings settings { 0.0f, 0.1f, 0.0f, 1.0f };
+            EnvelopeRun run;
+            run.start();
+            run.advance (settings, 0.5);
+            run.release();
+            run.advance (settings, 0.5);
+            const auto halfway = run.isReleasing() && isNear (run.getReleaseLeft(), 0.5, 1.0e-5) && juce::exactlyEqual (run.getLevel(), 0.0f);
+            run.advance (settings, 0.6);
+            check (halfway && run.isIdle(), "an envelope's release takes its whole time, even when the envelope is already at 0");
+        }
+
+        // Where a control goes as the release runs.
+        {
+            using namespace modulation;
+            const Assignment byEnvelope { envelopeSource (0), 0.4f, false };
+            const EnvelopeState held { 0.5f, false, 0.0f, 1.0f }, halfReleased { 0.25f, true, 0.5f, 0.5f };
+            const auto cutoff = filterCutoffTarget (lowPass);
+            const auto tune = oscillatorTuneTarget (0);
+
+            check (isNear (applyEnvelope (cutoff, byEnvelope, 0.3f, held), 0.5, 1.0e-5)
+                     && isNear (applyEnvelope (cutoff, byEnvelope, 0.3f, halfReleased), 0.25, 1.0e-5),
+                   "halfway through the release, a control has come halfway down from where it was at key up to the bottom");
+            check (isNear (applyEnvelope (tune, byEnvelope, tuning::toPosition (7.0f), halfReleased),
+                           tuning::toPosition (0.5f * (7.0f + 0.4f * 0.5f * 24.0f)), 1.0e-5),
+                   "an oscillator's tune comes back into tune as the release runs, rather than an octave down");
+        }
+
+        // An envelope on the volume, which is set to 60% and raised to the top by the envelope, fades the note out
+        // over the release from wherever it was, rather than coming back to 60% and stopping there.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::volumeId, 0.6f);
+        setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 1.0f });
+        synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.4f, false });
+
+        // Held for half a second, then let go, with a second's release. The note gets as loud as the volume's square.
+        auto signal = play (synth, 69, 0.5, 1.8);
+        const auto held = loudness (signal, 0.3, 0.45);
+        // Halfway through, the volume has come down halfway, so it's a quarter as loud, give or take the volume's own
+        // smoothing.
+        check (isNear (loudness (signal, 0.97, 1.03) / held, 0.25, 0.12) && loudness (signal, 1.4, 1.45) < 0.03 * held
+                 && loudness (signal, 1.48, 1.8) < 0.01 * held,
+               "an envelope on the volume fades the note steadily to nothing over its release, and it stays silent");
+
+        auto largestJump = 0.0f;
+
+        for (auto i = (size_t) (1.2 * sampleRate); i < (size_t) (1.6 * sampleRate); ++i)
+            largestJump = std::max (largestJump, std::abs (signal[i] - signal[i - 1]));
+
+        check (largestJump < 0.01f, "...without stopping suddenly as the release ends");
+
+        // An envelope that's fallen to nothing by the time the key's let go leaves the volume where it's set, and the
+        // release still fades the note from there.
+        setEnvelope (synth, 0, { 0.0f, 0.1f, 0.0f, 1.0f });
+        signal = play (synth, 69, 0.5, 1.8);
+        const auto atSetting = loudness (signal, 0.3, 0.45);
+        check (atSetting > 0.01 && isNear (loudness (signal, 0.97, 1.03) / atSetting, 0.25, 0.12)
+                 && loudness (signal, 1.4, 1.45) < 0.03 * atSetting && loudness (signal, 1.48, 1.8) < 0.01 * atSetting,
+               "...even from an envelope that had fallen to nothing, fading from the volume as it's set");
+        synth.setAssignment (modulation::volumeTarget, {});
+
+        // An envelope on one oscillator's level fades that oscillator over its release. Another oscillator, with no
+        // envelope on it, fades as a note normally does, rather than playing on until the release ends.
+        setPreset (synth, 1, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::onId (1), 1.0f);
+        setParameter (synth, SynthProcessor::tuneId (1), 12.0f);
+        setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 1.0f });
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { modulation::envelopeSource (0), 0.5f, false });
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+
+        signal = play (synth, 69, 0.5, 1.8);
+        const auto firstHeld = amplitudeAt (slice (signal, 0.3, 0.45), 440.0);
+        const auto secondHeld = amplitudeAt (slice (signal, 0.3, 0.45), 880.0);
+        check (isNear (amplitudeAt (slice (signal, 0.95, 1.05), 440.0) / firstHeld, 0.5, 0.05)
+                 && amplitudeAt (slice (signal, 1.4, 1.48), 440.0) < 0.1 * firstHeld,
+               "an envelope on an oscillator's level fades it steadily to nothing over its release");
+        check (amplitudeAt (slice (signal, 0.8, 0.9), 880.0) < 0.01 * secondHeld,
+               "...while another oscillator, with no envelope, fades out as a note normally does");
+
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
+    }
+
     void testVelocity()
     {
         std::cout << "Velocity" << std::endl;
@@ -1948,6 +2039,7 @@ int main (int argc, char* argv[])
     testFilters();
     testLfos();
     testEnvelopes();
+    testEnvelopeReleases();
     testVelocity();
     testShowingMovedHarmonics();
     testTuning();

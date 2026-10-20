@@ -15,7 +15,8 @@ struct EnvelopeSettings
 
 /** One note's run through an envelope. When the note starts, the envelope rises from 0 to 1 over its attack, falls
     to its sustain level over its decay, and stays there while the key is held. When the key is let go, it falls from
-    wherever it is to 0 over its release. Each stage is a straight line, so it takes just as long as it's set to.
+    wherever it is to 0 over its release, which takes its whole time even if the envelope was already at 0, as what it
+    moves still has its own way to fall. Each stage is a straight line, so it takes just as long as it's set to.
 */
 class EnvelopeRun
 {
@@ -39,6 +40,18 @@ public:
     float getLevel() const noexcept   { return level; }
     Stage getStage() const noexcept   { return stage; }
     bool isIdle() const noexcept   { return stage == Stage::idle; }
+    bool isReleasing() const noexcept   { return stage == Stage::release; }
+
+    /** Whether the key has been let go, so the envelope is releasing or has finished its release. What it moves stays
+        at rest once the release is over, until the next note starts.
+    */
+    bool hasBeenReleased() const noexcept   { return released; }
+
+    /** The level the envelope was at when its key was let go. */
+    float getReleaseFrom() const noexcept   { return releaseFrom; }
+
+    /** How much of the release is still to come, from 1 as the key is let go to 0 as it ends. */
+    float getReleaseLeft() const noexcept   { return releaseLeft; }
 
     /** How far through its current stage the envelope is, from 0 to 1. */
     float getProgress (const EnvelopeSettings&) const noexcept;
@@ -47,4 +60,6 @@ private:
     Stage stage = Stage::idle;
     float level = 0.0f;
     float releaseFrom = 0.0f;
+    float releaseLeft = 1.0f;
+    bool released = false;
 };

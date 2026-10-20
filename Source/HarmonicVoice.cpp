@@ -98,9 +98,14 @@ void HarmonicVoice::stopNote (float, bool allowTailOff)
 
         // An envelope moving the loudness decides how the note fades, so the note waits for it to finish.
         if (usesLoudnessEnvelope())
+        {
             waitingForEnvelopes = true;
+            samplesSinceKeyUp = 0;
+        }
         else
+        {
             ownEnvelope.noteOff();
+        }
     }
     else
     {
@@ -121,6 +126,12 @@ bool HarmonicVoice::usesLoudnessEnvelope() const
             return true;
 
     return false;
+}
+
+bool HarmonicVoice::hasEnvelope (int target) const
+{
+    const auto& assignment = patch.assignments[(size_t) target];
+    return assignment.isActive() && modulation::isEnvelope (assignment.source);
 }
 
 bool HarmonicVoice::isLoudnessEnvelopeRunning() const
@@ -162,32 +173,37 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                                      : lfo.phase + startSample / lfo.periodSamples;
     }
 
-    // Where the source assigned to a control is for it. A control given a phase follows where its LFO was that much
-    // of a period ago.
-    const auto sourceValue = [this, &lfoPeriodsGone] (const Assignment& assignment)
+    // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
+    // either is. An LFO that's switched off moves nothing. A control given a phase follows where its LFO was that much
+    // of a period ago. Once the key is let go, an envelope brings the control steadily down to rest.
+    const auto modulate = [this, &lfoPeriodsGone] (int target, float position)
     {
-        if (isEnvelope (assignment.source))
-            return envelopeRuns[(size_t) (assignment.source - numLfos)].getLevel();
-
-        const auto& lfo = patch.lfos[(size_t) assignment.source];
-        return lfoValue (lfo.shape, lfoPeriodsGone[(size_t) assignment.source] - assignment.phase, lfo.once);
-    };
-
-    // Moves a control's position, from 0 to 1, by the LFO or envelope assigned to it, and by the note's velocity, if
-    // either is. An LFO that's switched off moves nothing.
-    const auto modulate = [this, &sourceValue] (int target, float position)
-    {
-        auto offset = 0.0f;
-
-        if (const auto& assignment = patch.assignments[(size_t) target];
-            assignment.isActive() && (isEnvelope (assignment.source) || patch.lfos[(size_t) assignment.source].on))
-            offset += assignment.offset (sourceValue (assignment));
-
         if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
-            offset += byVelocity.offset (noteVelocity);
+            position += byVelocity.offset (noteVelocity);
 
-        return juce::jlimit (0.0f, 1.0f, position + offset);
+        const auto& assignment = patch.assignments[(size_t) target];
+
+        if (assignment.isActive() && isEnvelope (assignment.source))
+        {
+            const auto& run = envelopeRuns[(size_t) (assignment.source - numLfos)];
+            return applyEnvelope (target, assignment, position,
+                                  { run.getLevel(), run.hasBeenReleased(), run.getReleaseFrom(), run.getReleaseLeft() });
+        }
+
+        if (assignment.isActive() && patch.lfos[(size_t) assignment.source].on)
+        {
+            const auto& lfo = patch.lfos[(size_t) assignment.source];
+            position += assignment.offset (lfoValue (lfo.shape, lfoPeriodsGone[(size_t) assignment.source] - assignment.phase, lfo.once));
+        }
+
+        return juce::jlimit (0.0f, 1.0f, position);
     };
+
+    // Once the key's let go, while the note plays on for the envelopes shaping how loud some of it is, an oscillator
+    // whose loudness no envelope shapes fades out as a note does, rather than playing on and stopping suddenly.
+    const auto keyUpFade = waitingForEnvelopes
+                               ? (float) juce::jmax (0.0, 1.0 - (double) samplesSinceKeyUp / (releaseSeconds * getSampleRate()))
+                               : 1.0f;
 
     Targets targets;
 
@@ -201,7 +217,8 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
             continue;
 
-        const auto oscillatorLevel = modulate (oscillatorLevelTarget (i), oscillator.level);
+        const auto shaped = hasEnvelope (volumeTarget) || hasEnvelope (oscillatorOnTarget (i)) || hasEnvelope (oscillatorLevelTarget (i));
+        const auto oscillatorLevel = modulate (oscillatorLevelTarget (i), oscillator.level) * (shaped ? 1.0f : keyUpFade);
         const auto numHarmonics = positionToHarmonics (modulate (oscillatorHarmonicsTarget (i),
                                                                  harmonicsToPosition (oscillator.numHarmonics)));
 
@@ -410,6 +427,9 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     }
 
     samplesSinceNoteOn += numSamples;
+
+    if (waitingForEnvelopes)
+        samplesSinceKeyUp += numSamples;
 
     for (size_t i = 0; i < envelopeRuns.size(); ++i)
         envelopeRuns[i].advance (patch.envelopes[i], numSamples / sampleRate);

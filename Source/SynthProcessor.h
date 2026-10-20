@@ -139,6 +139,14 @@ public:
         EnvelopeRun::Stage stage = EnvelopeRun::Stage::idle;
         float progress = 0.0f;   // how far through the stage, from 0 to 1
         float level = 0.0f;
+        float releaseFrom = 0.0f;   // the level it was at when the key was let go
+
+        /** Where the envelope is, for working out where it moves a control. */
+        modulation::EnvelopeState getState() const noexcept
+        {
+            const auto releasing = stage == EnvelopeRun::Stage::release;
+            return { level, releasing, releaseFrom, releasing ? 1.0f - progress : 1.0f };
+        }
     };
 
     /** Where the newest note that's still sounding is in an envelope, or nothing if no note is. */
@@ -322,6 +330,7 @@ private:
         std::atomic<int> stage { 0 };
         std::atomic<float> progress { 0.0f };
         std::atomic<float> level { 0.0f };
+        std::atomic<float> releaseFrom { 0.0f };
     };
 
     /** Shares where the newest note still sounding is in each envelope, and how hard it was played. */

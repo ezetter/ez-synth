@@ -78,6 +78,9 @@ private:
     bool isLoudnessEnvelopeRunning() const;
     bool usesLoudnessEnvelope() const;
 
+    /** Whether an envelope moves a control. */
+    bool hasEnvelope (int target) const;
+
     const Patch& patch;
 
     // The amplitudes being played, by oscillator and harmonic, and how far each oscillator is tuned up, all gliding
@@ -93,6 +96,7 @@ private:
 
     bool startingNote = false;
     bool waitingForEnvelopes = false;   // the key's been let go, but an envelope moving the loudness is still releasing
+    juce::int64 samplesSinceKeyUp = 0;   // while waiting for the envelopes
     juce::int64 samplesSinceNoteOn = 0;
     std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
     double frequency = 440.0;

@@ -1,5 +1,7 @@
 #include "Modulation.h"
 
+#include "Tuning.h"
+
 namespace modulation
 {
     namespace
@@ -137,6 +139,21 @@ namespace modulation
     float positionToPeriod (float position)
     {
         return shortestPeriod * std::pow (longestPeriod / shortestPeriod, position);
+    }
+
+    float getRestPosition (int target)
+    {
+        return describe (target).kind == Kind::oscillatorTune ? tuning::toPosition (0.0f) : 0.0f;
+    }
+
+    float applyEnvelope (int target, const Assignment& assignment, float position, const EnvelopeState& envelope)
+    {
+        if (! envelope.releasing)
+            return juce::jlimit (0.0f, 1.0f, position + assignment.offset (envelope.level));
+
+        const auto rest = getRestPosition (target);
+        const auto atKeyUp = juce::jlimit (0.0f, 1.0f, position + assignment.offset (envelope.releaseFrom));
+        return rest + (atKeyUp - rest) * juce::jlimit (0.0f, 1.0f, envelope.releaseLeft);
     }
 
     juce::String phaseToText (float phase)

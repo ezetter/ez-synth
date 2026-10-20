@@ -4,13 +4,17 @@ void EnvelopeRun::start() noexcept
 {
     stage = Stage::attack;
     level = 0.0f;
+    releaseLeft = 1.0f;
+    released = false;
 }
 
 void EnvelopeRun::release() noexcept
 {
-    if (stage != Stage::idle)
+    if (stage != Stage::idle && stage != Stage::release)
     {
         releaseFrom = level;
+        releaseLeft = 1.0f;
+        released = true;
         stage = Stage::release;
     }
 }
@@ -76,15 +80,16 @@ void EnvelopeRun::advance (const EnvelopeSettings& settings, double seconds) noe
             case Stage::release:
             {
                 // The release falls from wherever the key was let go to 0 in the time it's set to.
-                const auto rate = settings.release > 0.0f ? releaseFrom / settings.release : 0.0;
-                const auto timeLeft = level > 0.0f && rate > 0.0 ? level / rate : 0.0;
+                if (settings.release > 0.0f)
+                    releaseLeft -= (float) (seconds / settings.release);
 
-                if (seconds < timeLeft)
+                if (settings.release > 0.0f && releaseLeft > 0.0f)
                 {
-                    level -= (float) (rate * seconds);
+                    level = releaseFrom * releaseLeft;
                     return;
                 }
 
+                releaseLeft = 0.0f;
                 stop();
                 return;
             }
@@ -100,7 +105,7 @@ float EnvelopeRun::getProgress (const EnvelopeSettings& settings) const noexcept
         case Stage::attack:   return level;
         case Stage::decay:    return settings.sustain < 1.0f ? juce::jlimit (0.0f, 1.0f, (1.0f - level) / (1.0f - settings.sustain)) : 1.0f;
         case Stage::sustain:  return 0.5f;
-        case Stage::release:  return releaseFrom > 0.0f ? juce::jlimit (0.0f, 1.0f, 1.0f - level / releaseFrom) : 1.0f;
+        case Stage::release:  return juce::jlimit (0.0f, 1.0f, 1.0f - releaseLeft);
     }
 
     return 0.0f;
