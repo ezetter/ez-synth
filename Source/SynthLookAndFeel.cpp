@@ -151,13 +151,27 @@ void SynthLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int wi
 
     g.setColour (colours::outline.brighter (0.15f));
     g.fillRoundedRectangle (track, 2.0f);
+    // The track fills to the thumb from its start, or from the value it's to fill from, such as its middle.
+    auto fillFrom = track.getX();
+
+    if (auto* modulatableSlider = dynamic_cast<ModulatableSlider*> (&slider);
+        modulatableSlider != nullptr && modulatableSlider->fillOrigin.has_value())
+        fillFrom = (float) slider.getPositionOfValue (juce::jlimit (slider.getMinimum(), slider.getMaximum(), *modulatableSlider->fillOrigin));
+
     g.setColour (slider.findColour (juce::Slider::trackColourId));
-    g.fillRoundedRectangle (track.withRight (sliderPos), 2.0f);
+    g.fillRoundedRectangle (track.withLeft (std::min (fillFrom, sliderPos)).withRight (std::max (fillFrom, sliderPos)), 2.0f);
 
     // Where an LFO has moved the slider to: a faint stretch from where it's set, and a dot.
     if (const auto livePosition = modulatable::getLivePosition (slider))
     {
-        const auto liveX = bounds.getX() + *livePosition * bounds.getWidth();
+        // A slider showing only part of its travel shows a position beyond that part at its end.
+        auto proportion = *livePosition;
+
+        if (auto* modulatableSlider = dynamic_cast<ModulatableSlider*> (&slider);
+            modulatableSlider != nullptr && modulatableSlider->positionToProportion != nullptr)
+            proportion = juce::jlimit (0.0f, 1.0f, modulatableSlider->positionToProportion (proportion));
+
+        const auto liveX = bounds.getX() + proportion * bounds.getWidth();
         g.setColour (colours::modulation.withAlpha (0.45f));
         g.fillRoundedRectangle (track.withLeft (std::min (sliderPos, liveX)).withRight (std::max (sliderPos, liveX)), 2.0f);
         g.setColour (colours::modulation);

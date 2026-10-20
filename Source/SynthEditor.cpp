@@ -247,15 +247,16 @@ void SynthEditor::resized()
     auto side = sidePanel.reduced (16, 14);
     lfoPanel.setBounds (side);
     harmonicsCaption = side.removeFromTop (18);
-    side.removeFromTop (8);
+    side.removeFromTop (6);
     harmonicSelector.setBounds (side.removeFromTop (34));
-    side.removeFromTop (14);
+    side.removeFromTop (10);
 
-    // The oscillator's tune, at the foot of the panel.
+    // The oscillator's tune, at the foot of the panel. The spacing is tight, so the smallest window still has room
+    // for all nine harmonic sliders.
     tuneSlider.setBounds (side.removeFromBottom (TuneSlider::preferredHeight));
-    side.removeFromBottom (12);
+    side.removeFromBottom (8);
     tuneDivider = side.removeFromBottom (1);
-    side.removeFromBottom (10);
+    side.removeFromBottom (7);
     harmonicSliders.setBounds (side);
 }
 

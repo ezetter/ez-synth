@@ -19,15 +19,26 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   off.
 - **Set each oscillator's level** with the dial on its card, from 0 to 100% of its full amplitude.
   Double-click a dial to reset it to 100%.
-- **Tune an oscillator** up from the note with the **Tune** slider at the foot of the panel beside the grid,
-  anywhere from in tune to an octave above. Ticks mark each semitone, and the major and perfect intervals
-  are numbered 2 to 7: a major 2nd, 3rd, 6th and 7th, and a perfect 4th and 5th. Dragging the slider snaps
-  to the nearest semitone once you're within a tenth of one, so the intervals are easy to land on exactly.
-  Hold Option while dragging to tune between them, for a slight detune. On a whole semitone the slider
-  names the interval, such as *+7 st · perfect 5th*, and the interval's number lights up. Double-click it
-  to put it back in tune. An oscillator that's tuned shows how far on its card, and the harmonics'
-  frequencies beside the sliders are its own. Like the other controls, the tune can be moved by an LFO, for
-  vibrato, or an envelope, to sweep the pitch with each note.
+- **Tune an oscillator** with the **Tune** slider at the foot of the panel beside the grid, anywhere from
+  an octave below the note to an octave above. The middle of the slider, marked with a longer tick, is in
+  tune. Ticks mark each semitone, and the major and perfect intervals are numbered either way, 2 to 8: a
+  major 2nd, 3rd, 6th and 7th, a perfect 4th and 5th, and the octave. On a whole semitone the slider names
+  the interval, such as *+7 st · perfect 5th* or *−7 st · perfect 5th below*, and the interval's number
+  lights up. Double-click it to put it back in tune. An oscillator that's tuned shows how far on its card,
+  and the harmonics' frequencies beside the sliders are its own.
+- **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
+  zoom in, from the whole two octaves down to a semitone either side, and left to zoom out; double-click it
+  to zoom right out. The figure beside it says how far either side of the middle the scale reaches. Zoomed
+  in, the scale shows the part around the whole semitone nearest the tune, so from in tune it shows a
+  semitone either side of the note, and from a 5th up a semitone either side of the 5th, for detuning the
+  5th slightly. Faint ticks mark tenths, quarters or halves of a semitone, whichever fit. The scale stays
+  put while you drag the tune, and follows the tune if it's set from elsewhere, such as by a preset. Zooming
+  never changes the tune.
+- **Snapping.** Dragging the tune snaps to the nearest whole semitone once you're within a few pixels of
+  it, so the intervals are easy to land on exactly. As that's a few pixels however far you've zoomed in, a
+  slight detune is easiest zoomed in. Hold Option while dragging to tune without snapping.
+- **Move the tune** like the other controls, with an LFO, for vibrato either side of the note, or an
+  envelope, to sweep the pitch with each note.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
@@ -232,7 +243,7 @@ the app and open it again.
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
-together at their levels, that a tuned oscillator plays as far above the note as it's tuned, glides there
+together at their levels, that a tuned oscillator plays as far above or below the note as it's tuned, glides there
 without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, that LFOs
 move each kind of control by the range and in the direction they're set to, looping or once per note, and
 as far behind as their phase says, that
@@ -289,8 +300,8 @@ save pictures of the window showing several waves.
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
-| `Source/Tuning.*` | Semitones, the intervals they make, and snapping to them |
-| `Source/TuneSlider.*` | The tune slider, with its intervals marked |
+| `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
+| `Source/TuneSlider.*` | The tune slider, with its intervals marked, and the zoom slider above it |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |

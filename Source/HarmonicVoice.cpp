@@ -196,7 +196,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         const auto& oscillator = patch.oscillators[(size_t) i];
 
         // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on.
-        targets.tunes[(size_t) i] = tuning::octave * modulate (oscillatorTuneTarget (i), oscillator.tune / tuning::octave);
+        targets.tunes[(size_t) i] = tuning::fromPosition (modulate (oscillatorTuneTarget (i), tuning::toPosition (oscillator.tune)));
 
         if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
             continue;

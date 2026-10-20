@@ -13,7 +13,7 @@ struct Patch
         bool on = false;
         float level = 0.0f;
         int numHarmonics = 1;
-        float tune = 0.0f;   // how many semitones up from the note it plays
+        float tune = 0.0f;   // how many semitones away from the note it plays, below it if negative
 
         /** Each harmonic's amplitude, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phaseSines {}, phaseCosines {};

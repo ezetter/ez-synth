@@ -36,6 +36,16 @@ public:
     */
     std::function<double (double value)> snap;
 
+    /** If set, where along the slider's length, from 0 to 1, a position along its control's travel lies, for a
+        slider that shows only part of its control's travel, such as one zoomed in.
+    */
+    std::function<float (float position)> positionToProportion;
+
+    /** If set, the value its track is filled from to its thumb, such as the middle of a slider that goes both ways,
+        rather than from its start.
+    */
+    std::optional<double> fillOrigin;
+
     double snapValue (double attemptedValue, DragMode) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;

@@ -1073,21 +1073,41 @@ namespace
     {
         std::cout << "Tuning oscillators" << std::endl;
 
-        check (juce::exactlyEqual (tuning::snap (6.93), 7.0) && juce::exactlyEqual (tuning::snap (6.85), 6.85),
-               "dragging the tune snaps to a whole semitone within a tenth of one");
+        const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+
+        check (juce::exactlyEqual (tuning::snap (6.93, 0.1), 7.0) && juce::exactlyEqual (tuning::snap (6.85, 0.1), 6.85)
+                 && juce::exactlyEqual (tuning::snap (-0.03, 0.05), 0.0),
+               "dragging the tune snaps to a whole semitone within the distance given");
         check (tuning::getIntervalName (7) == "perfect 5th" && tuning::getIntervalName (4) == "major 3rd"
-                 && tuning::getIntervalName (0) == "unison" && tuning::getIntervalName (12) == "octave",
-               "whole semitones are named as the intervals they make");
-        check (tuning::toText (7.0f) == "+7 st" && tuning::toText (0.15f) == "+0.15 st" && tuning::toText (0.0f) == "0 st",
-               "tunings are written in semitones");
+                 && tuning::getIntervalName (0) == "unison" && tuning::getIntervalName (12) == "octave"
+                 && tuning::getIntervalName (-7) == "perfect 5th below" && tuning::getIntervalName (-12) == "octave below",
+               "whole semitones are named as the intervals they make, above the note or below it");
+        check (tuning::toText (7.0f) == "+7 st" && tuning::toText (0.15f) == "+0.15 st" && tuning::toText (0.0f) == "0 st"
+                 && tuning::toText (-7.0f) == minus + "7 st" && tuning::toText (-0.15f) == minus + "0.15 st",
+               "tunings are written in semitones, up or down");
         check (std::all_of (tuning::markedIntervals.begin(), tuning::markedIntervals.end(),
                             [] (const tuning::Interval& interval)
                             {
-                                return tuning::getIntervalName (interval.semitones).endsWith (juce::String (interval.number)
-                                                                                                + (interval.number == 2 ? "nd" : interval.number == 3 ? "rd" : "th"))
-                                    && ! tuning::getIntervalName (interval.semitones).startsWith ("minor");
+                                const auto name = tuning::getIntervalName (interval.semitones);
+                                const auto suffix = interval.number == 2 ? "nd" : interval.number == 3 ? "rd" : "th";
+                                return (interval.number == 8 ? name == "octave" : name.endsWith (juce::String (interval.number) + suffix))
+                                    && ! name.startsWith ("minor");
                             }),
-               "the slider marks the major and perfect intervals from the 2nd to the 7th");
+               "the slider marks the major and perfect intervals from the 2nd to the octave");
+
+        // Zooming in on the tune slider's scale.
+        const auto isWindow = [] (float tune, float reach, float low, float high)
+        {
+            const auto window = tuning::getWindow (tune, reach);
+            return juce::exactlyEqual (window.low, low) && juce::exactlyEqual (window.high, high);
+        };
+
+        check (isNear (tuning::zoomToReach (0.0f), 12.0, 1.0e-6) && isNear (tuning::zoomToReach (1.0f), 1.0, 1.0e-6)
+                 && isNear (tuning::zoomToReach (0.5f), std::sqrt (12.0), 1.0e-4),
+               "zooming in goes from an octave either side to a semitone either side, by the same factor each step");
+        check (isWindow (0.0f, 1.0f, -1.0f, 1.0f) && isWindow (0.3f, 1.0f, -1.0f, 1.0f) && isWindow (7.0f, 1.0f, 6.0f, 8.0f)
+                 && isWindow (11.8f, 2.0f, 8.0f, 12.0f) && isWindow (-12.0f, 3.0f, -12.0f, -6.0f) && isWindow (5.0f, 12.0f, -12.0f, 12.0f),
+               "zoomed in, the scale shows the part around the whole semitone nearest the tune, within the octave either way");
 
         SynthProcessor synth;
         check (juce::exactlyEqual (synth.getTune (0), 0.0f) && juce::exactlyEqual (synth.getTune (2), 0.0f),
@@ -1107,14 +1127,22 @@ namespace
         const auto inTune = playTuned (0.0f);
         const auto bothAt440 = amplitudeAt (inTune, 440.0);
 
-        for (const auto& [tune, name] : { std::pair (7.0f, "a 5th"), std::pair (12.0f, "an octave"), std::pair (0.5f, "a quarter tone") })
+        for (const auto& [tune, name] : { std::pair (7.0f, "up a 5th"), std::pair (12.0f, "up an octave"),
+                                          std::pair (0.5f, "up a quarter tone"), std::pair (-7.0f, "down a 5th"),
+                                          std::pair (-12.0f, "down an octave"), std::pair (-0.5f, "down a quarter tone") })
         {
             const auto signal = playTuned (tune);
             const auto tuned = 440.0 * std::pow (2.0, tune / 12.0);
             check (isNear (amplitudeAt (signal, tuned) / amplitudeAt (signal, 440.0), 1.0, 0.03)
                      && isNear (amplitudeAt (signal, 440.0) / bothAt440, 0.5, 0.03),
-                   "an oscillator tuned up " + juce::String (name) + " plays that far above the note, alongside one in tune");
+                   "an oscillator tuned " + juce::String (name) + " plays that far from the note, alongside one in tune");
         }
+
+        auto& tuneParameter = *synth.parameters.getParameter (SynthProcessor::tuneId (1));
+        check (isNear (tuneParameter.convertFrom0to1 (tuneParameter.getValueForText (minus + "7 st")), -7.0, 1.0e-5)
+                 && isNear (tuneParameter.convertFrom0to1 (tuneParameter.getValueForText ("-2.5")), -2.5, 1.0e-5)
+                 && tuneParameter.getText (tuneParameter.convertTo0to1 (-7.0f), 20) == minus + "7 st",
+               "a host can show the tune, and have it typed in, below the note as well as above");
 
         // The harmonics too high to play cleanly are worked out at the oscillator's own pitch: a C8 tuned up an
         // octave plays its 2nd harmonic, at 16.7 kHz, partly faded, and leaves out its 3rd, at 25.1 kHz.
@@ -1131,7 +1159,7 @@ namespace
         setParameter (synth, SynthProcessor::onId (0), 1.0f);
         setParameter (synth, SynthProcessor::tuneId (1), 0.0f);
         setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
-        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 7.0f / 12.0f, false });
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 7.0f / 24.0f, false });
         auto signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
         check (isNear (amplitudeAt (signal, 440.0 * std::pow (2.0, 7.0 / 12.0)) / amplitudeAt (signal, 440.0), 1.0, 0.03),
                "an envelope on an oscillator's tune moves its pitch");
@@ -1194,12 +1222,38 @@ namespace
             shown.editorBeingDeleted (editor.get());
         }
 
+        // Zooming in on the tune slider never changes the tune, even one beyond the part of the scale shown.
+        {
+            SynthProcessor zoomed;
+            TuneSlider tuneSlider;
+            tuneSlider.setBounds (0, 0, 340, TuneSlider::preferredHeight);
+            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (0)), 0);
+            const auto shows = [&tuneSlider] (float from, float to)
+            {
+                return juce::exactlyEqual (tuneSlider.getWindow().low, from) && juce::exactlyEqual (tuneSlider.getWindow().high, to);
+            };
+
+            check (shows (-12.0f, 12.0f), "the tune slider starts zoomed right out, an octave either side");
+
+            setParameter (zoomed, SynthProcessor::tuneId (0), 7.0f);
+            tuneSlider.setZoom (1.0f);
+            check (shows (6.0f, 8.0f) && isNear (zoomed.getTune (0), 7.0, 1.0e-6),
+                   "zoomed right in, it shows the semitone either side of the tune, and leaves the tune as it was");
+
+            setParameter (zoomed, SynthProcessor::tuneId (0), -0.2f);
+            check (shows (-1.0f, 1.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5),
+                   "a tune set from elsewhere, beyond the part shown, moves the scale to it without changing it");
+
+            tuneSlider.setZoom (0.0f);
+            check (shows (-12.0f, 12.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5), "zooming out shows the whole range again");
+        }
+
         // Saving and loading.
         juce::MemoryBlock state;
         synth.getStateInformation (state);
         SynthProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
-        check (juce::exactlyEqual (restored.getTune (1), 7.0f) && juce::exactlyEqual (restored.getTune (0), 0.0f),
+        check (isNear (restored.getTune (1), 7.0, 1.0e-5) && juce::exactlyEqual (restored.getTune (0), 0.0f),
                "each oscillator's tune is restored");
 
         // Loading a save from before oscillators could be tuned puts them in tune.
@@ -1807,6 +1861,45 @@ namespace
 
         saveModulationEditor (modulation::filterCutoffTarget (modulation::lowPass), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
+
+        // The tune slider on its own: zoomed right out, a 5th below the note, then zoomed in on a slight detune, with
+        // an LFO swinging it, and partway in on a 5th above.
+        {
+            SynthProcessor tuned;
+            SynthLookAndFeel lookAndFeel;
+            TuneSlider tuneSlider;
+            tuneSlider.setLookAndFeel (&lookAndFeel);
+            tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
+            tuneSlider.setOscillator (*tuned.parameters.getParameter (SynthProcessor::tuneId (0)), 0);
+
+            const auto saveTuneSlider = [&folder, &tuneSlider] (const juce::String& name)
+            {
+                juce::Image image (juce::Image::ARGB, tuneSlider.getWidth() * 2 + 64, tuneSlider.getHeight() * 2 + 48, true);
+                juce::Graphics g (image);
+                g.fillAll (colours::panel);
+                g.addTransform (juce::AffineTransform::scale (2.0f).translated (32.0f, 24.0f));
+                tuneSlider.paintEntireComponent (g, false);
+
+                const auto file = folder.getChildFile (name + ".png");
+                file.deleteFile();
+                juce::FileOutputStream stream (file);
+                juce::PNGImageFormat().writeImageToStream (image, stream);
+            };
+
+            setParameter (tuned, SynthProcessor::tuneId (0), -7.0f);
+            saveTuneSlider ("13-tune-zoomed-out");
+
+            setParameter (tuned, SynthProcessor::tuneId (0), 0.15f);
+            tuneSlider.setZoom (1.0f);
+            modulatable::setLivePosition (*tuneSlider.getChildComponent (0), tuning::toPosition (-0.32f));
+            saveTuneSlider ("13a-tune-zoomed-in");
+
+            setParameter (tuned, SynthProcessor::tuneId (0), 7.0f);
+            tuneSlider.setZoom (0.5f);
+            modulatable::setLivePosition (*tuneSlider.getChildComponent (0), std::nullopt);
+            saveTuneSlider ("13b-tune-zoomed-partway");
+            tuneSlider.setLookAndFeel (nullptr);
+        }
 
         // The standalone app's window, playing from a MIDI keyboard, as a note arrives.
         {

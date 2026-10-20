@@ -131,12 +131,14 @@ namespace
                     1, waveform::maxHarmonics, waveform::defaultHarmonics),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::tuneId (i), 1 }, name + " Tune",
-                    juce::NormalisableRange<float> (0.0f, tuning::octave), 0.0f,
+                    juce::NormalisableRange<float> (tuning::lowest, tuning::highest), 0.0f,
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float semitones, int) { return tuning::toText (semitones); })
                         .withValueFromStringFunction ([] (const juce::String& text)
                         {
-                            return text.retainCharacters ("0123456789.").getFloatValue();
+                            const auto size = text.retainCharacters ("0123456789.").getFloatValue();
+                            const auto negative = text.containsChar ('-') || text.contains (juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x92")));
+                            return negative ? -size : size;
                         }))));
         }
 
