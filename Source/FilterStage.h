@@ -2,13 +2,18 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
-/** What a filter lets through: the frequencies below its cutoff, a band around it, or those above it. */
-enum class FilterType { lowPass, midPass, highPass };
+/** What a filter lets through: the frequencies below its cutoff, a band around it, those above it, or all but a band
+    around it.
+*/
+enum class FilterType { lowPass, midPass, highPass, notch };
 
-/** A filter, 12 dB an octave, that's a low pass, a mid pass or a high pass, and that can be switched in and out,
-    changed from one type to another, swept, made resonant or wider without clicks: every change glides over a few
-    milliseconds. It's a state variable filter, which works out all three types at once, so changing type fades from
-    one to the other.
+inline constexpr std::array<FilterType, 4> allFilterTypes { FilterType::lowPass, FilterType::midPass, FilterType::highPass,
+                                                            FilterType::notch };
+
+/** A filter, 12 dB an octave, that's a low pass, a mid pass, a high pass or a notch, and that can be switched in and
+    out, changed from one type to another, swept, made resonant, wider or deeper without clicks: every change glides
+    over a few milliseconds. It's a state variable filter, which works out every type at once, so changing type fades
+    from one to the other.
 */
 class FilterStage
 {
@@ -31,6 +36,19 @@ public:
     static const juce::NormalisableRange<float>& widthRange();
     static float widthToQ (float octaves);
 
+    /** A notch's Q: its cutoff over its bandwidth, the distance in hertz between the points either side where a
+        notch at full depth lets through half the power. The higher the Q, the narrower the notch.
+    */
+    static const juce::NormalisableRange<float>& qRange();
+
+    /** The bandwidth in octaves of a Q, between the points where a notch at full depth lets through half the power,
+        as in Robert Bristow-Johnson's Audio EQ Cookbook: 2 / ln 2 × asinh (1 / 2Q).
+    */
+    static float qToOctaves (float q);
+
+    /** How far a notch cuts its cutoff, in decibels, from 0, not at all, to 60, all but silencing it. */
+    static const juce::NormalisableRange<float>& depthRange();
+
     /** Where a cutoff sits along its dial, from 0 to 1, and back. Cutoffs are spread evenly by octave, as pitch is
         heard.
     */
@@ -38,7 +56,7 @@ public:
     static float positionToCutoff (float position);
 
     /** A filter's settings. A low or high pass uses its resonance; a mid pass, whose cutoff is the middle of its
-        band, uses its width.
+        band, uses its width; and a notch, whose cutoff is the middle of what it cuts, uses its Q and depth.
     */
     struct Settings
     {
@@ -47,6 +65,8 @@ public:
         float cutoff = 1000.0f;
         float resonance = 0.0f;
         float width = 2.0f;
+        float q = 2.0f;
+        float depth = 60.0f;   // in decibels
     };
 
     /** Gets ready to play at a sample rate, starting with these settings rather than gliding to them. */
@@ -75,7 +95,7 @@ private:
     void updateCoefficients();
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> cutoff, q;
-    juce::SmoothedValue<float> mix, typeMix;
+    juce::SmoothedValue<float> mix, typeMix, notchCut;
     FilterType type = FilterType::lowPass, previousType = FilterType::lowPass;
     double sampleRate = 44100.0;
 

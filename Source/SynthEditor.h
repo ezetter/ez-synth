@@ -83,6 +83,9 @@ private:
     /** Only in the standalone app, which plays from MIDI devices itself. */
     std::unique_ptr<MidiPanel> midiPanel;
 
+    /** Names what's under the mouse, for controls that show a picture rather than a word, such as the filter types. */
+    juce::TooltipWindow tooltipWindow { this, 500 };
+
     juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, tuneDivider, volumePanel, volumeCaption, volumeValue;
 
     Shown shown;

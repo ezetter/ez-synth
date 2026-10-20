@@ -244,13 +244,20 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (int i = 0; i < numFilters; ++i)
     {
         const auto& filter = patch.filters[(size_t) i];
-        const auto& widths = FilterStage::widthRange();
+        // Moves a setting that travels along a range as its dial does.
+        const auto modulateIn = [&modulate] (const juce::NormalisableRange<float>& range, int target, float value)
+        {
+            return range.convertFrom0to1 (modulate (target, range.convertTo0to1 (value)));
+        };
+
         targets.filters[(size_t) i] = { modulate (filterOnTarget (i), filter.on ? 1.0f : 0.0f) >= 0.5f,
                                         filter.type,
                                         FilterStage::positionToCutoff (modulate (filterCutoffTarget (i),
                                                                                  FilterStage::cutoffToPosition (filter.cutoff))),
                                         modulate (filterResonanceTarget (i), filter.resonance),
-                                        widths.convertFrom0to1 (modulate (filterWidthTarget (i), widths.convertTo0to1 (filter.width))) };
+                                        modulateIn (FilterStage::widthRange(), filterWidthTarget (i), filter.width),
+                                        modulateIn (FilterStage::qRange(), filterQTarget (i), filter.q),
+                                        modulateIn (FilterStage::depthRange(), filterDepthTarget (i), filter.depth) };
     }
 
     targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch.volume));

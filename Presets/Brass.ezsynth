@@ -14,12 +14,16 @@
   <PARAM id="env3Release" value="1.99999988079071"/>
   <PARAM id="env3Sustain" value="1.0"/>
   <PARAM id="filter1Cutoff" value="499.9999694824219"/>
+  <PARAM id="filter1Depth" value="60.0"/>
   <PARAM id="filter1On" value="1.0"/>
+  <PARAM id="filter1Q" value="2.0"/>
   <PARAM id="filter1Resonance" value="0.25"/>
   <PARAM id="filter1Type" value="0.0"/>
   <PARAM id="filter1Width" value="1.999999761581421"/>
   <PARAM id="filter2Cutoff" value="250.0000152587891"/>
+  <PARAM id="filter2Depth" value="60.0"/>
   <PARAM id="filter2On" value="0.0"/>
+  <PARAM id="filter2Q" value="2.0"/>
   <PARAM id="filter2Resonance" value="0.0"/>
   <PARAM id="filter2Type" value="2.0"/>
   <PARAM id="filter2Width" value="1.999999761581421"/>

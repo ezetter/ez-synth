@@ -86,8 +86,10 @@ namespace
         const auto name = "Filter " + juce::String (filter + 1);
         juce::StringArray typeNames;
 
-        for (const auto type : { FilterType::lowPass, FilterType::midPass, FilterType::highPass })
+        for (const auto type : allFilterTypes)
             typeNames.add (FilterStage::getName (type));
+
+        const auto parseNumber = [] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); };
 
         // Cutoffs are spread evenly by octave, as pitch is heard.
         const juce::NormalisableRange<float> cutoffRange (FilterStage::lowestCutoff, FilterStage::highestCutoff,
@@ -115,10 +117,17 @@ namespace
                 juce::ParameterID { ids.width, 1 }, name + " Width", FilterStage::widthRange(), 2.0f,
                 juce::AudioParameterFloatAttributes()
                     .withStringFromValueFunction ([] (float octaves, int) { return juce::String (octaves, 1) + " oct"; })
-                    .withValueFromStringFunction ([] (const juce::String& text)
-                    {
-                        return text.retainCharacters ("0123456789.").getFloatValue();
-                    })));
+                    .withValueFromStringFunction (parseNumber)),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { ids.q, 1 }, name + " Q", FilterStage::qRange(), 2.0f,
+                juce::AudioParameterFloatAttributes()
+                    .withStringFromValueFunction ([] (float q, int) { return juce::String (q, q < 10.0f ? 1 : 0); })
+                    .withValueFromStringFunction (parseNumber)),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { ids.depth, 1 }, name + " Depth", FilterStage::depthRange(), 60.0f,
+                juce::AudioParameterFloatAttributes()
+                    .withStringFromValueFunction ([] (float decibels, int) { return juce::String (juce::roundToInt (decibels)) + " dB"; })
+                    .withValueFromStringFunction (parseNumber)));
     }
 
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters()
@@ -252,7 +261,8 @@ SynthProcessor::FilterIds SynthProcessor::filterIds (int filter)
 {
     using namespace modulation;
     return { getKey (filterOnTarget (filter)), "filter" + juce::String (filter + 1) + "Type", getKey (filterCutoffTarget (filter)),
-             getKey (filterResonanceTarget (filter)), getKey (filterWidthTarget (filter)) };
+             getKey (filterResonanceTarget (filter)), getKey (filterWidthTarget (filter)), getKey (filterQTarget (filter)),
+             getKey (filterDepthTarget (filter)) };
 }
 juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juce::String (lfo + 1) + "On"; }
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
@@ -281,7 +291,9 @@ SynthProcessor::SynthProcessor()
                                               parameters.getRawParameterValue (ids.type),
                                               parameters.getRawParameterValue (ids.cutoff),
                                               parameters.getRawParameterValue (ids.resonance),
-                                              parameters.getRawParameterValue (ids.width) };
+                                              parameters.getRawParameterValue (ids.width),
+                                              parameters.getRawParameterValue (ids.q),
+                                              parameters.getRawParameterValue (ids.depth) };
     }
 
     for (int i = 0; i < numLfos; ++i)
@@ -480,9 +492,9 @@ void SynthProcessor::updatePatch()
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
         patch.filters[i] = { filterParameters[i].on->load() >= 0.5f,
-                             (FilterType) juce::jlimit (0, 2, juce::roundToInt (filterParameters[i].type->load())),
+                             (FilterType) juce::jlimit (0, (int) allFilterTypes.size() - 1, juce::roundToInt (filterParameters[i].type->load())),
                              filterParameters[i].cutoff->load(), filterParameters[i].resonance->load(),
-                             filterParameters[i].width->load() };
+                             filterParameters[i].width->load(), filterParameters[i].q->load(), filterParameters[i].depth->load() };
 
     patch.volume = volume->load();
 

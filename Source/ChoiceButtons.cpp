@@ -53,12 +53,24 @@ void ChoiceButtons::paint (juce::Graphics& g)
         }
 
         g.setColour (i == chosen ? colours::background : colours::dimText);
+
+        if (drawPicture != nullptr)
+        {
+            drawPicture (g, area, i);
+            continue;
+        }
+
         g.setFont (juce::FontOptions (juce::jmin (13.0f, (float) getHeight() * 0.62f), juce::Font::bold));
         g.drawText (labels[i], area, juce::Justification::centred);
     }
 
     g.setColour (colours::outline);
     g.drawRoundedRectangle (bounds, corner, 1.0f);
+}
+
+juce::String ChoiceButtons::getTooltip()
+{
+    return drawPicture != nullptr && juce::isPositiveAndBelow (hovered, labels.size()) ? labels[hovered] : juce::String();
 }
 
 void ChoiceButtons::mouseDown (const juce::MouseEvent& e)

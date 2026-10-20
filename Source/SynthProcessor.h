@@ -38,11 +38,11 @@ public:
     static juce::String tuneId (int oscillator);
 
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
-        low or high pass, and its width in octaves, as a mid pass.
+        low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
     struct FilterIds
     {
-        juce::String on, type, cutoff, resonance, width;
+        juce::String on, type, cutoff, resonance, width, q, depth;
     };
 
     /** The IDs of a filter's parameters, numbered from 0. The first starts as a low pass, the second a high pass. */
@@ -309,6 +309,8 @@ private:
         std::atomic<float>* cutoff = nullptr;
         std::atomic<float>* resonance = nullptr;
         std::atomic<float>* width = nullptr;
+        std::atomic<float>* q = nullptr;
+        std::atomic<float>* depth = nullptr;
     };
 
     struct LfoParameters

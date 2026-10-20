@@ -5,13 +5,21 @@
 #include <functional>
 
 /** A row of joined buttons of which one is chosen, such as Loop and Once. */
-class ChoiceButtons final : public juce::Component
+class ChoiceButtons final : public juce::Component,
+                            public juce::TooltipClient
 {
 public:
     explicit ChoiceButtons (juce::StringArray labels);
 
     /** Called when the user chooses a button, with its number from 0. */
     std::function<void (int)> onChoose;
+
+    /** If set, draws a picture on each button, in the colour set, in place of its label, which shows as the button's
+        tooltip instead.
+    */
+    std::function<void (juce::Graphics&, juce::Rectangle<float> area, int index)> drawPicture;
+
+    juce::String getTooltip() override;
 
     /** Shows a button as chosen, without calling onChoose. */
     void setChosen (int index);

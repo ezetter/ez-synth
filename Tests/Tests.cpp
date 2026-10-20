@@ -10,6 +10,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+#include <complex>
 #include <iostream>
 
 namespace
@@ -69,6 +70,16 @@ namespace
     {
         const auto w = std::tan (pi * frequency / sampleRate) / std::tan (pi * centre / sampleRate);
         return (w / q) / std::sqrt (std::pow (1.0 - w * w, 2.0) + std::pow (w / q, 2.0));
+    }
+
+    /** How much a notch should pass at a frequency: the sound, less the share of the mid pass's band that its depth
+        cuts, from 0 to 1. At full depth that's the standard notch, (s² + 1) / (s² + s / Q + 1).
+    */
+    double expectedNotchGain (double frequency, double centre, double q, double cut)
+    {
+        const auto w = std::tan (pi * frequency / sampleRate) / std::tan (pi * centre / sampleRate);
+        return std::abs (std::complex<double> (1.0 - w * w, (1.0 - cut) * w / q))
+             / std::abs (std::complex<double> (1.0 - w * w, w / q));
     }
 
     void setFilterType (SynthProcessor& synth, int filter, FilterType type)
@@ -501,6 +512,37 @@ namespace
                  && gainAt (narrow, 440.0) < 0.5 * gainAt (midPassed, 440.0),
                "a narrower mid pass lets through less either side, and its middle just as much");
 
+        // A notch takes away a band around its cutoff. At full depth it takes away all but a thousandth of the cutoff
+        // itself, and half the power at the edges of its bandwidth, which are its cutoff over its Q apart. Here it's at
+        // A4's 2nd harmonic with a Q of 1.2, so its edges are 733 Hz apart, at 587 Hz and at 1320 Hz, the 3rd harmonic.
+        setFilter (synth, SynthProcessor::filterIds (1), false, 880.0f);
+        setFilterType (synth, 0, FilterType::notch);
+        setParameter (synth, SynthProcessor::filterIds (0).q, 1.2f);
+        setParameter (synth, SynthProcessor::filterIds (0).depth, 60.0f);
+        setFilter (synth, SynthProcessor::filterIds (0), true, 880.0f);
+        const auto notched = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (gainAt (notched, 880.0) < 0.003 && isNear (gainAt (notched, 1320.0), halfPower, 0.03)
+                 && isNear (gainAt (notched, 440.0), expectedNotchGain (440.0, 880.0, 1.2, 1.0), 0.03)
+                 && isNear (gainAt (notched, 3960.0), 1.0, 0.03),
+               "a notch at full depth takes away its cutoff, and half the power at the edges of its bandwidth, its cutoff over its Q apart");
+
+        // Its depth is how far it cuts its cutoff, in decibels: 6 dB halves it, and none leaves it as it is.
+        setParameter (synth, SynthProcessor::filterIds (0).depth, 6.0f);
+        const auto shallow = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        const auto halfCut = 1.0 - std::pow (10.0, -6.0 / 20.0);
+        check (isNear (gainAt (shallow, 880.0), 0.501, 0.03) && isNear (gainAt (shallow, 1320.0), expectedNotchGain (1320.0, 880.0, 1.2, halfCut), 0.03),
+               "a notch 6 dB deep halves its cutoff, and cuts less either side");
+
+        setParameter (synth, SynthProcessor::filterIds (0).depth, 0.0f);
+        const auto noDepth = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (noDepth, 880.0), 1.0, 0.01) && isNear (gainAt (noDepth, 1320.0), 1.0, 0.01),
+               "a notch with no depth leaves the sound as it is");
+
+        check (isNear (FilterStage::qToOctaves (juce::MathConstants<float>::sqrt2), 1.0, 1.0e-4)
+                 && isNear (FilterStage::qToOctaves (FilterStage::widthToQ (2.5f)), 2.5, 1.0e-4),
+               "a Q of 1.41 is a bandwidth of an octave, as the Audio EQ Cookbook has it, and agrees with the mid pass's widths");
+        setFilter (synth, SynthProcessor::filterIds (0), false, 880.0f);
+
         // The first filter can be a high pass and the second a low pass, swapping them round.
         setFilterType (synth, 0, FilterType::highPass);
         setFilterType (synth, 1, FilterType::lowPass);
@@ -601,6 +643,9 @@ namespace
             setFilterType (shown, 0, FilterType::midPass);
             check (isShown ("Filter 1 width") && ! isShown ("Filter 1 resonance") && isShown ("Filter 2 resonance"),
                    "a mid pass shows a width dial instead");
+            setFilterType (shown, 0, FilterType::notch);
+            check (isShown ("Filter 1 Q") && isShown ("Filter 1 depth") && ! isShown ("Filter 1 width") && ! isShown ("Filter 1 resonance"),
+                   "a notch shows Q and depth dials beside its cutoff");
         }
 
         // At a low sample rate a 20 kHz cutoff is beyond the Nyquist frequency, where the filter can't work.
@@ -2162,7 +2207,9 @@ namespace
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
         synth.editedSource = 2;
-        // With the second filter a mid pass.
+        // With the first filter a notch, and the second a mid pass.
+        setFilterType (synth, 0, FilterType::notch);
+        setParameter (synth, SynthProcessor::filterIds (0).depth, 24.0f);
         setFilterType (synth, 1, FilterType::midPass);
         setFilter (synth, SynthProcessor::filterIds (1), true, 1200.0f);
         editor->setSize (1240, 900);

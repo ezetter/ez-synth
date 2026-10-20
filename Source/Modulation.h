@@ -38,10 +38,12 @@ namespace modulation
     constexpr int filterResonanceTarget (int filter)                { return 41 + filter; }
     constexpr int oscillatorTuneTarget (int oscillator)             { return 43 + oscillator; }
     constexpr int filterWidthTarget (int filter)                    { return 46 + filter; }
-    inline constexpr int numTargets = 48;
+    constexpr int filterQTarget (int filter)                        { return 48 + filter; }
+    constexpr int filterDepthTarget (int filter)                    { return 50 + filter; }
+    inline constexpr int numTargets = 52;
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth };
+                      oscillatorTune, filterWidth, filterQ, filterDepth };
 
     struct TargetInfo
     {
