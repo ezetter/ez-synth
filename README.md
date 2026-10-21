@@ -230,13 +230,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 #### Factory presets
 
-EZ Synth comes with ten presets, built into the app and the plugins. Each one shows off something different:
+EZ Synth comes with eleven presets, built into the app and the plugins. Each one shows off something different:
 
 | Preset | What it shows |
 | --- | --- |
 | Bell | A wave made from its harmonics, an envelope on the 9th harmonic that lights it up for a moment as each note strikes, and an envelope on the volume for a long ring |
 | Brass | An envelope opening the low pass filter with each note, and velocity on the cutoff, so softer notes are darker |
 | Electric Keys | Velocity alongside envelopes: softer notes are quieter, darker and lose the triangle's bark, while the volume dies away and the 4th harmonic pings |
+| Grand Piano | As near a grand piano as EZ Synth gets: two strings 2 cents apart that beat gently, a bright strike of upper harmonics that fades within a second, a low pass that mellows the note as it rings, a ring drawn on an LFO run once, falling quickly and then slowly, and velocity on the strings' levels and the cutoff, so soft notes are quieter and darker but ring as long |
 | Harmonic Sweep | One LFO moving two controls: the number of harmonics of a sawtooth, drawn falling, and of a square, inverted, so one brightens as the other darkens |
 | Organ | A sine with raised harmonics, like drawbars, a tremolo, a click on each key, and velocity taken off the volume |
 | Pluck | An oscillator at no level that an envelope plucks, with a low pass filter that snaps shut after it |
@@ -254,6 +255,21 @@ from the repository's folder, and build again:
 
 ```bash
 ./build/EZSynthMakeFactoryPresets
+```
+
+To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
+presets in it, make an empty file for the new one first, so the tool can be built to fill it in:
+
+```bash
+touch "Presets/New Preset.ezsynth"
+```
+
+To hear a preset without opening the app, `Tools/RenderPreset.cpp` plays it through a short phrase, an
+arpeggio, a held chord, a note played softly and then hard, and a high note and a low one, and saves it as a
+WAV file. Name a factory preset, or a preset's file:
+
+```bash
+./build/EZSynthRenderPreset "Grand Piano" piano.wav
 ```
 
 Everything is also saved with your DAW project, including which preset the sound came from and whether it's
@@ -318,7 +334,8 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that the arrows step through the factory presets, that random LFOs stay smooth, joined up and natural,
+clipping, that the arrows step through the factory presets, that the Grand Piano strikes, rings, mellows, damps and
+answers velocity as a piano does, that random LFOs stay smooth, joined up and natural,
 or spread their steps evenly, and play a new wave every cycle or key, that a click or a drag on the grid sets steps, and
 that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
@@ -394,6 +411,7 @@ save pictures of the window showing several waves.
 | `Source/PresetBar.*` | Loading, stepping through and saving presets |
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
+| `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
 | `Source/FilterPanel.*` | The filters' switches, types, cutoff dials, and resonance, width, or Q and depth dials |
 | `Source/FilterStage.*` | A low, mid or high pass or notch filter that switches, changes type and sweeps without clicks |

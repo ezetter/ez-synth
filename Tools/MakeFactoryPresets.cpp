@@ -170,6 +170,65 @@ namespace
             assign (synth, harmonicTarget (0, 4), env2, 0.5f);
         } },
 
+        // A grand piano. A hammer strikes the strings, bright at first, mellowing as they ring, then dying away in two
+        // stages, a quick fall and then a long, slow one, as a piano's strings do. Two strings a hair apart beat gently
+        // against each other, and letting go of the key damps them. Softer notes are quieter, and darker too.
+        { "Grand Piano", [] (SynthProcessor& synth)
+        {
+            // The first string: the harmonics of a piano's middle register, struck near an eighth of the string's
+            // length, which leaves its 8th harmonic weak.
+            synth.setShape (0, {});
+            setParameter (synth, SynthProcessor::harmonicsId (0), 9.0f);
+            setHarmonics (synth, 0, { 1.0f, 0.62f, 0.36f, 0.24f, 0.14f, 0.09f, 0.05f, 0.012f, 0.03f });
+            setParameter (synth, SynthProcessor::levelId (0), 1.0f);
+
+            // The second string, 2 cents sharp, quieter, beating slowly against the first.
+            synth.setShape (2, {});
+            setParameter (synth, SynthProcessor::onId (2), 1.0f);
+            setParameter (synth, SynthProcessor::harmonicsId (2), 6.0f);
+            setHarmonics (synth, 2, { 1.0f, 0.55f, 0.3f, 0.18f, 0.1f, 0.06f });
+            setParameter (synth, SynthProcessor::levelId (2), 0.25f);
+            setParameter (synth, SynthProcessor::tuneId (2), 0.02f);
+
+            // The strike: bright upper harmonics, a little sharp, as a piano's high harmonics are, gone within a
+            // second.
+            synth.setShape (1, {});
+            setParameter (synth, SynthProcessor::onId (1), 1.0f);
+            setParameter (synth, SynthProcessor::harmonicsId (1), 9.0f);
+            setHarmonics (synth, 1, { 0.0f, 0.35f, 0.45f, 0.5f, 0.45f, 0.4f, 0.3f, 0.08f, 0.25f });
+            setParameter (synth, SynthProcessor::levelId (1), 0.0f);
+            setParameter (synth, SynthProcessor::tuneId (1), 0.03f);
+            setEnvelope (synth, 0, { 0.002f, 0.9f, 0.0f, 0.25f });
+            assign (synth, oscillatorLevelTarget (1), env1, 0.7f);
+
+            // Softer notes strike more quietly, and less brightly. Velocity turns down the strings' levels, rather
+            // than the volume, so a soft note rings as long as a hard one, just more quietly.
+            assignVelocity (synth, volumeTarget, 0.15f);
+            assignVelocity (synth, oscillatorLevelTarget (0), 0.85f);
+            assignVelocity (synth, oscillatorLevelTarget (2), 0.25f);
+            assignVelocity (synth, oscillatorLevelTarget (1), 0.6f);
+
+            // The felt and the wood: a low pass that opens with the strike and closes as the note rings, more for
+            // harder notes, so the upper harmonics die away first.
+            setFilter (synth, SynthProcessor::filterIds (0), 900.0f, 0.0f);
+            setEnvelope (synth, 1, { 0.0f, 2.0f, 0.15f, 0.3f });
+            assign (synth, filterCutoffTarget (0), env2, 0.42f);
+            assignVelocity (synth, filterCutoffTarget (0), 0.45f);
+
+            // The ring, drawn on an LFO that runs once over ten seconds: a quick fall over the first second or so,
+            // then a long, slow one of about 2.5 dB a second, as a piano's strings fall once their quick first sound
+            // has gone, and to nothing at the end. The volume's loudness goes as its square, so the LFO draws the
+            // square root of the loudness. It peaks low enough to leave room for big chords.
+            setParameter (synth, SynthProcessor::volumeId, 0.32f);
+            setLfo (synth, lfo1, 10.0f, true, draw ([] (double t)
+            {
+                const auto ring = [] (double seconds) { return 0.55 * std::exp (-seconds / 0.6) + 0.45 * std::exp (-seconds / 3.5); };
+                const auto loudness = std::max (0.0, ring (10.0 * t) - ring (10.0) * t);
+                return 2.0 * std::sqrt (loudness) - 1.0;
+            }));
+            assign (synth, volumeTarget, lfo1, 0.64f);
+        } },
+
         // One LFO moving two controls at once: it plays a sawtooth, drawn falling, with more harmonics as it plays a
         // square with fewer, and back, over a steady sine.
         { "Harmonic Sweep", [] (SynthProcessor& synth)

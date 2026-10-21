@@ -78,6 +78,7 @@ juce_add_binary_data(EZSynthFactoryPresets
         "Presets/Bell.ezsynth"
         "Presets/Brass.ezsynth"
         "Presets/Electric Keys.ezsynth"
+        "Presets/Grand Piano.ezsynth"
         "Presets/Harmonic Sweep.ezsynth"
         "Presets/Organ.ezsynth"
         "Presets/Pluck.ezsynth"
@@ -130,6 +131,11 @@ target_link_libraries(EZSynthTests PRIVATE EZSynth)
 add_executable(EZSynthMakeFactoryPresets Tools/MakeFactoryPresets.cpp)
 target_include_directories(EZSynthMakeFactoryPresets PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
 target_link_libraries(EZSynthMakeFactoryPresets PRIVATE EZSynth)
+
+# Plays a preset through a short phrase and saves it as a WAV file, to hear it outside the app.
+add_executable(EZSynthRenderPreset Tools/RenderPreset.cpp)
+target_include_directories(EZSynthRenderPreset PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
+target_link_libraries(EZSynthRenderPreset PRIVATE EZSynth)
 
 # Draws the icon in Resources/Icon.png. Run it after changing the drawing, then build again.
 add_executable(EZSynthMakeIcon Tools/MakeIcon.cpp)
