@@ -2578,15 +2578,16 @@ namespace
         check (peakOf (chord) < 1.0f, "...and a five-note chord at full velocity peaks at " + juce::String (decibels (peakOf (chord)), 1) + " dB, without clipping");
     }
 
-    /** An LFO as fast as 50 Hz swings a control as fully as a slow one does: the swing of the level, in 1/400ths of a
-        second, from peak to trough, is the same as at 1 Hz.
+    /** An LFO as fast as 100 Hz swings a control as fully as a slow one does, or nearly so: the swing of the level,
+        in 1/400ths of a second, from peak to trough, against that at 1 Hz.
     */
     void testFastLfos()
     {
         std::cout << "Fast LFOs" << std::endl;
 
         for (const auto& [name, target] : { std::pair ("the volume", modulation::volumeTarget), std::pair ("a level", modulation::oscillatorLevelTarget (0)),
-                                            std::pair ("a harmonic", modulation::harmonicTarget (0, 1)) })
+                                            std::pair ("a harmonic", modulation::harmonicTarget (0, 1)),
+                                            std::pair ("a filter's cutoff", modulation::filterCutoffTarget (0)) })
         {
             std::array<double, 2> swings {};
 
@@ -2596,8 +2597,12 @@ namespace
                 setPreset (synth, 0, waveform::Preset::sine);
                 setParameter (synth, SynthProcessor::volumeId, 0.5f);
                 setParameter (synth, SynthProcessor::levelId (0), 0.5f);
-                setLfo (synth, 0, i == 0 ? 1.0f : 1.0f / 50.0f, false, waveform::Preset::square);
-                synth.setAssignment (target, { 0, 0.8f, false });
+                // A cutoff swung down too far takes the filter itself a while to quieten, so it's swung a few
+                // octaves either side of 1 kHz.
+                const auto onCutoff = target == modulation::filterCutoffTarget (0);
+                setFilter (synth, SynthProcessor::filterIds (0), onCutoff, 1000.0f);
+                setLfo (synth, 0, i == 0 ? 1.0f : 1.0f / 100.0f, false, waveform::Preset::square);
+                synth.setAssignment (target, { 0, onCutoff ? 0.4f : 0.8f, false });
                 const auto signal = play (synth, 81, 1.2, 1.3);
                 auto lowest = 1.0e9, highest = 0.0;
 
@@ -2611,13 +2616,15 @@ namespace
                 swings[i] = juce::Decibels::gainToDecibels (highest / lowest);
             }
 
-            check (std::abs (swings[1] - swings[0]) < 1.0,
-                   "an LFO at 50 Hz swings " + juce::String (name) + " " + juce::String (swings[1], 1) + " dB, as fully as one at 1 Hz");
+            // A filter takes a moment to respond to a new cutoff, so it falls a little short at 100 Hz.
+            const auto allowed = target == modulation::filterCutoffTarget (0) ? 3.5 : 1.0;
+            check (std::abs (swings[1] - swings[0]) < allowed,
+                   "an LFO at 100 Hz swings " + juce::String (name) + " " + juce::String (swings[1], 1) + " dB, against " + juce::String (swings[0], 1) + " dB at 1 Hz");
         }
 
         SynthProcessor synth;
         auto& rate = *synth.parameters.getParameter (SynthProcessor::lfoPeriodId (0));
-        check (rate.getText (1.0f, 20) == "50.0 Hz" && rate.getText (0.0f, 20) == "0.10 Hz", "an LFO's rate goes from 0.1 Hz up to 50 Hz");
+        check (rate.getText (1.0f, 20) == "100.0 Hz" && rate.getText (0.0f, 20) == "0.10 Hz", "an LFO's rate goes from 0.1 Hz up to 100 Hz");
     }
 
     void testFactoryPresets()

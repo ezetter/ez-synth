@@ -114,12 +114,12 @@ void FilterStage::prepare (double newSampleRate, const Settings& settings)
 {
     sampleRate = newSampleRate;
 
-    // Quick enough to follow an LFO at 50 Hz, slow enough not to click.
-    cutoff.reset (sampleRate, 0.003);
-    q.reset (sampleRate, 0.003);
+    // Quick enough to follow an LFO at 100 Hz, slow enough not to click.
+    cutoff.reset (sampleRate, 0.0015);
+    q.reset (sampleRate, 0.0015);
     mix.reset (sampleRate, 0.02);
     typeMix.reset (sampleRate, 0.02);
-    notchCut.reset (sampleRate, 0.003);
+    notchCut.reset (sampleRate, 0.0015);
 
     jumpTo (settings);
 }
