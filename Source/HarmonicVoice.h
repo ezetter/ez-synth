@@ -69,6 +69,9 @@ private:
     {
         Harmonics cosines {}, sines {};
         std::array<float, modulation::numOscillators> tunes {};
+
+        /** How far each harmonic is tuned from its whole number, in harmonics. */
+        Harmonics harmonicTunes {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
     };
@@ -90,6 +93,12 @@ private:
     // towards the targets.
     Harmonics cosines {}, sines {};
     std::array<double, modulation::numOscillators> tunes {};
+
+    // How far each harmonic is tuned from its whole number, gliding towards the targets, and how far its phase has
+    // drifted from its whole number's because of it, from 0 to 1. A harmonic in tune hasn't drifted, so it keeps
+    // its place in the wave.
+    Harmonics harmonicTunes {};
+    std::array<std::array<double, waveform::maxHarmonics + 1>, modulation::numOscillators> harmonicDrifts {};
 
     std::array<FilterStage, modulation::numFilters> filters;
     juce::SmoothedValue<float> gain;

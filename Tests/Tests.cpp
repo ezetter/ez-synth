@@ -1715,6 +1715,140 @@ namespace
         letGo (synth, 69);
     }
 
+    void testTuningHarmonics()
+    {
+        std::cout << "Tuning harmonics" << std::endl;
+
+        // A sawtooth's first 3 harmonics, at A4: 440, 880 and 1320 Hz.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        const auto inTune = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        const auto second = amplitudeAt (inTune, 880.0), third = amplitudeAt (inTune, 1320.0);
+
+        check (juce::exactlyEqual (synth.getHarmonicTune (0, 2), 0.0f) && juce::exactlyEqual (synth.getHarmonicTune (2, 9), 0.0f),
+               "harmonics start in tune");
+
+        // The 2nd harmonic a quarter of a harmonic sharp, at 2.25 times the fundamental, and the 3rd as flat as it
+        // goes, halfway down to the 2nd, at 2.5 times.
+        synth.setHarmonicTune (0, 2, 0.25f);
+        synth.setHarmonicTune (0, 3, -0.5f);
+        const auto tuned = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (amplitudeAt (tuned, 990.0), second, 0.03) && amplitudeAt (tuned, 880.0) < 0.05 * second,
+               "a harmonic tuned a quarter sharp plays at 2.25 times the fundamental, and not at its whole number");
+        check (isNear (amplitudeAt (tuned, 1100.0), third, 0.03) && amplitudeAt (tuned, 1320.0) < 0.05 * third,
+               "...and one tuned as flat as it goes, halfway to the harmonic below");
+        check (isNear (amplitudeAt (tuned, 440.0), amplitudeAt (inTune, 440.0), 0.01), "...leaving the fundamental as it was");
+
+        synth.setHarmonicTune (0, 2, 0.8f);
+        synth.setHarmonicTune (0, 1, 0.3f);
+        check (juce::exactlyEqual (synth.getHarmonicTune (0, 2), 0.5f) && juce::exactlyEqual (synth.getHarmonicTune (0, 1), 0.0f),
+               "a harmonic can be tuned no further than halfway to the next, and the fundamental not at all");
+        synth.setHarmonicTune (0, 2, 0.25f);
+
+        // The wave as shown: a tuned harmonic's sine wave doesn't fit the cycle a whole number of times.
+        const waveform::Partial partial { 2, 1.0f, 0.0f, 0.25f };
+        check (isNear (partial.valueAt (1.0), std::sin (juce::MathConstants<double>::twoPi * 2.25), 1.0e-5),
+               "the grid draws a tuned harmonic at its own frequency");
+
+        // Choosing a new wave keeps the harmonics tuned.
+        setPreset (synth, 0, waveform::Preset::square);
+        check (juce::exactlyEqual (synth.getHarmonicTune (0, 3), -0.5f), "choosing another wave keeps the harmonics tuned");
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+
+        // Retuning a harmonic while a note plays glides there without a click.
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> output;
+
+        for (int block = 0; block < 40; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+            if (block == 20)
+                synth.setHarmonicTune (0, 2, -0.3f);
+
+            synth.processBlock (buffer, midi);
+            output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        auto before = 0.0f, after = 0.0f;
+
+        for (size_t i = 1000; i < output.size(); ++i)
+            (i < 20 * blockSize ? before : after) = std::max (i < 20 * blockSize ? before : after, std::abs (output[i] - output[i - 1]));
+
+        check (after < 1.1f * before, "retuning a harmonic during a note doesn't click");
+        letGo (synth, 69);
+
+        // An envelope can move a harmonic's tune: here the 2nd harmonic slides from 1.7 to 2.25 times the
+        // fundamental, and holds there.
+        synth.setHarmonicTune (0, 2, -0.3f);
+        setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
+        synth.setAssignment (modulation::harmonicTuneTarget (0, 2), { modulation::envelopeSource (0), 0.55f, false });
+        const auto moved = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (amplitudeAt (moved, 990.0), second, 0.03), "an envelope on a harmonic's tune moves its frequency");
+        check (modulation::getName (modulation::harmonicTuneTarget (2, 9)) == "Osc 3 harmonic 9 tune"
+                 && modulation::findTarget ("osc2Harmonic4Tune") == modulation::harmonicTuneTarget (1, 4)
+                 && isNear (modulation::applyEnvelope (modulation::harmonicTuneTarget (0, 2), { modulation::envelopeSource (0), 0.4f, false },
+                                                       0.8f, { 0.0f, true, 1.0f, 0.0f }), 0.5, 1.0e-6),
+               "each harmonic's tune is a control of its own, which an envelope's release brings back into tune");
+        synth.setAssignment (modulation::harmonicTuneTarget (0, 2), {});
+
+        // Saving and loading.
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor restored;
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (isNear (restored.getHarmonicTune (0, 2), -0.3, 1.0e-6) && isNear (restored.getHarmonicTune (0, 3), -0.5, 1.0e-6)
+                 && juce::exactlyEqual (restored.getHarmonicTune (1, 2), 0.0f),
+               "each oscillator's harmonic tunes are saved and restored");
+
+        auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), (int) state.getSize());
+
+        for (auto* wave : xml->getChildWithTagNameIterator ("WAVE"))
+            wave->removeAttribute ("tunes");
+
+        juce::AudioProcessor::copyXmlToBinary (*xml, state);
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        check (juce::exactlyEqual (restored.getHarmonicTune (0, 2), 0.0f) && juce::exactlyEqual (restored.getHarmonicTune (0, 3), 0.0f),
+               "a save from before harmonics could be tuned has them in tune");
+
+        // The dials: one beside each harmonic above the fundamental.
+        HarmonicSliders sliders;
+        sliders.setBounds (0, 0, 348, 300);
+        std::vector<waveform::Partial> partials;
+
+        for (int harmonic = 1; harmonic <= 5; ++harmonic)
+            partials.push_back ({ harmonic, 0.5f, 0.0f, harmonic == 4 ? 0.2f : 0.0f });
+
+        sliders.setHarmonics (partials);
+        std::optional<std::pair<int, float>> turned;
+        sliders.onTuneChange = [&turned] (int harmonic, float tune) { turned = std::pair (harmonic, tune); };
+        juce::Slider* fourth = nullptr;
+        auto dialsShown = 0;
+
+        for (auto* child : sliders.getChildren())
+        {
+            if (child->getTitle().endsWith (" tune") && child->isVisible())
+            {
+                ++dialsShown;
+
+                if (child->getTitle() == "Harmonic 4 tune")
+                    fourth = dynamic_cast<juce::Slider*> (child);
+            }
+        }
+
+        check (dialsShown == 4 && fourth != nullptr && isNear (fourth->getValue(), 0.2, 1.0e-6),
+               "each harmonic above the fundamental has a tune dial, showing how far it's tuned");
+
+        if (fourth != nullptr)
+            fourth->setValue (-0.1, juce::sendNotificationSync);
+
+        check (turned.has_value() && turned->first == 4 && isNear (turned->second, -0.1, 1.0e-6), "...which tunes it");
+    }
+
     void testTuning()
     {
         std::cout << "Tuning oscillators" << std::endl;
@@ -2615,6 +2749,28 @@ namespace
             stepped.editorBeingDeleted (steppedEditor.get());
         }
 
+        // A sawtooth with some of its harmonics tuned, while C3 plays.
+        {
+            SynthProcessor tunedSynth;
+            setNumHarmonics (tunedSynth, 6);
+            tunedSynth.setHarmonicTune (0, 2, 0.25f);
+            tunedSynth.setHarmonicTune (0, 3, -0.2f);
+            tunedSynth.setHarmonicTune (0, 5, 0.4f);
+            tunedSynth.keyboardState.noteOn (1, 48, 1.0f);
+            tunedSynth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            juce::MidiBuffer midi;
+            tunedSynth.processBlock (buffer, midi);
+
+            std::unique_ptr<juce::AudioProcessorEditor> tunedEditor (tunedSynth.createEditorAndMakeActive());
+            dynamic_cast<SynthEditor&> (*tunedEditor).refresh();
+            const auto file = folder.getChildFile ("16-tuned-harmonics.png");
+            file.deleteFile();
+            juce::FileOutputStream stream (file);
+            juce::PNGImageFormat().writeImageToStream (tunedEditor->createComponentSnapshot (tunedEditor->getLocalBounds(), true, 2.0f), stream);
+            tunedSynth.editorBeingDeleted (tunedEditor.get());
+        }
+
         // A random LFO, drawn smoothly and then in 12 steps, a few cycles in.
         {
             SynthProcessor randomSynth;
@@ -2717,6 +2873,11 @@ namespace
         // The smallest the window goes, with the most harmonic sliders.
         setNumHarmonics (synth, 9, 2);
         synth.editedSource = 2;
+        // With some of the third oscillator's harmonics tuned.
+        synth.setHarmonicTune (2, 3, 0.3f);
+        synth.setHarmonicTune (2, 5, -0.2f);
+        synth.setHarmonicTune (2, 8, 0.45f);
+
         // With the first filter a notch, and the second a mid pass.
         setFilterType (synth, 0, FilterType::notch);
         setParameter (synth, SynthProcessor::filterIds (0).depth, 24.0f);
@@ -2735,6 +2896,7 @@ int main (int argc, char* argv[])
     testPlaying();
     testChangingTheWaveMidNote();
     testEditingHarmonics();
+    testTuningHarmonics();
     testDrawingInSteps();
     testOscillators();
     testFilters();

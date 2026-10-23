@@ -60,6 +60,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         refresh();
     };
 
+    harmonicSliders.onTuneChange = [this] (int harmonic, float tune)
+    {
+        synthProcessor.setHarmonicTune (synthProcessor.editedSource, harmonic, tune);
+        refresh();
+    };
+
     addAndMakeVisible (grid);
     addChildComponent (harmonicSliders);
     addChildComponent (tuneSlider);
@@ -313,7 +319,12 @@ std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) 
 {
     const auto& harmonics = synthProcessor.getDecomposition (oscillator).harmonics;
     const auto numHarmonics = juce::jlimit (1, waveform::maxHarmonics, synthProcessor.getNumHarmonics (oscillator));
-    return { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
+    std::vector<waveform::Partial> played { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
+
+    for (auto& partial : played)
+        partial.tune = synthProcessor.getHarmonicTune (oscillator, partial.harmonic);
+
+    return played;
 }
 
 juce::String SynthEditor::getWaveName (std::optional<waveform::Preset> preset)

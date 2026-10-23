@@ -485,6 +485,7 @@ void SynthProcessor::updatePatch()
                 }
 
                 oscillator.peaks = decomposition.peaks;
+                oscillator.tunes = received.tunes[i];
             }
 
             for (size_t i = 0; i < (size_t) numLfos; ++i)
@@ -603,6 +604,22 @@ void SynthProcessor::setHarmonicAmplitude (int oscillator, int harmonic, float a
         waveform::addHarmonic (shape, harmonic, amplitude, changed.phases[(size_t) harmonic - 1]);
 
     replaceShape (oscillator, shape, std::nullopt);
+}
+
+float SynthProcessor::getHarmonicTune (int oscillator, int harmonic) const noexcept
+{
+    return oscillators[(size_t) oscillator].tunes[(size_t) harmonic - 1];
+}
+
+void SynthProcessor::setHarmonicTune (int oscillator, int harmonic, float tune)
+{
+    if (harmonic < 2 || harmonic > waveform::maxHarmonics)
+        return;
+
+    presetEdited = true;
+    oscillators[(size_t) oscillator].tunes[(size_t) harmonic - 1] = juce::jlimit (-waveform::furthestTune, waveform::furthestTune, tune);
+    share();
+    ++shapeVersion;
 }
 
 //==============================================================================
@@ -822,7 +839,7 @@ bool SynthProcessor::LiveWave::operator== (const LiveWave& other) const noexcept
                        [] (const waveform::Partial& a, const waveform::Partial& b)
                        {
                            return a.harmonic == b.harmonic && juce::exactlyEqual (a.amplitude, b.amplitude)
-                               && juce::exactlyEqual (a.phase, b.phase);
+                               && juce::exactlyEqual (a.phase, b.phase) && juce::exactlyEqual (a.tune, b.tune);
                        });
 }
 
@@ -843,11 +860,21 @@ SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
     for (int harmonic = 1; harmonic <= numHarmonics; ++harmonic)
     {
         auto partial = harmonics[(size_t) harmonic - 1];
+        partial.tune = getHarmonicTune (oscillator, harmonic);
 
         if (const auto moved = getLivePosition (modulation::harmonicTarget (oscillator, harmonic)))
         {
             partial.amplitude = modulation::amplitudeRange().convertFrom0to1 (*moved);
             wave.moved = true;
+        }
+
+        if (harmonic > 1)
+        {
+            if (const auto moved = getLivePosition (modulation::harmonicTuneTarget (oscillator, harmonic)))
+            {
+                partial.tune = (*moved - 0.5f) * 2.0f * waveform::furthestTune;
+                wave.moved = true;
+            }
         }
 
         wave.harmonics.push_back (partial);
@@ -862,6 +889,11 @@ float SynthProcessor::getPosition (int target) const
         return parameters.getParameter (modulation::getKey (target))->getValue();
 
     const auto info = modulation::describe (target);
+
+    // A harmonic's tune is in tune in the middle of its travel.
+    if (info.kind == modulation::Kind::harmonicTune)
+        return getHarmonicTune (info.oscillator, info.harmonic) / (2.0f * waveform::furthestTune) + 0.5f;
+
     const auto& harmonic = getDecomposition (info.oscillator).harmonics[(size_t) info.harmonic - 1];
     return modulation::amplitudeRange().convertTo0to1 (harmonic.amplitude);
 }
@@ -874,6 +906,7 @@ void SynthProcessor::share()
     {
         shared.decompositions[i] = oscillators[i].decomposition;
         shared.phases[i] = oscillators[i].phases;
+        shared.tunes[i] = oscillators[i].tunes;
     }
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
@@ -917,10 +950,26 @@ juce::ValueTree SynthProcessor::createState()
         wave.setProperty ("stepped", drawing.stepped, nullptr);
         wave.setProperty ("steps", drawing.numSteps, nullptr);
         state.appendChild (wave, nullptr);
+        return wave;
     };
 
     for (int i = 0; i < numOscillators; ++i)
-        addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset, drawings[(size_t) i]);
+    {
+        auto wave = addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset, drawings[(size_t) i]);
+
+        // How far each harmonic from the 2nd up is tuned, saved only if any is.
+        const auto& tunes = oscillators[(size_t) i].tunes;
+
+        if (std::any_of (tunes.begin(), tunes.end(), [] (float tune) { return ! juce::exactlyEqual (tune, 0.0f); }))
+        {
+            juce::StringArray tuneTexts;
+
+            for (size_t k = 1; k < tunes.size(); ++k)
+                tuneTexts.add (juce::String (tunes[k]));
+
+            wave.setProperty ("tunes", tuneTexts.joinIntoString (" "), nullptr);
+        }
+    }
 
     for (int i = 0; i < numLfos; ++i)
         addWave ("lfo", i, lfos[(size_t) i].shape, lfos[(size_t) i].preset, drawings[(size_t) (numOscillators + i)]);
@@ -1008,8 +1057,12 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     parameters.replaceState (state);
 
-    // Waves saved before they could be drawn in steps were drawn smoothly.
+    // Waves saved before they could be drawn in steps were drawn smoothly, and before harmonics could be tuned, were
+    // in tune.
     drawings = {};
+
+    for (auto& oscillator : oscillators)
+        oscillator.tunes = {};
 
     for (const auto& wave : waves)
     {
@@ -1045,6 +1098,12 @@ void SynthProcessor::loadState (juce::ValueTree state)
             // Saves from before there were three oscillators have one wave, with no number.
             setShape (oscillator, restored, preset);
             drawings[(size_t) oscillator] = drawing;
+
+            const auto tuneTexts = juce::StringArray::fromTokens (wave["tunes"].toString(), " ", {});
+
+            for (int k = 0; k < std::min (tuneTexts.size(), waveform::maxHarmonics - 1); ++k)
+                oscillators[(size_t) oscillator].tunes[(size_t) k + 1] = juce::jlimit (-waveform::furthestTune, waveform::furthestTune,
+                                                                                      tuneTexts[k].getFloatValue());
         }
     }
 

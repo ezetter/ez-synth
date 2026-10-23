@@ -9,7 +9,7 @@ namespace
     /** The parts of a harmonic's row, from left to right. */
     struct Row
     {
-        juce::Rectangle<int> swatch, number, slider, amplitude, frequency;
+        juce::Rectangle<int> swatch, number, tune, slider, amplitude, frequency;
     };
 
     constexpr int amplitudeWidth = 36;
@@ -21,6 +21,8 @@ namespace
         row.swatch = area.removeFromLeft (16);
         area.removeFromLeft (6);
         row.number = area.removeFromLeft (16);
+        row.tune = area.removeFromLeft (area.getHeight() + 2);
+        area.removeFromLeft (4);
         row.frequency = area.removeFromRight (frequencyWidth);
         row.amplitude = area.removeFromRight (amplitudeWidth);
         area.removeFromRight (6);
@@ -69,6 +71,33 @@ HarmonicSliders::HarmonicSliders()
         };
 
         addChildComponent (slider);
+
+        // A harmonic above the fundamental can be tuned, in tune in the middle. Turning the dial snaps to that.
+        if (harmonic == 1)
+            continue;
+
+        auto& tuner = tuners[i];
+        tuner.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        tuner.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        tuner.setRange (-waveform::furthestTune, waveform::furthestTune);
+        tuner.setDoubleClickReturnValue (true, 0.0);
+        tuner.fillOrigin = 0.0;
+        tuner.snap = [] (double tune) { return std::abs (tune) < 0.015 ? 0.0 : tune; };
+        tuner.setScrollWheelEnabled (false);
+        tuner.setColour (juce::Slider::rotarySliderFillColourId, colours::forPartial ((int) i));
+        tuner.setTitle ("Harmonic " + juce::String (harmonic) + " tune");
+        tuner.setMouseClickGrabsKeyboardFocus (false);
+        tuner.setWantsKeyboardFocus (false);
+        tuner.onValueChange = [this, harmonic, &tuner]
+        {
+            tuner.setTooltip ("Harmonic " + juce::String (harmonic) + ", at " + juce::String (harmonic + tuner.getValue(), 2)
+                              + " times the fundamental. Double-click to put it in tune.");
+
+            if (onTuneChange != nullptr)
+                onTuneChange (harmonic, (float) tuner.getValue());
+        };
+
+        addChildComponent (tuner);
     }
 }
 
@@ -85,6 +114,16 @@ void HarmonicSliders::setHarmonics (std::vector<waveform::Partial> newHarmonics)
         // The slider being dragged already shows where the user has put it.
         if (i < harmonics.size() && ! slider.isMouseButtonDown())
             slider.setValue (harmonics[i].amplitude, juce::dontSendNotification);
+
+        auto& tuner = tuners[i];
+        tuner.setVisible (i > 0 && i < harmonics.size());
+
+        if (i > 0 && i < harmonics.size() && ! tuner.isMouseButtonDown())
+        {
+            tuner.setValue (harmonics[i].tune, juce::dontSendNotification);
+            tuner.setTooltip ("Harmonic " + juce::String ((int) i + 1) + ", at " + juce::String ((double) i + 1.0 + harmonics[i].tune, 2)
+                              + " times the fundamental. Double-click to put it in tune.");
+        }
     }
 
     if (numberChanged)
@@ -96,7 +135,12 @@ void HarmonicSliders::setHarmonics (std::vector<waveform::Partial> newHarmonics)
 void HarmonicSliders::setOscillator (int oscillator)
 {
     for (size_t i = 0; i < sliders.size(); ++i)
+    {
         modulatable::setTarget (sliders[i], modulation::harmonicTarget (oscillator, (int) i + 1));
+
+        if (i > 0)
+            modulatable::setTarget (tuners[i], modulation::harmonicTuneTarget (oscillator, (int) i + 1));
+    }
 }
 
 void HarmonicSliders::setFundamental (std::optional<double> hertz)
@@ -134,7 +178,11 @@ void HarmonicSliders::resized()
     const auto layout = getLayout();
 
     for (size_t i = 0; i < sliders.size(); ++i)
-        sliders[i].setBounds (splitRow (layout.rows[i]).slider);
+    {
+        const auto row = splitRow (layout.rows[i]);
+        sliders[i].setBounds (row.slider);
+        tuners[i].setBounds (row.tune);
+    }
 }
 
 void HarmonicSliders::paint (juce::Graphics& g)
@@ -180,9 +228,19 @@ void HarmonicSliders::paint (juce::Graphics& g)
         g.drawText (juce::String (harmonic.harmonic), row.number, juce::Justification::centredLeft);
         g.drawText (juce::String (harmonic.amplitude, 2), row.amplitude, juce::Justification::centredRight);
 
+        // A tuned harmonic's frequency, or its number, is off the whole number's.
+        const auto multiple = (double) harmonic.harmonic + harmonic.tune;
+        const auto tuned = ! juce::exactlyEqual (harmonic.tune, 0.0f);
+
+        if (! fundamental.has_value() && tuned)
+        {
+            g.setColour (colours::dimText);
+            g.drawText (juce::String (juce::CharPointer_UTF8 ("\xc3\x97")) + juce::String (multiple, 2), row.frequency, juce::Justification::centredRight);
+        }
+
         if (fundamental.has_value())
         {
-            const auto frequency = *fundamental * harmonic.harmonic;
+            const auto frequency = *fundamental * multiple;
             const auto audible = frequency < HarmonicVoice::highestFrequency;
 
             g.setColour (audible ? colours::dimText : colours::dimText.withAlpha (0.6f));

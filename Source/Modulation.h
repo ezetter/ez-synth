@@ -40,10 +40,13 @@ namespace modulation
     constexpr int filterWidthTarget (int filter)                    { return 46 + filter; }
     constexpr int filterQTarget (int filter)                        { return 48 + filter; }
     constexpr int filterDepthTarget (int filter)                    { return 50 + filter; }
-    inline constexpr int numTargets = 52;
+
+    /** The tune of a harmonic above the fundamental, from the 2nd up. */
+    constexpr int harmonicTuneTarget (int oscillator, int harmonic) { return 52 + oscillator * (waveform::maxHarmonics - 1) + harmonic - 2; }
+    inline constexpr int numTargets = 76;
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth, filterQ, filterDepth };
+                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune };
 
     struct TargetInfo
     {
@@ -73,7 +76,7 @@ namespace modulation
     */
     juce::String updateKey (const juce::String& key);
 
-    /** Whether a target is a plugin parameter, rather than one of a wave's harmonics. */
+    /** Whether a target is a plugin parameter, rather than one of a wave's harmonics or their tunes. */
     bool isParameter (int target);
 
     /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on
@@ -137,7 +140,9 @@ namespace modulation
         float releaseLeft = 1.0f;
     };
 
-    /** Where an envelope's release takes a control: the bottom of its travel, or for an oscillator's tune, in tune. */
+    /** Where an envelope's release takes a control: the bottom of its travel, or for an oscillator's or a harmonic's
+        tune, in tune.
+    */
     float getRestPosition (int target);
 
     /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope

@@ -97,6 +97,13 @@ public:
     /** Raises or lowers one harmonic of an oscillator's wave, numbered from 1, leaving the others as they are. */
     void setHarmonicAmplitude (int oscillator, int harmonic, float amplitude);
 
+    /** How far a harmonic, numbered from 2, is tuned from its whole number, in harmonics, from halfway to the one
+        below to halfway to the one above. The fundamental can't be tuned. Tuning harmonics makes the sound
+        inharmonic, as a bell's or a drum's is. Changing the wave keeps them tuned.
+    */
+    float getHarmonicTune (int oscillator, int harmonic) const noexcept;
+    void setHarmonicTune (int oscillator, int harmonic, float tune);
+
     /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 
@@ -311,6 +318,9 @@ private:
 
         /** Each harmonic's phase the last time it was heard, for when it's raised again from nothing. */
         std::array<float, waveform::maxHarmonics> phases {};
+
+        /** How far each harmonic, from the 1st up, is tuned from its whole number. The 1st never is. */
+        std::array<float, waveform::maxHarmonics> tunes {};
     };
 
     struct Lfo
@@ -323,7 +333,7 @@ private:
     struct Shared
     {
         std::array<waveform::Decomposition, numOscillators> decompositions;
-        std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {};
+        std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {}, tunes {};
         std::array<waveform::Shape, numLfos> lfoShapes {};
         std::array<waveform::Drawing, numLfos> lfoDrawings {};
         modulation::Assignments assignments, velocityAssignments;

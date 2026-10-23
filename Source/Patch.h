@@ -21,6 +21,9 @@ struct Patch
 
         /** peaks[n] is the highest the sum of the first n harmonics reaches. */
         std::array<float, waveform::maxHarmonics + 1> peaks {};
+
+        /** How far each harmonic, from the 1st up, is tuned from its whole number, in harmonics. */
+        std::array<float, waveform::maxHarmonics> tunes {};
     };
 
     using Filter = FilterStage::Settings;

@@ -57,17 +57,22 @@ namespace waveform
     */
     void setSteps (Shape&, int numSteps, int fromStep, float fromValue, int toStep, float toValue);
 
-    /** One of the sine waves a shape is made of: amplitude * sin (2π * harmonic * t + phase), where t goes
-        from 0 to 1 over the shape's wavelength.
+    /** One of the sine waves a shape is made of: amplitude * sin (2π * (harmonic + tune) * t + phase), where t
+        goes from 0 to 1 over the shape's wavelength. A harmonic above the fundamental can be tuned away from its
+        whole number, up to halfway to the harmonics either side, which makes the sound inharmonic.
     */
     struct Partial
     {
         int harmonic = 1;
         float amplitude = 0.0f;
         float phase = 0.0f;
+        float tune = 0.0f;   // how far from its whole number, in harmonics
 
         float valueAt (double t) const noexcept;
     };
+
+    /** How far a harmonic above the fundamental can be tuned either way: halfway to the next harmonic. */
+    inline constexpr float furthestTune = 0.5f;
 
     /** A shape's first harmonics. It holds no heap memory, so the audio thread can copy it. */
     struct Decomposition

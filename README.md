@@ -62,6 +62,17 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   sliders always agree. Raise a sine's 2nd and 3rd harmonics from 0, for instance, and the wave becomes
   Custom. A harmonic you lower to 0 and raise again comes back as it was. Raised harmonics can take a wave
   past −1 and +1, and the grid stretches to show it.
+- **Tune a harmonic** with the small dial beside it, for inharmonic sounds, such as bells, metal and drums,
+  whose overtones aren't whole multiples of the fundamental. Every harmonic above the fundamental has one;
+  the fundamental can't be tuned. A harmonic tunes from halfway down to the harmonic below to halfway up to
+  the one above: the 3rd, for instance, from 2.5 to 3.5 times the fundamental. In tune is the middle, where
+  the dial snaps, and its coloured arc shows which way and how far a harmonic is tuned. Double-click a dial
+  to put its harmonic back in tune, and hover over it to see the multiple it plays at. Once you've played a
+  note, the frequencies beside the sliders are the tuned ones; until then, a tuned harmonic shows its
+  multiple, such as ×2.25. On the grid, a tuned harmonic's sine wave no longer fits the cycle a whole number
+  of times, so it doesn't end where it began, and nor does the sum. Each oscillator keeps its harmonics'
+  tunes when you choose or draw another wave, and they're saved with the sound. Like the other controls, a
+  tune can be moved by an LFO, an envelope or velocity; an envelope's release brings it back into tune.
 - **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
   phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
@@ -176,7 +187,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Giving an LFO, envelope or velocity something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
-  the harmonic buttons, a harmonic's slider, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
+  the harmonic buttons, a harmonic's slider or tune, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
   switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
   the top part a **phase** and **polarity** too, and both can move the same control at once, their
@@ -320,7 +331,8 @@ the app and open it again.
 ```
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
-pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that oscillators add
+pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that a tuned harmonic
+plays at its own multiple of the fundamental, glides there without a click and is saved, that oscillators add
 together at their levels, that a tuned oscillator plays as far above or below the note as it's tuned, glides there
 without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, as low, mid and high passes and notches,
 that a filter's type can change during a note without a click, that saves from before the filters had types
@@ -353,9 +365,11 @@ save pictures of the window showing several waves.
   An oscillator plays its harmonics at their amplitudes times its level. If they add up to more than full
   scale, as a square's do, the oscillator turns them down to fit. Each oscillator keeps its own phase and
   plays at the note's frequency times 2 to the power of its tune in octaves, so oscillators tuned apart
-  drift in and out of step as they should. Only the harmonics that are sounding are worked out. Harmonics
+  drift in and out of step as they should. A tuned harmonic turns at its own speed, its number plus its tune
+  times the fundamental's, from where its whole number's phase would be plus how far it's drifted from it, so
+  one in tune stays exactly in its place in the wave. Only the harmonics that are sounding are worked out. Harmonics
   fade out between 16 and 19 kHz, worked out at each oscillator's own pitch, so high notes don't alias.
-  When a wave, level, switch, tune or number of harmonics changes during a note, the voice glides to the
+  When a wave, level, switch, tune, harmonic's tune or number of harmonics changes during a note, the voice glides to the
   new sound, most of the way in 5 ms and all of it in about 20, rather than clicking. Notes
   start in 8 ms and fade out over 250 ms when let go.
 - **Filtering.** Each note goes through its own two filters, the first and then the second
@@ -419,7 +433,7 @@ save pictures of the window showing several waves.
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
 | `Source/RandomWave.*` | Random LFO waves, smooth or in steps, worked out from a seed and the time |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
-| `Source/HarmonicSliders.*` | A slider for each harmonic, and the key to the grid's lines |
+| `Source/HarmonicSliders.*` | A slider and a tune dial for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
 | `Source/StandaloneApp.cpp` | The standalone app, which only the standalone build includes, playing from every MIDI device plugged in |
 | `Source/MidiInputs.*` | The standalone app's MIDI devices: switching them on as they're plugged in, and remembering those switched off |

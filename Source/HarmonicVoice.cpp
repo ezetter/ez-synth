@@ -76,6 +76,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     updateFrequency();
 
     phases.fill (0.0);
+    harmonicDrifts = {};
     noteVelocity = velocity;
 
     // Each note plays new random waves from the LFOs that run once.
@@ -248,6 +249,19 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             targets.cosines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseSines[index];
             targets.sines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseCosines[index];
         }
+
+        // How far each harmonic above the fundamental is tuned, which an LFO or envelope can move, in tune at the
+        // middle of its travel.
+        for (int harmonic = 2; harmonic <= waveform::maxHarmonics; ++harmonic)
+        {
+            const auto target = harmonicTuneTarget (i, harmonic);
+            auto tune = oscillator.tunes[(size_t) harmonic - 1];
+
+            if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
+                tune = (modulate (target, tune / (2.0f * waveform::furthestTune) + 0.5f) - 0.5f) * 2.0f * waveform::furthestTune;
+
+            targets.harmonicTunes[(size_t) i][(size_t) harmonic] = tune;
+        }
     }
 
     for (int i = 0; i < numFilters; ++i)
@@ -299,6 +313,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     {
         cosines = targets.cosines;
         sines = targets.sines;
+        harmonicTunes = targets.harmonicTunes;
         std::copy (targets.tunes.begin(), targets.tunes.end(), tunes.begin());
         gain.setCurrentAndTargetValue (targets.gain);
 
@@ -327,11 +342,23 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             tunes[i] = targets.tunes[i];
 
         cyclesPerSample[i] = frequency * tuning::toRatio (tunes[i]) / sampleRate;
+
+        for (size_t k = 2; k < harmonicTunes[i].size(); ++k)
+        {
+            auto& tune = harmonicTunes[i][k];
+            const auto target = targets.harmonicTunes[i][k];
+            tune += (float) ((target - tune) * glideShare);
+
+            if (std::abs (target - tune) < 1.0e-5f)
+                tune = target;
+        }
     }
 
     // Each harmonic is a point going round a circle, turned by a fixed angle every sample, which is much cheaper
     // than calling sin() every sample. The points are placed afresh from each oscillator's phase each chunk, so
     // rounding errors can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
+    // A tuned harmonic turns at its own speed, k + tune times the fundamental's, and has drifted from where its
+    // whole number would be.
     struct Playing
     {
         float cosine = 0.0f, sine = 0.0f, cosineStep = 0.0f, sineStep = 0.0f, bandLimit = 0.0f;
@@ -362,15 +389,16 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                     continue;
             }
 
-            const auto angle = twoPi * (double) k * phases[i];
-            const auto turn = twoPi * (double) k * cyclesPerSample[i];
+            const auto speed = (double) k + harmonicTunes[i][k];
+            const auto angle = twoPi * ((double) k * phases[i] + harmonicDrifts[i][k]);
+            const auto turn = twoPi * speed * cyclesPerSample[i];
 
             auto& harmonic = playing[numPlaying++];
             harmonic.cosine = cosine;
             harmonic.sine = sine;
             harmonic.cosineStep = (float) ((targetCosine - cosine) / glideSamples);
             harmonic.sineStep = (float) ((targetSine - sine) / glideSamples);
-            harmonic.bandLimit = bandLimitGain ((double) k * cyclesPerSample[i] * sampleRate, sampleRate);
+            harmonic.bandLimit = bandLimitGain (speed * cyclesPerSample[i] * sampleRate, sampleRate);
             harmonic.x = std::cos (angle);
             harmonic.y = std::sin (angle);
             harmonic.turnX = std::cos (turn);
@@ -434,6 +462,12 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     {
         phases[i] += numSamples * cyclesPerSample[i];
         phases[i] -= std::floor (phases[i]);
+
+        for (size_t k = 2; k < harmonicDrifts[i].size(); ++k)
+        {
+            harmonicDrifts[i][k] += (double) numSamples * harmonicTunes[i][k] * cyclesPerSample[i];
+            harmonicDrifts[i][k] -= std::floor (harmonicDrifts[i][k]);
+        }
     }
 
     samplesSinceNoteOn += numSamples;

@@ -60,11 +60,12 @@ SynthLookAndFeel::SynthLookAndFeel()
 void SynthLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
                                          float startAngle, float endAngle, juce::Slider& slider)
 {
-    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
+    // A small dial, such as a harmonic's tune, keeps less of a margin.
+    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (juce::jmin (4.0f, (float) juce::jmin (width, height) * 0.06f));
     const auto radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) / 2.0f;
     const auto centre = bounds.getCentre();
     const auto angle = startAngle + sliderPos * (endAngle - startAngle);
-    const auto trackWidth = juce::jmax (3.0f, radius * 0.11f);
+    const auto trackWidth = juce::jmax (radius < 12.0f ? 2.0f : 3.0f, radius * 0.11f);
     const auto arcRadius = radius - trackWidth / 2.0f;
     const juce::PathStrokeType trackStroke (trackWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
 
@@ -73,10 +74,18 @@ void SynthLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int wi
     g.setColour (slider.findColour (juce::Slider::rotarySliderOutlineColourId));
     g.strokePath (track, trackStroke);
 
-    if (sliderPos > 0.0f)
+    // The arc fills from the start, or from the value it's to fill from, such as the middle of a dial that goes
+    // both ways.
+    auto fillFrom = startAngle;
+
+    if (auto* modulatableSlider = dynamic_cast<ModulatableSlider*> (&slider);
+        modulatableSlider != nullptr && modulatableSlider->fillOrigin.has_value())
+        fillFrom = startAngle + (float) slider.valueToProportionOfLength (*modulatableSlider->fillOrigin) * (endAngle - startAngle);
+
+    if (! juce::approximatelyEqual (angle, fillFrom))
     {
         juce::Path value;
-        value.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f, startAngle, angle, true);
+        value.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f, std::min (fillFrom, angle), std::max (fillFrom, angle), true);
         g.setColour (slider.findColour (juce::Slider::rotarySliderFillColourId));
         g.strokePath (value, trackStroke);
     }

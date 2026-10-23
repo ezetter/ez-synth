@@ -81,7 +81,7 @@ namespace waveform
 
     float Partial::valueAt (double t) const noexcept
     {
-        return amplitude * (float) std::sin (twoPi * harmonic * t + phase);
+        return amplitude * (float) std::sin (twoPi * (harmonic + (double) tune) * t + phase);
     }
 
     Decomposition decompose (const Shape& shape)

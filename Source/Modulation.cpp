@@ -24,6 +24,9 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= harmonicTuneTarget (0, 2))
+            info = { Kind::harmonicTune, (target - harmonicTuneTarget (0, 2)) / (waveform::maxHarmonics - 1),
+                     (target - harmonicTuneTarget (0, 2)) % (waveform::maxHarmonics - 1) + 2 };
         else if (target >= filterDepthTarget (0))
             info = { Kind::filterDepth, 0, 1, target - filterDepthTarget (0) };
         else if (target >= filterQTarget (0))
@@ -70,6 +73,7 @@ namespace modulation
             case Kind::filterWidth:          return filter + " width";
             case Kind::filterQ:              return filter + " Q";
             case Kind::filterDepth:          return filter + " depth";
+            case Kind::harmonicTune:         return oscillator + " harmonic " + juce::String (info.harmonic) + " tune";
             case Kind::oscillatorTune:       return oscillator + " tune";
         }
 
@@ -95,6 +99,7 @@ namespace modulation
             case Kind::filterWidth:          return filter + "Width";
             case Kind::filterQ:              return filter + "Q";
             case Kind::filterDepth:          return filter + "Depth";
+            case Kind::harmonicTune:         return oscillator + "Harmonic" + juce::String (info.harmonic) + "Tune";
             case Kind::oscillatorTune:       return oscillator + "Tune";
         }
 
@@ -123,7 +128,8 @@ namespace modulation
 
     bool isParameter (int target)
     {
-        return describe (target).kind != Kind::harmonic;
+        const auto kind = describe (target).kind;
+        return kind != Kind::harmonic && kind != Kind::harmonicTune;
     }
 
     bool isLoudness (int target)
@@ -166,7 +172,12 @@ namespace modulation
 
     float getRestPosition (int target)
     {
-        return describe (target).kind == Kind::oscillatorTune ? tuning::toPosition (0.0f) : 0.0f;
+        const auto kind = describe (target).kind;
+
+        if (kind == Kind::oscillatorTune)
+            return tuning::toPosition (0.0f);
+
+        return kind == Kind::harmonicTune ? 0.5f : 0.0f;
     }
 
     float applyEnvelope (int target, const Assignment& assignment, float position, const EnvelopeState& envelope)
