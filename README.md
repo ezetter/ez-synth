@@ -139,7 +139,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### LFOs
 
 - **An LFO is an oscillator too slow to hear**, whose wave moves controls instead. Its card has a switch, a
-  **Period** dial for how long one cycle takes, from 0.1 to 10 seconds, and **Loop** and **Once**. Click
+  **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 10 Hz, ten
+  cycles a second, and **Loop** and **Once**. Click
   the card to draw its wave on the grid, or pick a preset for it. An LFO follows its drawing exactly, rather
   than rebuilding it from harmonics, so a square LFO switches cleanly between its two values. The grid marks
   the LFO's period in time, and a line shows where the LFO has got to.

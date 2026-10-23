@@ -191,7 +191,7 @@ void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, c
 //==============================================================================
 LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
     : SourceCard ("LFO " + juce::String (lfo + 1), parameters, SynthProcessor::lfoOnId (lfo),
-                  SynthProcessor::lfoPeriodId (lfo), "PERIOD"),
+                  SynthProcessor::lfoPeriodId (lfo), "RATE"),
       modeAttachment (*parameters.getParameter (SynthProcessor::lfoModeId (lfo)),
                       [this] (float value) { mode.setChosen (juce::roundToInt (value)); })
 {

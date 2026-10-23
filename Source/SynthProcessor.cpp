@@ -46,9 +46,11 @@ namespace
         return juce::String (hertz / 1000.0f, hertz < 10000.0f ? 2 : 1) + " kHz";
     }
 
-    juce::String formatPeriod (float seconds)
+    /** An LFO's rate, from its period, such as "0.25 Hz" or "4.0 Hz". */
+    juce::String formatRate (float seconds)
     {
-        return juce::String (seconds, seconds < 1.0f ? 2 : 1) + " s";
+        const auto hertz = 1.0f / seconds;
+        return juce::String (hertz, hertz < 1.0f ? 2 : 1) + " Hz";
     }
 
     juce::String formatTime (float seconds)
@@ -172,10 +174,11 @@ namespace
         layout.add (createFilterParameters (0, FilterType::lowPass, 1000.0f));
         layout.add (createFilterParameters (1, FilterType::highPass, 250.0f));
 
-        // The LFOs start on, as they do nothing until a control is assigned to one.
+        // The LFOs start on, as they do nothing until a control is assigned to one. Each keeps its period, in seconds,
+        // but it's shown as a rate, in hertz, which rises as its dial turns up, from 0.1 to 10 Hz.
         const juce::NormalisableRange<float> periodRange (modulation::shortestPeriod, modulation::longestPeriod,
-                                                          [] (float, float, float position) { return modulation::positionToPeriod (position); },
-                                                          [] (float, float, float seconds) { return modulation::periodToPosition (seconds); });
+                                                          [] (float, float, float position) { return modulation::positionToPeriod (1.0f - position); },
+                                                          [] (float, float, float seconds) { return 1.0f - modulation::periodToPosition (seconds); });
 
         for (int i = 0; i < SynthProcessor::numLfos; ++i)
         {
@@ -185,13 +188,14 @@ namespace
                 "lfo" + juce::String (i + 1), name, " ",
                 std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoOnId (i), 1 }, name + " On", true),
                 std::make_unique<juce::AudioParameterFloat> (
-                    juce::ParameterID { SynthProcessor::lfoPeriodId (i), 1 }, name + " Period", periodRange,
+                    juce::ParameterID { SynthProcessor::lfoPeriodId (i), 1 }, name + " Rate", periodRange,
                     startingPeriods[(size_t) i],
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float value, int) { return formatPeriod (value); })
+                        .withStringFromValueFunction ([] (float value, int) { return formatRate (value); })
                         .withValueFromStringFunction ([] (const juce::String& text)
                         {
-                            return text.retainCharacters ("0123456789.").getFloatValue();
+                            const auto hertz = text.retainCharacters ("0123456789.").getFloatValue();
+                            return hertz > 0.0f ? 1.0f / hertz : modulation::longestPeriod;
                         })),
                 std::make_unique<juce::AudioParameterChoice> (
                     juce::ParameterID { SynthProcessor::lfoModeId (i), 1 }, name + " Mode",

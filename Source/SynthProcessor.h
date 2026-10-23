@@ -48,7 +48,9 @@ public:
     /** The IDs of a filter's parameters, numbered from 0. The first starts as a low pass, the second a high pass. */
     static FilterIds filterIds (int filter);
 
-    /** The IDs of each LFO's parameters: whether it's on, its period in seconds, and whether it loops or runs once. */
+    /** The IDs of each LFO's parameters: whether it's on, its period in seconds, which is shown as its rate, in
+        hertz, and whether it loops or runs once.
+    */
     static juce::String lfoOnId (int lfo);
     static juce::String lfoPeriodId (int lfo);
     static juce::String lfoModeId (int lfo);
