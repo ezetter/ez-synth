@@ -13,9 +13,10 @@ namespace
     constexpr float noteLevel = 0.3f;
 
     /** How quickly a playing note follows changes to its harmonics: it covers about two thirds of the way in this
-        time, and nearly all of it in four times as long.
+        time, and nearly all of it in four times as long. That's quick enough to follow an LFO at 50 Hz, and slow
+        enough not to click.
     */
-    constexpr double glideSeconds = 0.005;
+    constexpr double glideSeconds = 0.0015;
 
     /** How much of a harmonic at this frequency to play. At low sample rates the fade starts lower, to stay clear
         of the Nyquist frequency.
@@ -63,7 +64,8 @@ void HarmonicVoice::setCurrentPlaybackSampleRate (double newRate)
         return;
 
     ownEnvelope.setSampleRate (newRate);
-    gain.reset (newRate, 0.02);
+    // Quick enough for an LFO at 50 Hz to swing the volume fully.
+    gain.reset (newRate, 0.003);
 
     for (auto& filter : filters)
         filter.prepare (newRate, {});

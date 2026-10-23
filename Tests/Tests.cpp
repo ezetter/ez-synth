@@ -2578,6 +2578,48 @@ namespace
         check (peakOf (chord) < 1.0f, "...and a five-note chord at full velocity peaks at " + juce::String (decibels (peakOf (chord)), 1) + " dB, without clipping");
     }
 
+    /** An LFO as fast as 50 Hz swings a control as fully as a slow one does: the swing of the level, in 1/400ths of a
+        second, from peak to trough, is the same as at 1 Hz.
+    */
+    void testFastLfos()
+    {
+        std::cout << "Fast LFOs" << std::endl;
+
+        for (const auto& [name, target] : { std::pair ("the volume", modulation::volumeTarget), std::pair ("a level", modulation::oscillatorLevelTarget (0)),
+                                            std::pair ("a harmonic", modulation::harmonicTarget (0, 1)) })
+        {
+            std::array<double, 2> swings {};
+
+            for (size_t i = 0; i < swings.size(); ++i)
+            {
+                SynthProcessor synth;
+                setPreset (synth, 0, waveform::Preset::sine);
+                setParameter (synth, SynthProcessor::volumeId, 0.5f);
+                setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+                setLfo (synth, 0, i == 0 ? 1.0f : 1.0f / 50.0f, false, waveform::Preset::square);
+                synth.setAssignment (target, { 0, 0.8f, false });
+                const auto signal = play (synth, 81, 1.2, 1.3);
+                auto lowest = 1.0e9, highest = 0.0;
+
+                for (auto at = 0.2; at < 1.1; at += 0.0025)
+                {
+                    const auto level = loudness (signal, at, at + 0.0025);
+                    lowest = std::min (lowest, level);
+                    highest = std::max (highest, level);
+                }
+
+                swings[i] = juce::Decibels::gainToDecibels (highest / lowest);
+            }
+
+            check (std::abs (swings[1] - swings[0]) < 1.0,
+                   "an LFO at 50 Hz swings " + juce::String (name) + " " + juce::String (swings[1], 1) + " dB, as fully as one at 1 Hz");
+        }
+
+        SynthProcessor synth;
+        auto& rate = *synth.parameters.getParameter (SynthProcessor::lfoPeriodId (0));
+        check (rate.getText (1.0f, 20) == "50.0 Hz" && rate.getText (0.0f, 20) == "0.10 Hz", "an LFO's rate goes from 0.1 Hz up to 50 Hz");
+    }
+
     void testFactoryPresets()
     {
         std::cout << "Factory presets" << std::endl;
@@ -3034,6 +3076,7 @@ int main (int argc, char* argv[])
     testFilters();
     testLfos();
     testRandomLfos();
+    testFastLfos();
     testEnvelopes();
     testEnvelopeReleases();
     testVelocity();

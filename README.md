@@ -138,9 +138,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### LFOs
 
-- **An LFO is an oscillator too slow to hear**, whose wave moves controls instead. Its card has a switch, a
-  **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 10 Hz, ten
-  cycles a second, and **Loop** and **Once**. Click
+- **An LFO is an oscillator mostly too slow to hear**, whose wave moves controls instead. Its card has a switch,
+  a **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 50 Hz, fast
+  enough to roughen a sound or growl, and **Loop** and **Once**. Even at 50 Hz an LFO swings what it moves as
+  fully as a slow one does. Click
   the card to draw its wave on the grid, or pick a preset for it. An LFO follows its drawing exactly, rather
   than rebuilding it from harmonics, so a square LFO switches cleanly between its two values. The grid marks
   the LFO's period in time, and a line shows where the LFO has got to.
@@ -381,7 +382,8 @@ save pictures of the window showing several waves.
   one in tune stays exactly in its place in the wave. Only the harmonics that are sounding are worked out. Harmonics
   fade out between 16 and 19 kHz, worked out at each oscillator's own pitch, so high notes don't alias.
   When a wave, level, switch, tune, harmonic's tune or number of harmonics changes during a note, the voice glides to the
-  new sound, most of the way in 5 ms and all of it in about 20, rather than clicking. Notes
+  new sound, most of the way in 1.5 ms and all of it in about 6, rather than clicking, quickly enough to follow
+  an LFO at 50 Hz. The volume glides over 3 ms. Notes
   start in 8 ms and fade out over 250 ms when let go.
 - **Filtering.** Each note goes through its own two filters, the first and then the second
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
@@ -390,7 +392,7 @@ save pictures of the window showing several waves.
   pass is the band pass, scaled down by its Q so its middle comes through as it is; its width of N octaves
   sets its Q to √(2^N) / (2^N − 1). A notch is the sound less the mid pass's band, times its depth's share,
   1 − 10^(−depth / 20), so at full depth it's the low pass and high pass added together. Switching a filter
-  fades it in or out over 20 ms, and its cutoff, resonance, width, Q and depth glide over 10 ms, so nothing
+  fades it in or out over 20 ms, and its cutoff, resonance, width, Q and depth glide over 3 ms, so nothing
   clicks. A filter that's switched out is skipped
   entirely. Cutoffs too near the Nyquist frequency, as 20 kHz is at low sample rates, are lowered to 45% of
   the sample rate.
