@@ -43,10 +43,13 @@ namespace modulation
 
     /** The tune of a harmonic above the fundamental, from the 2nd up. */
     constexpr int harmonicTuneTarget (int oscillator, int harmonic) { return 52 + oscillator * (waveform::maxHarmonics - 1) + harmonic - 2; }
-    inline constexpr int numTargets = 76;
+
+    /** The phase of a harmonic, from the 1st up, from 0 at the bottom of its travel round to a whole turn at the top. */
+    constexpr int harmonicPhaseTarget (int oscillator, int harmonic) { return 76 + oscillator * waveform::maxHarmonics + harmonic - 1; }
+    inline constexpr int numTargets = 103;
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune };
+                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase };
 
     struct TargetInfo
     {
@@ -76,7 +79,7 @@ namespace modulation
     */
     juce::String updateKey (const juce::String& key);
 
-    /** Whether a target is a plugin parameter, rather than one of a wave's harmonics or their tunes. */
+    /** Whether a target is a plugin parameter, rather than one of a wave's harmonics or their tunes or phases. */
     bool isParameter (int target);
 
     /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on

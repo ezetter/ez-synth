@@ -9,7 +9,7 @@ namespace
     /** The parts of a harmonic's row, from left to right. */
     struct Row
     {
-        juce::Rectangle<int> swatch, number, tune, slider, amplitude, frequency;
+        juce::Rectangle<int> swatch, number, tune, phase, slider, amplitude, frequency;
     };
 
     constexpr int amplitudeWidth = 36;
@@ -22,6 +22,8 @@ namespace
         area.removeFromLeft (6);
         row.number = area.removeFromLeft (16);
         row.tune = area.removeFromLeft (area.getHeight() + 2);
+        area.removeFromLeft (2);
+        row.phase = area.removeFromLeft (area.getHeight() + 2);
         area.removeFromLeft (4);
         row.frequency = area.removeFromRight (frequencyWidth);
         row.amplitude = area.removeFromRight (amplitudeWidth);
@@ -36,6 +38,14 @@ namespace
             return juce::String (hertz, 1) + " Hz";
 
         return juce::String (hertz / 1000.0, 2) + " kHz";
+    }
+
+    /** A phase dial's tooltip, such as "Harmonic 3's phase: 90°". */
+    juce::String describePhase (int harmonic, double degrees)
+    {
+        const juce::String degreeSign (juce::CharPointer_UTF8 ("\xc2\xb0"));
+        return "Harmonic " + juce::String (harmonic) + "'s phase: " + juce::String (juce::roundToInt (degrees)) + degreeSign
+             + ". Double-click to set it to 0" + degreeSign + ".";
     }
 
     void drawSwatch (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour colour, float thickness)
@@ -71,6 +81,33 @@ HarmonicSliders::HarmonicSliders()
         };
 
         addChildComponent (slider);
+
+        // Every harmonic's phase goes round a whole turn, from the top of its dial, snapping to each quarter turn.
+        auto& phaseDial = phaseDials[i];
+        phaseDial.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        phaseDial.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        phaseDial.setRotaryParameters (0.0f, juce::MathConstants<float>::twoPi, true);
+        phaseDial.setRange (0.0, 360.0);
+        phaseDial.setDoubleClickReturnValue (true, 0.0);
+        phaseDial.snap = [] (double degrees)
+        {
+            const auto quarter = 90.0 * std::round (degrees / 90.0);
+            return std::abs (degrees - quarter) < 4.0 ? quarter : degrees;
+        };
+        phaseDial.setScrollWheelEnabled (false);
+        phaseDial.setColour (juce::Slider::rotarySliderFillColourId, colours::forPartial ((int) i).withAlpha (0.75f));
+        phaseDial.setTitle ("Harmonic " + juce::String (harmonic) + " phase");
+        phaseDial.setMouseClickGrabsKeyboardFocus (false);
+        phaseDial.setWantsKeyboardFocus (false);
+        phaseDial.onValueChange = [this, harmonic, &phaseDial]
+        {
+            phaseDial.setTooltip (describePhase (harmonic, phaseDial.getValue()));
+
+            if (onPhaseChange != nullptr)
+                onPhaseChange (harmonic, (float) juce::degreesToRadians (phaseDial.getValue()));
+        };
+
+        addChildComponent (phaseDial);
 
         // A harmonic above the fundamental can be tuned, in tune in the middle. Turning the dial snaps to that.
         if (harmonic == 1)
@@ -115,6 +152,16 @@ void HarmonicSliders::setHarmonics (std::vector<waveform::Partial> newHarmonics)
         if (i < harmonics.size() && ! slider.isMouseButtonDown())
             slider.setValue (harmonics[i].amplitude, juce::dontSendNotification);
 
+        auto& phaseDial = phaseDials[i];
+        phaseDial.setVisible (i < harmonics.size());
+
+        if (i < harmonics.size() && ! phaseDial.isMouseButtonDown())
+        {
+            const auto degrees = juce::radiansToDegrees ((double) harmonics[i].phase);
+            phaseDial.setValue (degrees - 360.0 * std::floor (degrees / 360.0), juce::dontSendNotification);
+            phaseDial.setTooltip (describePhase ((int) i + 1, phaseDial.getValue()));
+        }
+
         auto& tuner = tuners[i];
         tuner.setVisible (i > 0 && i < harmonics.size());
 
@@ -137,6 +184,7 @@ void HarmonicSliders::setOscillator (int oscillator)
     for (size_t i = 0; i < sliders.size(); ++i)
     {
         modulatable::setTarget (sliders[i], modulation::harmonicTarget (oscillator, (int) i + 1));
+        modulatable::setTarget (phaseDials[i], modulation::harmonicPhaseTarget (oscillator, (int) i + 1));
 
         if (i > 0)
             modulatable::setTarget (tuners[i], modulation::harmonicTuneTarget (oscillator, (int) i + 1));
@@ -182,6 +230,7 @@ void HarmonicSliders::resized()
         const auto row = splitRow (layout.rows[i]);
         sliders[i].setBounds (row.slider);
         tuners[i].setBounds (row.tune);
+        phaseDials[i].setBounds (row.phase);
     }
 }
 

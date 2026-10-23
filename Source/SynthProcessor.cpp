@@ -480,6 +480,7 @@ void SynthProcessor::updatePatch()
                     const auto& harmonic = decomposition.harmonics[k];
                     const auto phase = harmonic.amplitude > 0.0f ? harmonic.phase : received.phases[i][k];
                     oscillator.amplitudes[k] = harmonic.amplitude;
+                    oscillator.phases[k] = phase;
                     oscillator.phaseSines[k] = std::sin (phase);
                     oscillator.phaseCosines[k] = std::cos (phase);
                 }
@@ -620,6 +621,37 @@ void SynthProcessor::setHarmonicTune (int oscillator, int harmonic, float tune)
     oscillators[(size_t) oscillator].tunes[(size_t) harmonic - 1] = juce::jlimit (-waveform::furthestTune, waveform::furthestTune, tune);
     share();
     ++shapeVersion;
+}
+
+float SynthProcessor::getHarmonicPhase (int oscillator, int harmonic) const noexcept
+{
+    const auto& source = oscillators[(size_t) oscillator];
+    const auto& current = source.decomposition.harmonics[(size_t) harmonic - 1];
+    const auto phase = current.amplitude > 0.0f ? current.phase : source.phases[(size_t) harmonic - 1];
+    const auto turn = juce::MathConstants<float>::twoPi;
+    return phase - turn * std::floor (phase / turn);
+}
+
+void SynthProcessor::setHarmonicPhase (int oscillator, int harmonic, float phase)
+{
+    presetEdited = true;
+
+    auto& changed = oscillators[(size_t) oscillator];
+    const auto current = changed.decomposition.harmonics[(size_t) harmonic - 1];
+    changed.phases[(size_t) harmonic - 1] = phase;
+
+    if (current.amplitude <= 0.0f)
+    {
+        share();
+        ++shapeVersion;
+        return;
+    }
+
+    // The harmonic's sine wave is taken out of the wave and put back at its new phase.
+    auto shape = changed.shape;
+    waveform::addHarmonic (shape, harmonic, -current.amplitude, current.phase);
+    waveform::addHarmonic (shape, harmonic, current.amplitude, phase);
+    replaceShape (oscillator, shape, std::nullopt);
 }
 
 //==============================================================================
@@ -861,6 +893,13 @@ SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
     {
         auto partial = harmonics[(size_t) harmonic - 1];
         partial.tune = getHarmonicTune (oscillator, harmonic);
+        partial.phase = getHarmonicPhase (oscillator, harmonic);
+
+        if (const auto moved = getLivePosition (modulation::harmonicPhaseTarget (oscillator, harmonic)))
+        {
+            partial.phase = *moved * juce::MathConstants<float>::twoPi;
+            wave.moved = true;
+        }
 
         if (const auto moved = getLivePosition (modulation::harmonicTarget (oscillator, harmonic)))
         {
@@ -890,9 +929,12 @@ float SynthProcessor::getPosition (int target) const
 
     const auto info = modulation::describe (target);
 
-    // A harmonic's tune is in tune in the middle of its travel.
+    // A harmonic's tune is in tune in the middle of its travel, and its phase goes from 0 round to a whole turn.
     if (info.kind == modulation::Kind::harmonicTune)
         return getHarmonicTune (info.oscillator, info.harmonic) / (2.0f * waveform::furthestTune) + 0.5f;
+
+    if (info.kind == modulation::Kind::harmonicPhase)
+        return getHarmonicPhase (info.oscillator, info.harmonic) / juce::MathConstants<float>::twoPi;
 
     const auto& harmonic = getDecomposition (info.oscillator).harmonics[(size_t) info.harmonic - 1];
     return modulation::amplitudeRange().convertTo0to1 (harmonic.amplitude);

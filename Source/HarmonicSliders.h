@@ -11,7 +11,8 @@
 
 /** A slider for each harmonic the oscillator plays, to raise or lower it, with its strength and, once a note has
     been played, its frequency. Beside each harmonic above the fundamental, a small dial tunes it away from its whole
-    number, up to halfway to the harmonics either side, for inharmonic sounds. Above them, a key to the grid's lines.
+    number, up to halfway to the harmonics either side, for inharmonic sounds. Beside every harmonic, another sets its
+    phase, from 0 round to a whole turn. Above them, a key to the grid's lines.
 */
 class HarmonicSliders final : public juce::Component
 {
@@ -23,6 +24,9 @@ public:
 
     /** Called as a tune dial is turned, with the harmonic, numbered from 2, and how far it's now tuned, in harmonics. */
     std::function<void (int harmonic, float tune)> onTuneChange;
+
+    /** Called as a phase dial is turned, with the harmonic, numbered from 1, and its new phase, in radians. */
+    std::function<void (int harmonic, float phase)> onPhaseChange;
 
     /** The harmonics the oscillator plays, from the 1st up. */
     void setHarmonics (std::vector<waveform::Partial>);
@@ -43,13 +47,18 @@ private:
         std::array<juce::Rectangle<int>, waveform::maxHarmonics> rows;
     };
 
-    /** Where each part goes. A row is split into its colour, number, tune dial, slider, amplitude and frequency. */
+    /** Where each part goes. A row is split into its colour, number, tune and phase dials, slider, amplitude and
+        frequency.
+    */
     Layout getLayout() const;
 
     std::array<ModulatableSlider, waveform::maxHarmonics> sliders;
 
     /** The tune dials, from the 1st harmonic up, though the 1st can't be tuned and its dial is never shown. */
     std::array<ModulatableSlider, waveform::maxHarmonics> tuners;
+
+    /** The phase dials, in degrees, from the 1st harmonic up. */
+    std::array<ModulatableSlider, waveform::maxHarmonics> phaseDials;
     std::vector<waveform::Partial> harmonics;
     std::optional<double> fundamental;
 

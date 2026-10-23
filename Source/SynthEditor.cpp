@@ -66,6 +66,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         refresh();
     };
 
+    harmonicSliders.onPhaseChange = [this] (int harmonic, float phase)
+    {
+        synthProcessor.setHarmonicPhase (synthProcessor.editedSource, harmonic, phase);
+        refresh();
+    };
+
     addAndMakeVisible (grid);
     addChildComponent (harmonicSliders);
     addChildComponent (tuneSlider);
@@ -322,7 +328,10 @@ std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) 
     std::vector<waveform::Partial> played { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
 
     for (auto& partial : played)
+    {
         partial.tune = synthProcessor.getHarmonicTune (oscillator, partial.harmonic);
+        partial.phase = synthProcessor.getHarmonicPhase (oscillator, partial.harmonic);
+    }
 
     return played;
 }

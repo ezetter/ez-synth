@@ -104,6 +104,13 @@ public:
     float getHarmonicTune (int oscillator, int harmonic) const noexcept;
     void setHarmonicTune (int oscillator, int harmonic, float tune);
 
+    /** A harmonic's phase, in radians from 0 up to a whole turn: where its sine wave starts in the cycle. Setting it
+        turns that harmonic's sine wave within the wave, leaving the others as they are, so the wave becomes Custom.
+        A harmonic that's silent keeps the phase it's given, and comes in at it when it's raised.
+    */
+    float getHarmonicPhase (int oscillator, int harmonic) const noexcept;
+    void setHarmonicPhase (int oscillator, int harmonic, float phase);
+
     /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 

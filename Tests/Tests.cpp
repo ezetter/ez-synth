@@ -1199,10 +1199,20 @@ namespace
             return total / size;
         };
 
-        auto signal = play (synth, 69, 1.4, 1.6);
-        auto levels = profile (signal, 0.25, 4);
-        check (differenceBetween (levels, 0, levels, 8) > 0.2 && differenceBetween (levels, 8, levels, 16) > 0.2,
-               "a looping random LFO plays a new wave every cycle");
+        // Any two random cycles could happen to look alike, so it's how different they are over several that counts.
+        const auto averageChange = [&differenceBetween] (const std::vector<double>& levels, int numCycles)
+        {
+            auto total = 0.0;
+
+            for (int cycle = 0; cycle + 1 < numCycles; ++cycle)
+                total += differenceBetween (levels, (size_t) cycle * 8, levels, (size_t) (cycle + 1) * 8);
+
+            return total / (numCycles - 1);
+        };
+
+        auto signal = play (synth, 69, 1.6, 1.8);
+        auto levels = profile (signal, 0.25, 5);
+        check (averageChange (levels, 5) > 0.2, "a looping random LFO plays a new wave every cycle");
 
         auto largestJump = 0.0f;
 
@@ -1236,9 +1246,15 @@ namespace
 
         // Run once, a random LFO plays a new wave with each key.
         setParameter (synth, SynthProcessor::lfoModeId (0), 1.0f);
-        const auto firstNote = profile (play (synth, 69, 0.4, 0.7), 0.0, 1);
-        const auto secondNote = profile (play (synth, 69, 0.4, 0.7), 0.0, 1);
-        check (differenceBetween (firstNote, 0, secondNote, 0) > 0.2, "an LFO that runs once plays a new random wave with each key");
+        std::vector<double> notes;
+
+        for (int note = 0; note < 5; ++note)
+        {
+            const auto played = profile (play (synth, 69, 0.4, 0.7), 0.0, 1);
+            notes.insert (notes.end(), played.begin(), played.end());
+        }
+
+        check (averageChange (notes, 5) > 0.2, "an LFO that runs once plays a new random wave with each key");
         setParameter (synth, SynthProcessor::lfoModeId (0), 0.0f);
 
         // The window shows the cycle that's playing.
@@ -1847,6 +1863,119 @@ namespace
             fourth->setValue (-0.1, juce::sendNotificationSync);
 
         check (turned.has_value() && turned->first == 4 && isNear (turned->second, -0.1, 1.0e-6), "...which tunes it");
+    }
+
+    void testHarmonicPhases()
+    {
+        std::cout << "Harmonic phases" << std::endl;
+
+        constexpr auto turn = juce::MathConstants<double>::twoPi;
+        const auto wrapped = [] (double phase) { return phase - turn * std::floor (phase / turn); };
+
+        // How far a harmonic's phase in a signal is from where the fundamental's puts it, from 0 to a whole turn.
+        const auto relativePhase = [&wrapped] (const std::vector<float>& signal, double fundamental, int harmonic)
+        {
+            const auto phaseAt = [&signal] (double frequency)
+            {
+                std::complex<double> sum;
+
+                for (size_t i = 0; i < signal.size(); ++i)
+                {
+                    const auto window = 0.5 - 0.5 * std::cos (juce::MathConstants<double>::twoPi * (double) i / (double) (signal.size() - 1));
+                    sum += (double) signal[i] * window * std::polar (1.0, -juce::MathConstants<double>::twoPi * frequency * (double) i / sampleRate);
+                }
+
+                return std::arg (sum);
+            };
+
+            return wrapped (phaseAt (fundamental * harmonic) - harmonic * phaseAt (fundamental));
+        };
+
+        const auto turnedBy = [&wrapped] (double before, double after, double expected)
+        {
+            const auto difference = wrapped (after - before - expected + turn / 2.0) - turn / 2.0;
+            return std::abs (difference) < juce::degreesToRadians (3.0);
+        };
+
+        // Turning a harmonic's phase turns its sine wave within the wave, leaving its amplitude, and the others, as
+        // they were.
+        SynthProcessor synth;
+        const auto before = synth.getDecomposition (0);
+        const auto playedBefore = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        synth.setHarmonicPhase (0, 2, (float) wrapped (before.harmonics[1].phase + turn / 4.0));
+        const auto after = synth.getDecomposition (0);
+
+        check (isNear (after.harmonics[1].amplitude, before.harmonics[1].amplitude, 1.0e-4)
+                 && turnedBy (before.harmonics[1].phase, after.harmonics[1].phase, turn / 4.0)
+                 && isNear (after.harmonics[0].amplitude, before.harmonics[0].amplitude, 1.0e-4)
+                 && isNear (after.harmonics[2].phase, before.harmonics[2].phase, 1.0e-4),
+               "turning a harmonic's phase a quarter turn turns its sine wave, and only its");
+        check (! synth.getPreset (0).has_value(), "...which makes the wave Custom");
+        check (synth.getHarmonicPhase (0, 2) >= 0.0f && synth.getHarmonicPhase (0, 2) < (float) turn
+                 && turnedBy (synth.getHarmonicPhase (0, 2), after.harmonics[1].phase, 0.0),
+               "a harmonic's phase is given from 0 up to a whole turn");
+
+        const auto playedAfter = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (turnedBy (relativePhase (playedBefore, 440.0, 2), relativePhase (playedAfter, 440.0, 2), turn / 4.0)
+                 && turnedBy (relativePhase (playedBefore, 440.0, 3), relativePhase (playedAfter, 440.0, 3), 0.0)
+                 && isNear (amplitudeAt (playedAfter, 880.0), amplitudeAt (playedBefore, 880.0), 0.01),
+               "...which is heard: the 2nd harmonic a quarter turn on from the fundamental, as loud as before");
+
+        // A silent harmonic keeps the phase it's given, and comes in at it.
+        setPreset (synth, 0, waveform::Preset::sine);
+        synth.setHarmonicPhase (0, 3, 1.0f);
+        check (synth.getPreset (0) == waveform::Preset::sine && isNear (synth.getHarmonicPhase (0, 3), 1.0, 1.0e-6),
+               "a silent harmonic keeps the phase it's given, leaving the wave as it was");
+        synth.setHarmonicAmplitude (0, 3, 0.3f);
+        check (turnedBy (synth.getDecomposition (0).harmonics[2].phase, 1.0, 0.0), "...and comes in at it when it's raised");
+
+        // An envelope can turn a harmonic's phase: here, a quarter turn as each key is pressed.
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        const auto steady = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
+        synth.setAssignment (modulation::harmonicPhaseTarget (0, 2), { modulation::envelopeSource (0), 0.25f, false });
+        const auto envelopeTurned = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (turnedBy (relativePhase (steady, 440.0, 2), relativePhase (envelopeTurned, 440.0, 2), turn / 4.0),
+               "an envelope on a harmonic's phase turns it");
+        synth.setAssignment (modulation::harmonicPhaseTarget (0, 2), {});
+
+        check (modulation::getName (modulation::harmonicPhaseTarget (0, 1)) == "Osc 1 harmonic 1 phase"
+                 && modulation::findTarget ("osc3Harmonic9Phase") == modulation::harmonicPhaseTarget (2, 9)
+                 && modulation::harmonicPhaseTarget (2, 9) == modulation::numTargets - 1,
+               "every harmonic's phase, the fundamental's too, is a control of its own");
+
+        // The dials: one beside every harmonic, the fundamental too.
+        HarmonicSliders sliders;
+        sliders.setBounds (0, 0, 348, 300);
+        std::vector<waveform::Partial> partials;
+
+        for (int harmonic = 1; harmonic <= 4; ++harmonic)
+            partials.push_back ({ harmonic, 0.5f, harmonic == 3 ? (float) (turn / 4.0) : 0.0f });
+
+        sliders.setHarmonics (partials);
+        std::optional<std::pair<int, float>> turned;
+        sliders.onPhaseChange = [&turned] (int harmonic, float phase) { turned = std::pair (harmonic, phase); };
+        juce::Slider* third = nullptr;
+        auto dialsShown = 0;
+
+        for (auto* child : sliders.getChildren())
+        {
+            if (child->getTitle().endsWith (" phase") && child->isVisible())
+            {
+                ++dialsShown;
+
+                if (child->getTitle() == "Harmonic 3 phase")
+                    third = dynamic_cast<juce::Slider*> (child);
+            }
+        }
+
+        check (dialsShown == 4 && third != nullptr && isNear (third->getValue(), 90.0, 1.0e-4),
+               "every harmonic has a phase dial, in degrees");
+
+        if (third != nullptr)
+            third->setValue (180.0, juce::sendNotificationSync);
+
+        check (turned.has_value() && turned->first == 3 && isNear (turned->second, turn / 2.0, 1.0e-5), "...which sets its phase");
     }
 
     void testTuning()
@@ -2756,6 +2885,8 @@ namespace
             tunedSynth.setHarmonicTune (0, 2, 0.25f);
             tunedSynth.setHarmonicTune (0, 3, -0.2f);
             tunedSynth.setHarmonicTune (0, 5, 0.4f);
+            tunedSynth.setHarmonicPhase (0, 2, juce::MathConstants<float>::halfPi);
+            tunedSynth.setHarmonicPhase (0, 4, juce::MathConstants<float>::pi * 1.25f);
             tunedSynth.keyboardState.noteOn (1, 48, 1.0f);
             tunedSynth.prepareToPlay (sampleRate, blockSize);
             juce::AudioBuffer<float> buffer (2, blockSize);
@@ -2897,6 +3028,7 @@ int main (int argc, char* argv[])
     testChangingTheWaveMidNote();
     testEditingHarmonics();
     testTuningHarmonics();
+    testHarmonicPhases();
     testDrawingInSteps();
     testOscillators();
     testFilters();

@@ -73,6 +73,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   of times, so it doesn't end where it began, and nor does the sum. Each oscillator keeps its harmonics'
   tunes when you choose or draw another wave, and they're saved with the sound. Like the other controls, a
   tune can be moved by an LFO, an envelope or velocity; an envelope's release brings it back into tune.
+- **Set a harmonic's phase** with the ring-shaped dial beside its tune dial: where its sine wave starts in the
+  cycle, from 0° at the top of the dial round to a whole turn. Every harmonic has one, the fundamental too,
+  and the coloured ring fills round as far as the phase goes. Dragging snaps to each quarter turn, and a
+  double-click sets it to 0°; hover over it to see the phase. Turning a harmonic's phase turns its sine wave
+  within the wave and leaves the others alone, so the drawing and the grid's lines change with it and the
+  wave becomes Custom, though the harmonic is just as loud: a sawtooth with its 2nd harmonic turned a
+  quarter turn has the same harmonics but a different shape. A harmonic that's at 0 keeps the phase you give
+  it, and comes in at it when you raise it. The phase can be moved by an LFO, an envelope or velocity too.
 - **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
   phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
@@ -187,7 +195,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Giving an LFO, envelope or velocity something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
-  the harmonic buttons, a harmonic's slider or tune, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
+  the harmonic buttons, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
   in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
   switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
   the top part a **phase** and **polarity** too, and both can move the same control at once, their
@@ -332,7 +340,8 @@ the app and open it again.
 
 This checks that the presets break down into their textbook harmonics, that notes come out at the right
 pitch with the right harmonics, that raising and lowering a harmonic changes it alone, that a tuned harmonic
-plays at its own multiple of the fundamental, glides there without a click and is saved, that oscillators add
+plays at its own multiple of the fundamental, glides there without a click and is saved, that turning a
+harmonic's phase turns only its sine wave, as heard, that oscillators add
 together at their levels, that a tuned oscillator plays as far above or below the note as it's tuned, glides there
 without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, as low, mid and high passes and notches,
 that a filter's type can change during a note without a click, that saves from before the filters had types
@@ -433,7 +442,7 @@ save pictures of the window showing several waves.
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
 | `Source/RandomWave.*` | Random LFO waves, smooth or in steps, worked out from a seed and the time |
 | `Source/HarmonicSelector.*` | The 1 to 9 buttons |
-| `Source/HarmonicSliders.*` | A slider and a tune dial for each harmonic, and the key to the grid's lines |
+| `Source/HarmonicSliders.*` | A slider and tune and phase dials for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
 | `Source/StandaloneApp.cpp` | The standalone app, which only the standalone build includes, playing from every MIDI device plugged in |
 | `Source/MidiInputs.*` | The standalone app's MIDI devices: switching them on as they're plugged in, and remembering those switched off |

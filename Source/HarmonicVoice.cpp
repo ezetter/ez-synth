@@ -245,9 +245,21 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
                 amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
 
-            // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ.
-            targets.cosines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseSines[index];
-            targets.sines[(size_t) i][(size_t) harmonic] = scale * amplitude * oscillator.phaseCosines[index];
+            // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. A harmonic's phase can be moved round its whole turn.
+            auto phaseSine = oscillator.phaseSines[index], phaseCosine = oscillator.phaseCosines[index];
+
+            if (const auto phaseTarget = harmonicPhaseTarget (i, harmonic);
+                patch.assignments[(size_t) phaseTarget].isActive() || patch.velocityAssignments[(size_t) phaseTarget].isActive())
+            {
+                constexpr auto turn = juce::MathConstants<float>::twoPi;
+                const auto phase = oscillator.phases[index] - turn * std::floor (oscillator.phases[index] / turn);
+                const auto moved = turn * modulate (phaseTarget, phase / turn);
+                phaseSine = std::sin (moved);
+                phaseCosine = std::cos (moved);
+            }
+
+            targets.cosines[(size_t) i][(size_t) harmonic] = scale * amplitude * phaseSine;
+            targets.sines[(size_t) i][(size_t) harmonic] = scale * amplitude * phaseCosine;
         }
 
         // How far each harmonic above the fundamental is tuned, which an LFO or envelope can move, in tune at the

@@ -24,6 +24,9 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= harmonicPhaseTarget (0, 1))
+            info = { Kind::harmonicPhase, (target - harmonicPhaseTarget (0, 1)) / waveform::maxHarmonics,
+                     (target - harmonicPhaseTarget (0, 1)) % waveform::maxHarmonics + 1 };
         else if (target >= harmonicTuneTarget (0, 2))
             info = { Kind::harmonicTune, (target - harmonicTuneTarget (0, 2)) / (waveform::maxHarmonics - 1),
                      (target - harmonicTuneTarget (0, 2)) % (waveform::maxHarmonics - 1) + 2 };
@@ -74,6 +77,7 @@ namespace modulation
             case Kind::filterQ:              return filter + " Q";
             case Kind::filterDepth:          return filter + " depth";
             case Kind::harmonicTune:         return oscillator + " harmonic " + juce::String (info.harmonic) + " tune";
+            case Kind::harmonicPhase:        return oscillator + " harmonic " + juce::String (info.harmonic) + " phase";
             case Kind::oscillatorTune:       return oscillator + " tune";
         }
 
@@ -100,6 +104,7 @@ namespace modulation
             case Kind::filterQ:              return filter + "Q";
             case Kind::filterDepth:          return filter + "Depth";
             case Kind::harmonicTune:         return oscillator + "Harmonic" + juce::String (info.harmonic) + "Tune";
+            case Kind::harmonicPhase:        return oscillator + "Harmonic" + juce::String (info.harmonic) + "Phase";
             case Kind::oscillatorTune:       return oscillator + "Tune";
         }
 
@@ -129,7 +134,7 @@ namespace modulation
     bool isParameter (int target)
     {
         const auto kind = describe (target).kind;
-        return kind != Kind::harmonic && kind != Kind::harmonicTune;
+        return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase;
     }
 
     bool isLoudness (int target)
