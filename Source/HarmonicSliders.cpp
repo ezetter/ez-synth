@@ -244,13 +244,13 @@ void HarmonicSliders::paint (juce::Graphics& g)
     drawSwatch (g, key.removeFromLeft (22.0f), colours::drawn.withAlpha (0.45f), 8.0f);
     key.removeFromLeft (8.0f);
     g.setColour (colours::text);
-    g.drawText ("Your wave", key, juce::Justification::centredLeft);
+    g.drawText ("Target wave", key, juce::Justification::centredLeft);
 
     key = layout.sumKey.toFloat();
     drawSwatch (g, key.removeFromLeft (22.0f), colours::sum, 2.5f);
     key.removeFromLeft (8.0f);
     g.setColour (colours::text);
-    g.drawText ("Sum: the wave this oscillator plays", key, juce::Justification::centredLeft, true);
+    g.drawText ("Actual wave", key, juce::Justification::centredLeft, true);
 
     g.setColour (colours::outline);
     g.fillRect (layout.divider);

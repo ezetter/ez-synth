@@ -81,8 +81,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   wave becomes Custom, though the harmonic is just as loud: a sawtooth with its 2nd harmonic turned a
   quarter turn has the same harmonics but a different shape. A harmonic that's at 0 keeps the phase you give
   it, and comes in at it when you raise it. The phase can be moved by an LFO, an envelope or velocity too.
-- **Read the grid.** The faint band is the wave. Each coloured line is one harmonic, at its true size and
-  phase, coloured like its slider. The white line is their sum, which is the wave that oscillator plays.
+- **Read the grid.** The faint band is the wave as drawn, the key's **Target wave**. Each coloured line is one
+  harmonic, at its true size and phase, coloured like its slider. The white line is their sum, the key's
+  **Actual wave**, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
 - **Filter the sound** with the Filters panel, at the right of the row above the keys. It has two filters,
   which shape all the oscillators together, the first and then the second. Each has a switch, a choice of
