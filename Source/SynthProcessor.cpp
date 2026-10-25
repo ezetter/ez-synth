@@ -9,9 +9,11 @@ namespace
 {
     constexpr int numVoices = 16;
 
-    /** The waves the oscillators start with, so each sounds different when it's switched on. */
+    /** The waves the oscillators start with, so each sounds different when it's switched on: a sine, a square and
+        a sawtooth, each with its first 3 harmonics.
+    */
     constexpr std::array<waveform::Preset, SynthProcessor::numOscillators> startingPresets {
-        waveform::Preset::sawtooth, waveform::Preset::square, waveform::Preset::sine
+        waveform::Preset::sine, waveform::Preset::square, waveform::Preset::sawtooth
     };
 
     /** The waves and periods the LFOs start with. */
@@ -174,7 +176,7 @@ namespace
         layout.add (createFilterParameters (0, FilterType::lowPass, 1000.0f));
         layout.add (createFilterParameters (1, FilterType::highPass, 250.0f));
 
-        // The LFOs start on, as they do nothing until a control is assigned to one. Each keeps its period, in seconds,
+        // The LFOs start off, ready to switch on, which giving one something to move does. Each keeps its period, in seconds,
         // but it's shown as a rate, in hertz, which rises as its dial turns up, from 0.1 to 10 Hz.
         const juce::NormalisableRange<float> periodRange (modulation::shortestPeriod, modulation::longestPeriod,
                                                           [] (float, float, float position) { return modulation::positionToPeriod (1.0f - position); },
@@ -186,7 +188,7 @@ namespace
 
             layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
                 "lfo" + juce::String (i + 1), name, " ",
-                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoOnId (i), 1 }, name + " On", true),
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoOnId (i), 1 }, name + " On", false),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::lfoPeriodId (i), 1 }, name + " Rate", periodRange,
                     startingPeriods[(size_t) i],
@@ -1104,11 +1106,15 @@ void SynthProcessor::loadState (juce::ValueTree state)
     parameters.replaceState (state);
 
     // Waves saved before they could be drawn in steps were drawn smoothly, and before harmonics could be tuned, were
-    // in tune.
+    // in tune. A silent harmonic's phase, which isn't saved, goes back to 0, so nothing from the sound before
+    // lingers.
     drawings = {};
 
     for (auto& oscillator : oscillators)
+    {
         oscillator.tunes = {};
+        oscillator.phases = {};
+    }
 
     for (const auto& wave : waves)
     {

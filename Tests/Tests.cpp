@@ -222,6 +222,7 @@ namespace
         std::cout << "Playing notes" << std::endl;
 
         SynthProcessor synth;   // a sawtooth, played with 3 sine waves
+        setPreset (synth, 0, waveform::Preset::sawtooth);
         const auto signal = play (synth, 69, 0.5, 1.0);
         const auto steady = slice (signal, 0.1, 0.45);
 
@@ -528,6 +529,7 @@ namespace
         std::cout << "Filtering" << std::endl;
 
         SynthProcessor synth;   // a sawtooth
+        setPreset (synth, 0, waveform::Preset::sawtooth);
         setNumHarmonics (synth, 9);
         const auto open = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);   // A4: harmonics from 440 Hz to 3960 Hz
         const auto gainAt = [&open] (const std::vector<float>& filtered, double frequency)
@@ -1900,6 +1902,7 @@ namespace
         // Turning a harmonic's phase turns its sine wave within the wave, leaving its amplitude, and the others, as
         // they were.
         SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sawtooth);
         const auto before = synth.getDecomposition (0);
         const auto playedBefore = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         synth.setHarmonicPhase (0, 2, (float) wrapped (before.harmonics[1].phase + turn / 4.0));
@@ -2413,6 +2416,82 @@ namespace
         }
     }
 
+    /** Init puts everything back as EZ Synth starts: a sine, a square and a sawtooth, each with 3 harmonics, only the
+        first on, everything in tune and in phase, the LFOs and filters off, and nothing moving anything.
+    */
+    void testInit()
+    {
+        std::cout << "Init" << std::endl;
+
+        SynthProcessor fresh;
+        check (fresh.getPreset (0) == waveform::Preset::sine && fresh.getPreset (1) == waveform::Preset::square
+                 && fresh.getPreset (2) == waveform::Preset::sawtooth
+                 && fresh.getNumHarmonics (0) == 3 && fresh.getNumHarmonics (1) == 3 && fresh.getNumHarmonics (2) == 3
+                 && fresh.isOn (0) && ! fresh.isOn (1) && ! fresh.isOn (2),
+               "EZ Synth starts with a sine, a square and a sawtooth, each with 3 harmonics, only the sine on");
+
+        auto nothingMoves = true, inTune = true;
+
+        for (int target = 0; target < modulation::numTargets; ++target)
+            nothingMoves = nothingMoves && ! fresh.getAssignment (target).isActive();
+
+        for (int oscillator = 0; oscillator < SynthProcessor::numOscillators; ++oscillator)
+        {
+            inTune = inTune && juce::exactlyEqual (fresh.getTune (oscillator), 0.0f);
+
+            for (int harmonic = 2; harmonic <= waveform::maxHarmonics; ++harmonic)
+                inTune = inTune && juce::exactlyEqual (fresh.getHarmonicTune (oscillator, harmonic), 0.0f);
+        }
+
+        const auto value = [] (SynthProcessor& synth, const juce::String& id) { return synth.parameters.getRawParameterValue (id)->load(); };
+        auto lfosOff = true, filtersOff = true;
+
+        for (int lfo = 0; lfo < SynthProcessor::numLfos; ++lfo)
+            lfosOff = lfosOff && value (fresh, SynthProcessor::lfoOnId (lfo)) < 0.5f && ! fresh.isLfoRandom (lfo);
+
+        for (int filter = 0; filter < modulation::numFilters; ++filter)
+            filtersOff = filtersOff && value (fresh, SynthProcessor::filterIds (filter).on) < 0.5f;
+
+        check (nothingMoves && inTune && lfosOff && filtersOff,
+               "...in tune, with the LFOs and filters off, and no LFO or envelope moving anything");
+
+        // A sound with almost everything changed.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 7, 0);
+        setParameter (synth, SynthProcessor::onId (2), 1.0f);
+        setParameter (synth, SynthProcessor::levelId (1), 0.3f);
+        setParameter (synth, SynthProcessor::tuneId (1), -5.0f);
+        setParameter (synth, SynthProcessor::volumeId, 0.2f);
+        synth.setHarmonicTune (2, 4, 0.3f);
+        synth.setHarmonicPhase (0, 2, 1.2f);
+        synth.setHarmonicPhase (0, 8, 2.0f);   // silent
+        setFilterType (synth, 0, FilterType::notch);
+        setFilter (synth, SynthProcessor::filterIds (1), true, 300.0f, 0.6f);
+        setLfo (synth, 1, 0.05f, true, waveform::Preset::square);
+        setParameter (synth, SynthProcessor::lfoRandomId (2), 1.0f);
+        synth.setDrawing (SynthProcessor::numOscillators + 2, { true, 5 });
+        synth.setDrawing (0, { true, 12 });
+        setEnvelope (synth, 2, { 1.0f, 1.0f, 0.1f, 5.0f });
+        synth.setAssignment (modulation::filterCutoffTarget (1), { 1, 0.4f, true, 0.3f });
+        synth.setAssignment (modulation::harmonicTuneTarget (0, 3), { modulation::envelopeSource (0), 0.2f, false });
+        synth.setVelocityAssignment (modulation::volumeTarget, {});
+        synth.setVelocityAssignment (modulation::oscillatorLevelTarget (2), { modulation::velocitySource, 0.5f, false });
+
+        synth.loadInitPreset();
+
+        juce::MemoryBlock initialised, started;
+        synth.getStateInformation (initialised);
+        fresh.getStateInformation (started);
+        const auto initialisedXml = juce::AudioProcessor::getXmlFromBinary (initialised.getData(), (int) initialised.getSize());
+        const auto startedXml = juce::AudioProcessor::getXmlFromBinary (started.getData(), (int) started.getSize());
+        check (initialisedXml != nullptr && startedXml != nullptr && initialisedXml->isEquivalentTo (startedXml.get(), false),
+               "choosing Init puts every control back as EZ Synth starts");
+        check (juce::exactlyEqual (synth.getHarmonicPhase (0, 8), 0.0f) && ! synth.getDrawing (0).stepped && synth.getPresetName() == "Init"
+                 && ! synth.isPresetEdited(),
+               "...even a silent harmonic's phase, and how each wave is drawn");
+    }
+
     void testPresets()
     {
         std::cout << "Presets" << std::endl;
@@ -2726,7 +2805,7 @@ namespace
 
         check (restored.getShape (1) == drawn, "a drawn wave is restored to its oscillator, even beyond full scale");
         check (! restored.getPreset (1).has_value(), "...and isn't taken for a preset");
-        check (restored.getPreset (2) == waveform::Preset::triangle && restored.getPreset (0) == waveform::Preset::sawtooth,
+        check (restored.getPreset (2) == waveform::Preset::triangle && restored.getPreset (0) == waveform::Preset::sine,
                "the other oscillators' presets are restored as those presets");
         check (restored.getNumHarmonics (1) == 7 && restored.getNumHarmonics (0) == 3, "each oscillator's number of harmonics is restored");
         check (restored.isOn (0) && restored.isOn (1) && ! restored.isOn (2), "which oscillators are on is restored");
@@ -3091,6 +3170,7 @@ int main (int argc, char* argv[])
     testTuning();
     testMidiInputs();
     testPresets();
+    testInit();
     testFactoryPresets();
     testGrandPiano();
     testSavingAndLoading();

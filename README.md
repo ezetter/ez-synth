@@ -12,8 +12,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 - **Choose an oscillator or LFO.** The six cards across the top are the three oscillators, then the three
   LFOs. Click one to show its wave on the grid; its card is outlined. The presets and the drawing work on
-  whichever is shown. Only OSC 1 is on to begin with. The others start as a square and a sine, so each
-  sounds different once switched on.
+  whichever is shown. Only OSC 1 is on to begin with, playing a sine. The others start as a square and a
+  sawtooth, so each sounds different once switched on, and each plays its first 3 harmonics. The LFOs start
+  switched off, until you give one something to move.
 - **Switch oscillators on and off** with the switch on each card. Every oscillator that's on plays every
   note, added together. You can still edit one that's off: its wave is drawn faintly, and the grid says it's
   off.
@@ -243,7 +244,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
   suggests the current preset's name, so saving again over it is quick.
 - **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
-  then the factory presets, then your own. It also has a way to open a preset file from anywhere, and a way
+  then the factory presets, then your own. Init puts every control back as it starts: a sine, a square and a
+  sawtooth with 3 harmonics each, only the sine on, every oscillator and harmonic in tune and every
+  harmonic's phase as its wave has it, each wave drawn smoothly, the filters a low pass and a high pass, both
+  off, the LFOs off and not random, the envelopes as they start, and nothing moved by an LFO or envelope.
+  Velocity still makes softer notes quieter, as it starts out doing. It also has a way to open a preset file from anywhere, and a way
   to show the presets folder in Finder.
 - **The arrows** either side of the name step back and forth through the factory presets, then your own,
   each in order of name.
