@@ -41,6 +41,20 @@ public:
 
     void showModulationEditor (juce::Component& control) override;
 
+    /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
+    bool keyPressed (const juce::KeyPress&) override;
+
+    /** Each click, scroll or key in the window, so the changes that follow count as the user's and can be undone. */
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    void noteUserTouch()   { userTouched = true; }
+
+    /** Makes whatever's changed since last time a step that can be undone, if the user changed it and has finished:
+        once the mouse is up and a scroll has stopped. Changes that just happen, from the host, are taken into the
+        step the history is on. The window does this many times a second.
+    */
+    void rememberChanges();
+
 private:
     /** What the window shows depends on these. When any of them changes, it's all brought up to date. */
     struct Shown
@@ -96,6 +110,10 @@ private:
     std::array<SynthProcessor::RandomCycle, SynthProcessor::numLfos> randomCycles;
     int shownNote = -2;
     bool focusGiven = false;
+
+    int rememberedChangeCount = -1;
+    bool userTouched = false;
+    juce::uint32 lastScrollTime = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SynthEditor)
 };

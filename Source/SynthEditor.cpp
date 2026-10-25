@@ -120,12 +120,19 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     setResizeLimits (1240, 900, 2000, 1400);
     setSize (1320, 960);
 
+    // Hears every click and scroll in the window, whichever control it lands on, and takes the keys none of them
+    // use, such as Command-Z.
+    addMouseListener (this, true);
+    setWantsKeyboardFocus (true);
+
     refresh();
+    rememberChanges();
     startTimerHz (30);
 }
 
 SynthEditor::~SynthEditor()
 {
+    removeMouseListener (this);
     setLookAndFeel (nullptr);
 }
 
@@ -547,10 +554,67 @@ void SynthEditor::showModulationEditor (juce::Component& control)
                                             getLocalArea (&control, control.getLocalBounds()), this);
 }
 
+//==============================================================================
+bool SynthEditor::keyPressed (const juce::KeyPress& key)
+{
+    const auto command = juce::ModifierKeys::commandModifier;
+
+    if (key == juce::KeyPress ('z', command, 0) || key == juce::KeyPress ('z', command | juce::ModifierKeys::shiftModifier, 0))
+    {
+        // Whatever was just changed is a step of its own, even if it hasn't been taken as one yet.
+        rememberChanges();
+
+        if (key.getModifiers().isShiftDown() ? synthProcessor.redo() : synthProcessor.undo())
+        {
+            rememberedChangeCount = synthProcessor.getChangeCount();
+            userTouched = false;
+            refresh();
+        }
+
+        return true;
+    }
+
+    userTouched = true;
+    return false;
+}
+
+void SynthEditor::mouseDown (const juce::MouseEvent&)
+{
+    userTouched = true;
+}
+
+void SynthEditor::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&)
+{
+    userTouched = true;
+    lastScrollTime = juce::Time::getMillisecondCounter();
+}
+
+void SynthEditor::rememberChanges()
+{
+    const auto changeCount = synthProcessor.getChangeCount();
+
+    if (changeCount == rememberedChangeCount)
+        return;
+
+    // A drag or a scroll is one step, taken once it's finished.
+    if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()
+         || juce::Time::getMillisecondCounter() - lastScrollTime < 400)
+        return;
+
+    if (userTouched)
+        synthProcessor.rememberForUndo();
+    else
+        synthProcessor.updateUndoStep();
+
+    rememberedChangeCount = changeCount;
+    userTouched = false;
+}
+
 void SynthEditor::timerCallback()
 {
     refresh();
     showModulation();
+    rememberChanges();
 
     // In the standalone app the computer keyboard plays the piano straight away.
     if (! focusGiven && isShowing() && synthProcessor.wrapperType == juce::AudioProcessor::wrapperType_Standalone)

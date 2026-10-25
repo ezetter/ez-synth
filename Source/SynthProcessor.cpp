@@ -342,9 +342,10 @@ SynthProcessor::SynthProcessor()
         if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (parameter))
             parameters.addParameterListener (withId->paramID, this);
 
-    // Init is the sound as it starts, before anything's been edited.
+    // Init is the sound as it starts, before anything's been edited, and the first step of the undo history.
     presetEdited = false;
     initState = createState();
+    undoHistory.push_back (initState);
 }
 
 SynthProcessor::~SynthProcessor()
@@ -574,7 +575,7 @@ float SynthProcessor::getTune (int oscillator) const noexcept
 
 void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
-    presetEdited = true;
+    markEdited();
 
     // A harmonic the new wave doesn't have will start like a sine, rising from zero, if it's raised.
     oscillators[(size_t) oscillator].phases.fill (0.0f);
@@ -598,7 +599,7 @@ void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newSha
 
 void SynthProcessor::setHarmonicAmplitude (int oscillator, int harmonic, float amplitude)
 {
-    presetEdited = true;
+    markEdited();
 
     const auto& changed = oscillators[(size_t) oscillator];
     const auto& current = changed.decomposition.harmonics[(size_t) harmonic - 1];
@@ -623,7 +624,7 @@ void SynthProcessor::setHarmonicTune (int oscillator, int harmonic, float tune)
     if (harmonic < 2 || harmonic > waveform::maxHarmonics)
         return;
 
-    presetEdited = true;
+    markEdited();
     oscillators[(size_t) oscillator].tunes[(size_t) harmonic - 1] = juce::jlimit (-waveform::furthestTune, waveform::furthestTune, tune);
     share();
     ++shapeVersion;
@@ -640,7 +641,7 @@ float SynthProcessor::getHarmonicPhase (int oscillator, int harmonic) const noex
 
 void SynthProcessor::setHarmonicPhase (int oscillator, int harmonic, float phase)
 {
-    presetEdited = true;
+    markEdited();
 
     auto& changed = oscillators[(size_t) oscillator];
     const auto current = changed.decomposition.harmonics[(size_t) harmonic - 1];
@@ -673,7 +674,7 @@ std::optional<waveform::Preset> SynthProcessor::getLfoPreset (int lfo) const noe
 
 void SynthProcessor::setLfoShape (int lfo, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
-    presetEdited = true;
+    markEdited();
 
     lfos[(size_t) lfo] = { newShape, fromPreset };
     share();
@@ -748,6 +749,7 @@ std::optional<float> SynthProcessor::getPlayedLfoEnd (int lfo) const
 void SynthProcessor::setDrawing (int source, const waveform::Drawing& drawing)
 {
     drawings[(size_t) source] = drawing;
+    ++changeCount;
     share();
 }
 
@@ -789,7 +791,7 @@ const modulation::Assignment& SynthProcessor::getAssignment (int target) const n
 
 void SynthProcessor::setAssignment (int target, const modulation::Assignment& assignment)
 {
-    presetEdited = true;
+    markEdited();
 
     assignments[(size_t) target] = assignment;
     assignments[(size_t) target].phase = juce::jlimit (0.0f, modulation::latestPhase, assignment.phase);
@@ -812,7 +814,7 @@ const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target)
 
 void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
 {
-    presetEdited = true;
+    markEdited();
 
     velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
     share();
@@ -1199,6 +1201,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
     presetEdited = edited;
     factoryPreset = factory;
     ++presetVersion;
+    ++changeCount;
 }
 
 //==============================================================================
@@ -1297,7 +1300,53 @@ bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::Str
 
 void SynthProcessor::parameterChanged (const juce::String&, float)
 {
-    presetEdited = true;
+    markEdited();
+}
+
+//==============================================================================
+void SynthProcessor::rememberForUndo()
+{
+    auto now = createState();
+
+    if (! undoHistory.empty() && now.isEquivalentTo (undoHistory[undoStep]))
+        return;
+
+    // A change after undoing some takes the place of what was undone.
+    if (! undoHistory.empty())
+        undoHistory.resize (undoStep + 1);
+
+    undoHistory.push_back (std::move (now));
+
+    if (undoHistory.size() > mostUndoSteps)
+        undoHistory.erase (undoHistory.begin());
+
+    undoStep = undoHistory.size() - 1;
+}
+
+void SynthProcessor::updateUndoStep()
+{
+    if (undoHistory.empty())
+        undoHistory.push_back (createState());
+    else
+        undoHistory[undoStep] = createState();
+}
+
+bool SynthProcessor::undo()
+{
+    if (! canUndo())
+        return false;
+
+    loadState (undoHistory[--undoStep].createCopy());
+    return true;
+}
+
+bool SynthProcessor::redo()
+{
+    if (! canRedo())
+        return false;
+
+    loadState (undoHistory[++undoStep].createCopy());
+    return true;
 }
 
 juce::AudioProcessorEditor* SynthProcessor::createEditor()

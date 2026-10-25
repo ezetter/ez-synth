@@ -287,6 +287,31 @@ public:
     int getPresetVersion() const noexcept   { return presetVersion; }
 
     //==============================================================================
+    // Undo and redo, of the whole sound.
+
+    /** Goes up with every change to the sound, from the window, a preset or the host. */
+    int getChangeCount() const noexcept   { return changeCount.load(); }
+
+    /** Remembers the sound as it is now as the next step that can be undone, after whatever was undone, if it's
+        changed since the last. The window calls this after each change the user makes.
+    */
+    void rememberForUndo();
+
+    /** Takes the sound as it is now as the step it's on, without adding a step: for changes the user didn't make,
+        such as a host's automation, so undoing doesn't step through them.
+    */
+    void updateUndoStep();
+
+    /** Goes back to the sound before the last change, or on to the next one undone, if there is one. */
+    bool undo();
+    bool redo();
+    bool canUndo() const noexcept   { return undoStep > 0; }
+    bool canRedo() const noexcept   { return undoStep + 1 < undoHistory.size(); }
+
+    /** How many steps the history keeps. */
+    static constexpr size_t mostUndoSteps = 200;
+
+    //==============================================================================
     /** The note most recently started, or -1 if none has been. */
     int getLastNote() const noexcept   { return lastNote.load(); }
 
@@ -419,6 +444,17 @@ private:
     juce::File presetFile;
     bool factoryPreset = false;
     std::atomic<bool> presetEdited { false };   // set from whichever thread changes a parameter
+    std::atomic<int> changeCount { 0 };
+
+    /** Notes that the sound has been changed, so it's no longer the preset's, and there's something to undo. */
+    void markEdited() noexcept
+    {
+        presetEdited = true;
+        ++changeCount;
+    }
+
+    std::vector<juce::ValueTree> undoHistory;
+    size_t undoStep = 0;
     int presetVersion = 0;
     juce::ValueTree initState;
 

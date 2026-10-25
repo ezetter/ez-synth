@@ -2492,6 +2492,108 @@ namespace
                "...even a silent harmonic's phase, and how each wave is drawn");
     }
 
+    /** Command-Z goes back through each change made in the window, whatever it was, and Shift-Command-Z forward again;
+        a change after undoing takes the place of what was undone, and changes the user didn't make aren't steps.
+    */
+    void testUndo()
+    {
+        std::cout << "Undo" << std::endl;
+
+        const auto stateOf = [] (SynthProcessor& synth)
+        {
+            juce::MemoryBlock block;
+            synth.getStateInformation (block);
+            return juce::ValueTree::fromXml (*juce::AudioProcessor::getXmlFromBinary (block.getData(), (int) block.getSize()));
+        };
+        const auto same = [] (const juce::ValueTree& a, const juce::ValueTree& b) { return a.isEquivalentTo (b); };
+
+        SynthProcessor synth;
+        std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
+        auto& window = dynamic_cast<SynthEditor&> (*editor);
+        const auto undoKey = juce::KeyPress ('z', juce::ModifierKeys::commandModifier, 0);
+        const auto redoKey = juce::KeyPress ('z', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0);
+
+        const auto start = stateOf (synth);
+        check (! synth.canUndo() && ! synth.canRedo() && window.keyPressed (undoKey) && same (stateOf (synth), start),
+               "there's nothing to undo at first, and Command-Z does nothing");
+
+        // Each of these is a change the user makes in the window.
+        const std::vector<std::function<void()>> changes {
+            [&] { setParameter (synth, SynthProcessor::volumeId, 0.3f); },
+            [&] { setPreset (synth, 1, waveform::Preset::triangle); },
+            [&] { synth.setHarmonicTune (0, 3, 0.25f); },
+            [&] { synth.setHarmonicPhase (2, 4, 1.5f); },
+            [&] { synth.setDrawing (0, { true, 9 }); },
+            [&] { synth.setAssignment (modulation::filterCutoffTarget (0), { 2, 0.5f, false }); },
+            [&] { synth.setVelocityAssignment (modulation::volumeTarget, {}); },
+            [&] { setEnvelope (synth, 1, { 0.5f, 0.2f, 0.4f, 1.0f }); },
+        };
+
+        std::vector<juce::ValueTree> states { start };
+
+        for (const auto& change : changes)
+        {
+            window.noteUserTouch();
+            change();
+            window.rememberChanges();
+            states.push_back (stateOf (synth));
+        }
+
+        auto backAndForth = true;
+
+        for (auto i = states.size() - 1; i-- > 0;)
+            backAndForth = backAndForth && window.keyPressed (undoKey) && same (stateOf (synth), states[i]);
+
+        check (backAndForth && ! synth.canUndo(), "Command-Z undoes each change in turn, back to the start");
+
+        for (size_t i = 1; i < states.size(); ++i)
+            backAndForth = backAndForth && window.keyPressed (redoKey) && same (stateOf (synth), states[i]);
+
+        check (backAndForth && ! synth.canRedo(), "...and Shift-Command-Z redoes each one");
+
+        window.keyPressed (undoKey);
+        window.keyPressed (undoKey);
+        window.noteUserTouch();
+        setParameter (synth, SynthProcessor::levelId (0), 0.1f);
+        window.rememberChanges();
+        const auto changedAfterUndoing = stateOf (synth);
+        check (! synth.canRedo(), "a change after undoing takes the place of what was undone");
+        window.keyPressed (undoKey);
+        check (same (stateOf (synth), states[states.size() - 3]), "...and undoing it goes back to before it");
+        window.keyPressed (redoKey);
+
+        // A host moving a control isn't a step of its own, so undoing goes back past it to the user's last change.
+        setParameter (synth, SynthProcessor::levelId (1), 0.6f);
+        window.rememberChanges();
+        const auto automated = stateOf (synth);
+        window.keyPressed (undoKey);
+        window.keyPressed (redoKey);
+        check (! same (changedAfterUndoing, automated) && same (stateOf (synth), automated),
+               "changes from the host aren't steps to undo");
+
+        // A preset is one step, however much it changes.
+        window.noteUserTouch();
+        synth.loadInitPreset();
+        window.rememberChanges();
+        window.keyPressed (undoKey);
+        check (same (stateOf (synth), automated), "undoing a preset goes back to the sound before it");
+
+        // The history only goes back so far.
+        for (size_t i = 0; i < SynthProcessor::mostUndoSteps + 20; ++i)
+        {
+            window.noteUserTouch();
+            setParameter (synth, SynthProcessor::volumeId, (float) (i % 50) / 100.0f);
+            window.rememberChanges();
+        }
+
+        size_t steps = 0;
+
+        while (synth.undo())
+            ++steps;
+
+        check (steps == SynthProcessor::mostUndoSteps - 1, "the history keeps the last " + juce::String (SynthProcessor::mostUndoSteps) + " steps");
+    }
+
     void testPresets()
     {
         std::cout << "Presets" << std::endl;
@@ -3171,6 +3273,7 @@ int main (int argc, char* argv[])
     testMidiInputs();
     testPresets();
     testInit();
+    testUndo();
     testFactoryPresets();
     testGrandPiano();
     testSavingAndLoading();

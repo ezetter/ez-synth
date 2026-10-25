@@ -238,6 +238,16 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   moved from it. The oscillator's card above follows along too. The grid stretches to fit a harmonic
   raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
+### Undo
+
+**Command-Z** undoes the last change to the sound, whatever it was: a knob, a slider, a switch, a drawn wave,
+what an LFO, envelope or velocity moves, or loading a preset. Press it again to go further back.
+**Shift-Command-Z** redoes what was undone. A drag or a scroll is one step, however far it went. Making a
+change after undoing replaces what was undone. EZ Synth remembers the last 200 steps. Changes made by your
+DAW's automation aren't steps of their own, so undoing goes back to the last change you made.
+
+In a plugin, click in EZ Synth's window first so the keys come to it rather than to your DAW.
+
 ### Presets
 
 - **Save** in the header saves the whole sound as a preset: every oscillator's and LFO's wave and settings,
