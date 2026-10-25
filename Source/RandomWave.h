@@ -4,9 +4,10 @@
 
 #include <cstdint>
 
-/** The random waves an LFO can play instead of its drawn one: a new wave every cycle, or for an LFO that runs once, a
-    new one with every key. A random wave is worked out from a seed and the time, in cycles, so the same seed always
-    gives the same wave, and any moment of it can be found straight away, even one from the cycle before.
+/** The random waves an LFO can play instead of its drawn one: a new wave every cycle, which for an LFO that starts
+    with each key, starts anew with every key. A random wave is worked out from a seed and the time, in cycles, so
+    the same seed always gives the same wave, and any moment of it can be found straight away, even one from the
+    cycle before.
 
     Drawn smoothly, it's a curve that rises and falls through random levels, turning smoothly at each, at random times
     from 0.08 to 0.32 of a cycle apart, so its rises and falls last different lengths, as a curve drawn by hand might.
@@ -19,8 +20,10 @@ namespace randomwave
     /** The wave at a time, in cycles from when it started. */
     float valueAt (std::uint32_t seed, double cycles, const waveform::Drawing&);
 
-    /** The wave of an LFO that runs once: its first cycle, starting at its start and holding its end. */
-    float onceValueAt (std::uint32_t seed, double cycles, const waveform::Drawing&);
+    /** The wave of an LFO that starts with each key and plays a number of times, or forever for 0: its first
+        cycles, starting at its start and holding the end of the last.
+    */
+    float fromKeyValueAt (std::uint32_t seed, double cycles, const waveform::Drawing&, int times);
 
     /** One cycle of the wave, numbered from 0, for showing. */
     waveform::Shape getCycle (std::uint32_t seed, std::int64_t cycle, const waveform::Drawing&);

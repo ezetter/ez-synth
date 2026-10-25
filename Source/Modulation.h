@@ -184,8 +184,22 @@ namespace modulation
     inline constexpr float longestStage = 20.0f;
 
     //==============================================================================
-    /** Where an LFO is, given how far through its periods it's gone. A looping LFO repeats; one that runs once
-        holds its wave's last value after its period is over.
+    /** How an LFO runs: looping all the time, or starting with each key and playing its wave once, twice, up to
+        5 times, or forever.
     */
-    float lfoValue (const waveform::Shape&, double periodsGone, bool once);
+    inline constexpr int lfoLoops = 0;
+    inline constexpr int mostLfoTimes = 5;
+    inline constexpr int lfoForever = mostLfoTimes + 1;
+
+    /** The modes' names: Loop, Once, Twice, 3 times, 4 times, 5 times and an infinity sign. */
+    juce::StringArray getLfoModeNames();
+
+    /** How many times an LFO in a mode that starts with each key plays its wave, or 0 for forever. */
+    inline int getLfoTimes (int mode) noexcept   { return mode == lfoForever ? 0 : mode; }
+
+    /** Where an LFO is, given how far through its periods it's gone. One that loops, or runs forever, repeats; one
+        that starts with each key waits at its first value until it starts, and one that plays its wave a number of
+        times holds its last value once it has.
+    */
+    float lfoValue (const waveform::Shape&, double periodsGone, bool fromKey, int times);
 }

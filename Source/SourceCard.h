@@ -2,6 +2,7 @@
 
 #include "ChoiceButtons.h"
 #include "ModulatableControls.h"
+#include "Modulation.h"
 #include "Waveform.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -67,7 +68,9 @@ public:
     void setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName, float tune);
 };
 
-/** An LFO's card: its switch, its wave, whether it loops or runs once, and its period. */
+/** An LFO's card: its switch, its wave, whether it loops or starts with each key, and how many times it plays then,
+    and its rate.
+*/
 class LfoCard final : public SourceCard
 {
 public:
@@ -80,7 +83,15 @@ public:
 
     void resized() override;
 
+    /** The second button's label: how many times the LFO plays from each key, as last chosen. */
+    juce::String getTimesLabel() const   { return mode.getLabel (1); }
+
 private:
-    ChoiceButtons mode { { "Loop", "Once" } };
+    void showMode (int);
+    void chooseTimes();
+
+    // Loop, or a button showing how many times it plays from each key, which opens a menu of them.
+    ChoiceButtons mode { { "Loop", modulation::getLfoModeNames()[1] } };
     juce::ParameterAttachment modeAttachment;
+    int timesMode = 1;
 };

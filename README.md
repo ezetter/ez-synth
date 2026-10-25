@@ -141,7 +141,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 - **An LFO is an oscillator mostly too slow to hear**, whose wave moves controls instead. Its card has a switch,
   a **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 100 Hz,
-  fast enough to roughen a sound or growl, and **Loop** and **Once**. Even at 100 Hz an LFO swings the volume,
+  fast enough to roughen a sound or growl, and **Loop** and **Once**, which is a menu. Even at 100 Hz an LFO swings the volume,
   a level or a harmonic as fully as a slow one does, within 1 dB, and a filter's cutoff nearly so, as the
   filter itself takes a moment to respond. Click
   the card to draw its wave on the grid, or pick a preset for it. An LFO follows its drawing exactly, rather
@@ -150,9 +150,15 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each
   time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
   rises from −1 to +1 and holds there, for instance, to swell each note in.
+- Clicking **Once** opens a menu to run the LFO **Once**, **Twice**, **3 times**, **4 times** or **5 times**
+  from each key, or **∞**, forever. The button shows the one chosen. Each starts from the start of the wave
+  with each key, as Once does, and runs through it that many times, heading back to the start between times as
+  a looping LFO does, then holds the last value. **∞** runs like Loop, except that it starts again with each
+  key, separately for each note. With Loop chosen, the button keeps showing the last number chosen, so
+  clicking it goes back to that.
 - An LFO that's switched off moves nothing. Giving one something to move switches it on.
 - **Random** plays a new random wave instead of the LFO's drawn one: every cycle when it loops, and with
-  every key when it runs once, separately for each note. Switch it on with **Random** at the top of the
+  every key when it starts with each key, separately for each note, a new wave each time it runs through. Switch it on with **Random** at the top of the
   grid, beside **Draw**, which sets what kind of random wave it plays:
   - **Smooth** is a curve that rises and falls through random levels between −1 and +1, turning smoothly
     at each, as a curve drawn by hand might. The levels come at random times, from 0.08 to 0.32 of a cycle
@@ -220,7 +226,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase
     just short of 360° is the same as shifting it slightly to the left: at 270° the control peaks a quarter
     of a period before the LFO does. Give two controls on the same LFO different phases and they move out of
-    step. For an LFO that runs **Once**, a phase is a delay: after each key, the control waits where the
+    step. For an LFO that starts with each key, a phase is a delay: after each key, the control waits where the
     wave starts for that share of the period, then runs through the wave. Double-click the slider to put it
     back to 0°. Envelopes and velocity have no phase.
   - **Normal** polarity raises the control as the LFO or envelope rises. **Inverted** lowers it. Velocity has
@@ -418,7 +424,8 @@ save pictures of the window showing several waves.
   of a cycle, and the curve joins the levels with Fritsch and Carlson's monotone cubic, which turns flat at
   each peak and trough and never overshoots, so it stays between −1 and 1. A looping LFO counts its cycles
   and plays its own seed's wave at the cycle and phase it's at, so each cycle is new and runs on from the
-  last. One that runs once gives each note a new seed.
+  last. One that starts with each key gives each note a new seed, and plays its cycles from the first, holding
+  the end of the last if it plays a number of times.
 - **Modulation.** Every 64 samples, each note works out where the LFOs and its envelopes are, and where
   they've moved its controls (`Source/HarmonicVoice.cpp`). A looping LFO carries on from where it was at
   the start of the block; one that runs once, and each envelope (`Source/Envelope.cpp`), counts from the

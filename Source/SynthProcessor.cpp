@@ -201,7 +201,7 @@ namespace
                         })),
                 std::make_unique<juce::AudioParameterChoice> (
                     juce::ParameterID { SynthProcessor::lfoModeId (i), 1 }, name + " Mode",
-                    juce::StringArray { "Loop", "Once" }, 0),
+                    modulation::getLfoModeNames(), modulation::lfoLoops),
                 std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoRandomId (i), 1 }, name + " Random", false)));
         }
 
@@ -417,7 +417,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         lfoCycles[i] += (std::int64_t) periodsDone;
         lfoCyclesShown[i] = lfoCycles[i];
 
-        if (! lfo.once)
+        if (! lfo.fromKey)
             lfoProgress[i] = lfoPhases[i];
         else if (lastNoteOnSample >= 0)
             lfoProgress[i] = (double) (samplesPlayed + numSamples - lastNoteOnSample) / lfo.periodSamples;
@@ -533,7 +533,9 @@ void SynthProcessor::updatePatch()
     {
         auto& lfo = patch.lfos[i];
         lfo.on = lfoParameters[i].on->load() >= 0.5f;
-        lfo.once = lfoParameters[i].mode->load() >= 0.5f;
+        const auto mode = getLfoMode ((int) i);
+        lfo.fromKey = mode != modulation::lfoLoops;
+        lfo.times = modulation::getLfoTimes (mode);
         lfo.periodSamples = std::max (1.0, lfoParameters[i].period->load() * playingSampleRate);
         lfo.phase = lfoPhases[i];
         lfo.cycle = lfoCycles[i];
@@ -691,9 +693,25 @@ float SynthProcessor::getLfoPeriod (int lfo) const noexcept
     return lfoParameters[(size_t) lfo].period->load();
 }
 
-bool SynthProcessor::isLfoOnce (int lfo) const noexcept
+int SynthProcessor::getLfoMode (int lfo) const noexcept
 {
-    return lfoParameters[(size_t) lfo].mode->load() >= 0.5f;
+    return juce::jlimit (0, modulation::lfoForever, juce::roundToInt (lfoParameters[(size_t) lfo].mode->load()));
+}
+
+bool SynthProcessor::isLfoFromKey (int lfo) const noexcept
+{
+    return getLfoMode (lfo) != modulation::lfoLoops;
+}
+
+int SynthProcessor::getLfoTimes (int lfo) const noexcept
+{
+    return modulation::getLfoTimes (getLfoMode (lfo));
+}
+
+bool SynthProcessor::isLfoOnLastTime (int lfo) const noexcept
+{
+    const auto times = getLfoTimes (lfo);
+    return isLfoFromKey (lfo) && times > 0 && getLfoProgress (lfo).value_or (0.0) >= (double) (times - 1);
 }
 
 std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
@@ -707,12 +725,15 @@ float SynthProcessor::getLfoValue (int lfo, float phase) const
     const auto progress = getLfoProgress (lfo).value_or (0.0) - phase;
 
     if (! isLfoRandom (lfo))
-        return modulation::lfoValue (getLfoShape (lfo), progress, isLfoOnce (lfo));
+        return modulation::lfoValue (getLfoShape (lfo), progress, isLfoFromKey (lfo), getLfoTimes (lfo));
 
     const auto random = getRandomCycle (lfo);
     const auto& drawing = getDrawing (numOscillators + lfo);
-    return isLfoOnce (lfo) ? randomwave::onceValueAt (random.seed, progress, drawing)
-                           : randomwave::valueAt (random.seed, (double) random.cycle + progress, drawing);
+
+    if (isLfoFromKey (lfo))
+        return randomwave::fromKeyValueAt (random.seed, progress, drawing, getLfoTimes (lfo));
+
+    return randomwave::valueAt (random.seed, (double) random.cycle + progress, drawing);
 }
 
 bool SynthProcessor::isLfoRandom (int lfo) const noexcept
@@ -722,8 +743,17 @@ bool SynthProcessor::isLfoRandom (int lfo) const noexcept
 
 SynthProcessor::RandomCycle SynthProcessor::getRandomCycle (int lfo) const noexcept
 {
-    if (isLfoOnce (lfo))
-        return { newestOnceSeeds[(size_t) lfo].load(), 0 };
+    if (isLfoFromKey (lfo))
+    {
+        // The cycle the newest note is in, staying on the last once an LFO that plays a number of times has finished.
+        const auto times = getLfoTimes (lfo);
+        auto cycle = (std::int64_t) std::floor (std::max (0.0, getLfoProgress (lfo).value_or (0.0)));
+
+        if (times > 0)
+            cycle = std::min (cycle, (std::int64_t) times - 1);
+
+        return { newestOnceSeeds[(size_t) lfo].load(), cycle };
+    }
 
     return { randomSeeds[(size_t) lfo], lfoCyclesShown[(size_t) lfo].load() };
 }
@@ -739,7 +769,7 @@ waveform::Shape SynthProcessor::getPlayedLfoShape (int lfo) const
 
 std::optional<float> SynthProcessor::getPlayedLfoEnd (int lfo) const
 {
-    if (! isLfoRandom (lfo) || isLfoOnce (lfo))
+    if (! isLfoRandom (lfo) || isLfoOnLastTime (lfo))
         return std::nullopt;
 
     const auto random = getRandomCycle (lfo);

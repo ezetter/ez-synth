@@ -81,10 +81,11 @@ namespace randomwave
         return (float) levelFor (seed, (std::int64_t) std::floor (cycles * drawing.numSteps), forSteps);
     }
 
-    float onceValueAt (std::uint32_t seed, double cycles, const waveform::Drawing& drawing)
+    float fromKeyValueAt (std::uint32_t seed, double cycles, const waveform::Drawing& drawing, int times)
     {
-        // Just short of the end of the cycle is still in its last step.
-        return valueAt (seed, juce::jlimit (0.0, std::nextafter (1.0, 0.0), cycles), drawing);
+        // Just short of the end of the last cycle is still in its last step.
+        return valueAt (seed, times > 0 ? juce::jlimit (0.0, std::nextafter ((double) times, 0.0), cycles) : std::max (0.0, cycles),
+                        drawing);
     }
 
     waveform::Shape getCycle (std::uint32_t seed, std::int64_t cycle, const waveform::Drawing& drawing)

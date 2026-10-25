@@ -60,10 +60,11 @@ public:
     /** Says which oscillator's wave is shown, numbered from 1. One that's off is shown faintly. */
     void setOscillator (int number, bool isOn);
 
-    /** Says which LFO's wave is shown, numbered from 1, how long its period is, and whether it runs once rather
-        than looping.
+    /** Says which LFO's wave is shown, numbered from 1, how long its period is, whether it starts with each key
+        rather than looping, and whether it holds its end, as it does the last time it plays, rather than heading back
+        to its start.
     */
-    void setLfo (int number, bool isOn, double periodSeconds, bool once);
+    void setLfo (int number, bool isOn, double periodSeconds, bool fromKey, bool holdsEnd);
 
     /** Where the LFO shown is in its period, from 0 to 1, and its value there, or nothing to hide the line marking
         it.
@@ -107,7 +108,8 @@ private:
     int sourceNumber = 1;
     bool on = true;
     std::optional<double> lfoPeriod;   // the period of the LFO shown, or nothing for an oscillator
-    bool runsOnce = false;   // whether the LFO shown runs once, so its wave doesn't repeat
+    bool startsWithKey = false;   // whether the LFO shown starts with each key
+    bool holdsEnd = false;        // whether it's playing its last time, so its wave doesn't head back to its start
     std::optional<float> playhead;
     float playheadValue = 0.0f;
 

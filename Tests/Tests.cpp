@@ -5,6 +5,7 @@
 #include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
 #include "../Source/RandomWave.h"
+#include "../Source/SourceCard.h"
 #include "../Source/SynthEditor.h"
 #include "../Source/SynthProcessor.h"
 #include "../Source/Waveform.h"
@@ -947,13 +948,13 @@ namespace
             for (int i = 0; i <= 100; ++i)
             {
                 const auto periodsGone = (waveform::numPoints - 2 + 2.0 * i / 100) / waveform::numPoints;
-                stays = stays && modulation::lfoValue (rising, periodsGone, true) >= secondToLast;
+                stays = stays && modulation::lfoValue (rising, periodsGone, true, 1) >= secondToLast;
             }
 
             check (stays, "an LFO that runs once doesn't slide back towards its first value at the end of its period");
 
             const auto lastStretch = (waveform::numPoints - 0.5) / waveform::numPoints;
-            check (modulation::lfoValue (rising, lastStretch, false) < rising.back() - 0.1f,
+            check (modulation::lfoValue (rising, lastStretch, false, 0) < rising.back() - 0.1f,
                    "...while a looping one does, as its wave repeats");
         }
 
@@ -1015,7 +1016,7 @@ namespace
         check (restored.getLfoShape (2) == drawn && ! restored.getLfoPreset (2).has_value()
                  && restored.getLfoPreset (1) == waveform::Preset::square,
                "the LFOs' waves are restored");
-        check (isNear (restored.getLfoPeriod (2), 7.5, 1.0e-4) && restored.isLfoOnce (2) && ! restored.isLfoOnce (1),
+        check (isNear (restored.getLfoPeriod (2), 7.5, 1.0e-4) && restored.isLfoFromKey (2) && ! restored.isLfoFromKey (1),
                "their periods, and whether they loop, are restored");
         check (restored.getAssignment (modulation::volumeTarget) == modulation::Assignment { 2, 0.3f, true, 0.75f }
                  && restored.getAssignment (modulation::oscillatorOnTarget (1)) == modulation::Assignment { 1, 1.0f, false },
@@ -1058,6 +1059,92 @@ namespace
         setParameter (synth, SynthProcessor::decayId (envelope), settings.decay);
         setParameter (synth, SynthProcessor::sustainId (envelope), settings.sustain);
         setParameter (synth, SynthProcessor::releaseId (envelope), settings.release);
+    }
+
+    /** An LFO can start with each key and play its wave a number of times, from once to 5 times, or forever. */
+    void testLfoTimes()
+    {
+        std::cout << "LFOs played a number of times" << std::endl;
+
+        check (modulation::getLfoModeNames() == juce::StringArray { "Loop", "Once", "Twice", "3 times", "4 times", "5 times",
+                                                                    juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x9e")) },
+               "an LFO loops, or plays once, twice, 3, 4 or 5 times, or forever, from each key");
+
+        const auto sine = waveform::makePreset (waveform::Preset::sine);
+        const auto rising = waveform::makePreset (waveform::Preset::sawtooth);
+        const auto lastStretch = (waveform::numPoints - 0.5) / waveform::numPoints;
+        auto repeats = true;
+
+        for (const auto at : { 0.1, 0.3, 0.55, 0.8 })
+            repeats = repeats && juce::exactlyEqual (modulation::lfoValue (sine, at + 1.0, true, 3), modulation::lfoValue (sine, at, true, 3))
+                              && juce::exactlyEqual (modulation::lfoValue (sine, at + 2.0, true, 3), modulation::lfoValue (sine, at, true, 3))
+                              && juce::exactlyEqual (modulation::lfoValue (sine, at + 7.0, true, 0), modulation::lfoValue (sine, at, true, 0));
+
+        check (repeats, "its wave plays the same each time");
+        check (modulation::lfoValue (rising, lastStretch, true, 3) < rising.back() - 0.1f
+                 && modulation::lfoValue (rising, lastStretch + 2.0, true, 3) >= rising[waveform::numPoints - 2],
+               "each time but the last heads back to the start, and the last holds its end");
+        check (juce::exactlyEqual (modulation::lfoValue (rising, 3.5, true, 3), rising.back())
+                 && juce::exactlyEqual (modulation::lfoValue (rising, -0.2, true, 0), rising.front()),
+               "...holding it afterwards, while one played forever waits at its start until it starts");
+
+        const auto seed = 1234u;
+        const waveform::Drawing smooth;
+        check (juce::exactlyEqual (randomwave::fromKeyValueAt (seed, 1.5, smooth, 2), randomwave::valueAt (seed, 1.5, smooth))
+                 && juce::exactlyEqual (randomwave::fromKeyValueAt (seed, 4.0, smooth, 2), randomwave::valueAt (seed, std::nextafter (2.0, 0.0), smooth))
+                 && juce::exactlyEqual (randomwave::fromKeyValueAt (seed, 9.5, smooth, 0), randomwave::valueAt (seed, 9.5, smooth)),
+               "a random one plays a new wave each time, holding the end of its last");
+
+        // A sine over 0.2 seconds swings the oscillator's level between nothing and full, peaking 0.05 seconds into
+        // each period and falling to its trough 0.15 seconds in.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 0.2f, false, waveform::Preset::sine);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+
+        setParameter (synth, SynthProcessor::lfoModeId (0), 3.0f);
+        check (synth.isLfoFromKey (0) && synth.getLfoTimes (0) == 3, "3 times starts with each key, and plays 3 times");
+
+        auto signal = playNotes (synth, { { 0.0, 69 } }, 1.2);
+        const auto held = loudness (signal, 0.9, 1.1);
+        check (loudness (signal, 0.44, 0.46) > 1.5 * held && loudness (signal, 0.54, 0.56) < 0.2 * held,
+               "played 3 times, it swings the level a third time");
+        check (isNear (loudness (signal, 0.64, 0.66), held, 0.03) && isNear (loudness (signal, 0.74, 0.76), held, 0.03),
+               "...and then holds it, rather than swinging a fourth");
+
+        setParameter (synth, SynthProcessor::lfoModeId (0), (float) modulation::lfoForever);
+        check (synth.isLfoFromKey (0) && synth.getLfoTimes (0) == 0, "forever starts with each key, and never stops");
+
+        // A second key, 0.5 seconds after the first, is pressed with a looping LFO half way through its period.
+        signal = playNotes (synth, { { 0.0, 69 }, { 0.5, 76 } }, 1.2);
+        const auto e5 = juce::MidiMessage::getMidiNoteInHertz (76);
+        check (amplitudeAt (slice (signal, 1.13, 1.17), 440.0) < 0.2 * amplitudeAt (slice (signal, 1.03, 1.07), 440.0),
+               "played forever, it swings the level on and on");
+        check (amplitudeAt (slice (signal, 0.53, 0.57), e5) > 5.0 * amplitudeAt (slice (signal, 0.63, 0.67), e5),
+               "...from the start of its wave with each key, as a looping one doesn't");
+
+        setParameter (synth, SynthProcessor::lfoModeId (0), 0.0f);
+        signal = playNotes (synth, { { 0.0, 69 }, { 0.5, 76 } }, 1.2);
+        check (amplitudeAt (slice (signal, 0.53, 0.57), e5) < 0.2 * amplitudeAt (slice (signal, 0.63, 0.67), e5),
+               "(a looping one carries on from where it was)");
+
+        // The LFO's card shows Loop, and a button for how many times it plays from each key, which opens a menu.
+        LfoCard card (0, synth.parameters);
+        setParameter (synth, SynthProcessor::lfoModeId (0), 4.0f);
+        check (card.getTimesLabel() == "4 times", "the LFO's card shows how many times it plays from each key");
+        setParameter (synth, SynthProcessor::lfoModeId (0), 0.0f);
+        check (card.getTimesLabel() == "4 times", "...and still shows it while it loops, to go back to");
+        setParameter (synth, SynthProcessor::lfoModeId (0), (float) modulation::lfoForever);
+        check (card.getTimesLabel() == juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x9e")), "forever is shown as an infinity sign");
+
+        // Saved and loaded, it plays the same number of times.
+        setParameter (synth, SynthProcessor::lfoModeId (0), 5.0f);
+        juce::MemoryBlock saved;
+        synth.getStateInformation (saved);
+        SynthProcessor restored;
+        restored.setStateInformation (saved.getData(), (int) saved.getSize());
+        check (restored.getLfoTimes (0) == 5 && restored.isLfoFromKey (0), "it's saved and loaded with the sound");
     }
 
     void testRandomLfos()
@@ -1164,8 +1251,8 @@ namespace
                                    / std::sqrt ((sumLastSquared - sumLast * sumLast / n) * (sumFirstSquared - sumFirst * sumFirst / n));
             check (std::abs (correlation) < 0.05, "...the first and last steps as random as the others, even where the cycles meet");
 
-            check (juce::exactlyEqual (randomwave::onceValueAt (seed, 1.5, eightSteps), randomwave::valueAt (seed, 0.95, eightSteps))
-                     && juce::exactlyEqual (randomwave::onceValueAt (seed, -0.3, eightSteps), randomwave::valueAt (seed, 0.05, eightSteps)),
+            check (juce::exactlyEqual (randomwave::fromKeyValueAt (seed, 1.5, eightSteps, 1), randomwave::valueAt (seed, 0.95, eightSteps))
+                     && juce::exactlyEqual (randomwave::fromKeyValueAt (seed, -0.3, eightSteps, 1), randomwave::valueAt (seed, 0.05, eightSteps)),
                    "an LFO that runs once holds its random wave's first step before it starts, and its last after it ends");
         }
 
@@ -3031,7 +3118,8 @@ namespace
         setParameter (synth, SynthProcessor::tuneId (2), 3.4f);
         synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 0.3f, false });
         synth.setAssignment (modulation::filterResonanceTarget (0), { modulation::envelopeSource (1), 0.6f, false });
-        setParameter (synth, SynthProcessor::lfoModeId (1), 1.0f);
+        setParameter (synth, SynthProcessor::lfoModeId (1), 5.0f);
+        setParameter (synth, SynthProcessor::lfoModeId (2), (float) modulation::lfoForever);
         synth.editedSource = SynthProcessor::numOscillators;
 
         // Plays on a while, so the LFOs are partway through their periods.
@@ -3263,6 +3351,7 @@ int main (int argc, char* argv[])
     testOscillators();
     testFilters();
     testLfos();
+    testLfoTimes();
     testRandomLfos();
     testFastLfos();
     testEnvelopes();

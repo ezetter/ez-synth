@@ -109,18 +109,22 @@ juce::String ModulationEditor::describeSource() const
              + juce::String (juce::roundToInt (assignment.range * 100.0f)) + "% of its travel from where it's set, "
              + "as the envelope rises, each time a key is pressed. It comes back as the envelope falls.";
 
-    const auto once = synthProcessor.isLfoOnce (assignment.source);
-    auto timing = juce::String (once ? ", once each time a key is pressed" : "");
+    const auto fromKey = synthProcessor.isLfoFromKey (assignment.source);
+    const auto times = synthProcessor.getLfoTimes (assignment.source);
+    const auto howOften = times == 0 ? juce::String ("from") : times == 1 ? juce::String ("once")
+                        : times == 2 ? juce::String ("twice") : juce::String (times) + " times";
+    auto timing = fromKey ? ", " + howOften + " each time a key is pressed" : juce::String();
 
-    // Shifted to the right, a looping LFO moves the control behind the others it moves. One that runs once starts late.
+    // Shifted to the right, a looping LFO moves the control behind the others it moves. One that starts with each key
+    // starts late.
     if (assignment.phase > 0.0f)
     {
         const auto degrees = modulation::phaseToText (assignment.phase);
         const auto delay = assignment.phase * synthProcessor.getLfoPeriod (assignment.source);
         const auto seconds = juce::String (delay, delay < 1.0f ? 2 : 1) + " s";
 
-        timing += once ? ", starting " + seconds + " after the key, " + degrees + " into the LFO's period"
-                       : ", " + degrees + " behind it, or " + seconds + " late";
+        timing += fromKey ? ", starting " + seconds + " after the key, " + degrees + " into the LFO's period"
+                          : ", " + degrees + " behind it, or " + seconds + " late";
     }
 
     return name + " swings the " + control + " up to " + juce::String (juce::roundToInt (assignment.range * 50.0f))

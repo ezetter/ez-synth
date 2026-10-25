@@ -18,6 +18,15 @@ void ChoiceButtons::setChosen (int index)
     }
 }
 
+void ChoiceButtons::setLabel (int index, const juce::String& label)
+{
+    if (labels[index] != label)
+    {
+        labels.set (index, label);
+        repaint();
+    }
+}
+
 juce::Rectangle<float> ChoiceButtons::getButtonArea (int index) const
 {
     const auto width = (float) getWidth() / (float) labels.size();
@@ -79,6 +88,10 @@ void ChoiceButtons::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto index = getIndexAt (e.position);
+
+    if (onClick != nullptr && onClick (index))
+        return;
+
     setChosen (index);
 
     if (onChoose != nullptr)

@@ -55,7 +55,7 @@ public:
     /** How hard the note's key was played, from 0 to 1. */
     float getVelocity() const noexcept   { return noteVelocity; }
 
-    /** The seed of the random wave an LFO that runs once plays for this note, new with each note. */
+    /** The seed of the random wave an LFO that starts with each key plays for this note, new with each note. */
     std::uint32_t getRandomSeed (int lfo) const noexcept   { return randomSeeds[(size_t) lfo]; }
 
 private:

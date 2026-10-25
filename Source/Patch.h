@@ -31,20 +31,24 @@ struct Patch
     struct Lfo
     {
         bool on = false;
-        bool once = false;
         double periodSamples = 48000.0;
 
+        /** Whether it starts with each note rather than looping all the time, and how many times it plays its wave
+            then, or 0 for forever.
+        */
+        bool fromKey = false;
+        int times = 0;
+
         /** How far through its period a looping LFO is at the start of the block, and how many periods it's been
-            through before this one. One that runs once starts with each note instead.
+            through before this one. One that starts with each key starts with each note instead.
         */
         double phase = 0.0;
         std::int64_t cycle = 0;
 
         waveform::Shape shape {};
 
-        /** Whether it plays a new random wave every cycle, or with each key if it runs once, drawn smoothly or in
-            steps, rather than its drawn wave. A looping LFO's random wave comes from its seed; one that runs once
-            has a new seed with each note.
+        /** Whether it plays a new random wave every cycle, drawn smoothly or in steps, rather than its drawn wave. A
+            looping LFO's random wave comes from its seed; one that starts with each key has a new seed with each note.
         */
         bool random = false;
         waveform::Drawing drawing;

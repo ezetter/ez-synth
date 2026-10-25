@@ -49,7 +49,7 @@ public:
     static FilterIds filterIds (int filter);
 
     /** The IDs of each LFO's parameters: whether it's on, its period in seconds, which is shown as its rate, in
-        hertz, and whether it loops or runs once.
+        hertz, and whether it loops or starts with each key, and how many times it plays then.
     */
     static juce::String lfoOnId (int lfo);
     static juce::String lfoPeriodId (int lfo);
@@ -133,10 +133,22 @@ public:
 
     bool isLfoOn (int lfo) const noexcept;
     float getLfoPeriod (int lfo) const noexcept;
-    bool isLfoOnce (int lfo) const noexcept;
+    /** How the LFO runs: modulation::lfoLoops, a number of times from each key, or modulation::lfoForever. */
+    int getLfoMode (int lfo) const noexcept;
 
-    /** How far through its periods an LFO is, as last played. One that runs once counts from the last key pressed,
-        and has no progress before any key has been.
+    /** Whether the LFO starts with each key, rather than looping all the time. */
+    bool isLfoFromKey (int lfo) const noexcept;
+
+    /** How many times an LFO that starts with each key plays its wave, or 0 for forever. */
+    int getLfoTimes (int lfo) const noexcept;
+
+    /** Whether an LFO that plays its wave a number of times from each key is on its last, as last played, so its
+        wave holds its end rather than heading back to its start.
+    */
+    bool isLfoOnLastTime (int lfo) const noexcept;
+
+    /** How far through its periods an LFO is, as last played. One that starts with each key counts from the last key
+        pressed, and has no progress before any key has been.
     */
     std::optional<double> getLfoProgress (int lfo) const noexcept;
 
@@ -145,13 +157,13 @@ public:
     */
     float getLfoValue (int lfo, float phase = 0.0f) const;
 
-    /** Whether the LFO plays a new random wave every cycle, or with each key if it runs once, rather than its drawn
-        wave.
+    /** Whether the LFO plays a new random wave every cycle, starting anew with each key if it starts with each
+        key, rather than its drawn wave.
     */
     bool isLfoRandom (int lfo) const noexcept;
 
     /** The random wave an LFO is playing: its seed, and the cycle it's in. A looping LFO's is its own seed, and the
-        cycle it's in now. One that runs once plays the first cycle of the newest note's seed.
+        cycle it's in now. One that starts with each key plays the newest note's seed, from its first cycle.
     */
     struct RandomCycle
     {
@@ -212,7 +224,7 @@ public:
     void setVelocityAssignment (int target, const modulation::Assignment&);
 
     /** An LFO's, envelope's or velocity's value now, as the newest note has it, or nothing if it isn't moving
-        anything: an LFO that's off, or that runs once before any key has been pressed, or an envelope or velocity
+        anything: an LFO that's off, or that starts with each key before any key has been pressed, or an envelope or velocity
         when no note is sounding. An LFO's value is taken the given phase behind, as a control assigned it with that
         phase has it.
     */

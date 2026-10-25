@@ -165,20 +165,22 @@ void WaveGrid::setOscillator (int number, bool isOn)
         sourceNumber = number;
         on = isOn;
         lfoPeriod.reset();
-        runsOnce = false;
+        startsWithKey = false;
+        holdsEnd = false;
         playhead.reset();
         repaint();
     }
 }
 
-void WaveGrid::setLfo (int number, bool isOn, double periodSeconds, bool once)
+void WaveGrid::setLfo (int number, bool isOn, double periodSeconds, bool fromKey, bool holdsLastValue)
 {
-    if (number != sourceNumber || isOn != on || lfoPeriod != periodSeconds || once != runsOnce)
+    if (number != sourceNumber || isOn != on || lfoPeriod != periodSeconds || fromKey != startsWithKey || holdsLastValue != holdsEnd)
     {
         sourceNumber = number;
         on = isOn;
         lfoPeriod = periodSeconds;
-        runsOnce = once;
+        startsWithKey = fromKey;
+        holdsEnd = holdsLastValue;
         repaint();
     }
 }
@@ -373,7 +375,7 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");
     const auto hints = ! on ? juce::StringArray { sourceName + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
                                                   sourceName + " is off" }
-                     : random ? juce::StringArray { runsOnce ? "A new random wave with each key" : "A new random wave every cycle", "Random" }
+                     : random ? juce::StringArray { startsWithKey ? "A new random wave with each key" : "A new random wave every cycle", "Random" }
                      : drawing.stepped ? juce::StringArray { "Click a step to set it, or drag across them", "Drag to set steps" }
                                        : juce::StringArray { "Click and drag to draw a wave", "Drag to draw" };
 
@@ -479,9 +481,9 @@ juce::Path WaveGrid::makeShapeCurve() const
     for (int i = 1; i < waveform::numPoints; ++i)
         curve.lineTo (toX ((double) i / waveform::numPoints), toY (shape[(size_t) i]));
 
-    // A wave that repeats ends where it began, or a random one where its next cycle begins. An LFO that runs once
-    // holds its last value instead.
-    curve.lineTo (toX (1.0), toY (shapeEnd.value_or (runsOnce ? shape.back() : shape[0])));
+    // A wave that repeats ends where it began, or a random one where its next cycle begins. An LFO playing its last
+    // time holds its last value instead.
+    curve.lineTo (toX (1.0), toY (shapeEnd.value_or (holdsEnd ? shape.back() : shape[0])));
     return curve;
 }
 

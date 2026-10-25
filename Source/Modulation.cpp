@@ -200,15 +200,22 @@ namespace modulation
         return juce::String (juce::roundToInt (phase * 360.0f)) + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0"));
     }
 
-    float lfoValue (const waveform::Shape& shape, double periodsGone, bool once)
+    juce::StringArray getLfoModeNames()
     {
-        // An LFO that runs once, shifted to start later, waits at its first value until it does.
-        if (once && periodsGone <= 0.0)
+        return { "Loop", "Once", "Twice", "3 times", "4 times", "5 times", juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x9e")) };
+    }
+
+    float lfoValue (const waveform::Shape& shape, double periodsGone, bool fromKey, int times)
+    {
+        // An LFO that starts with each key, shifted to start later, waits at its first value until it does.
+        if (fromKey && periodsGone <= 0.0)
             return shape.front();
 
-        if (once && periodsGone >= 1.0)
+        if (times > 0 && periodsGone >= (double) times)
             return shape.back();
 
-        return waveform::valueAt (shape, periodsGone - std::floor (periodsGone), ! once);
+        // Each time but the last heads back to the start for the next, as a looping wave does. The last holds its end.
+        const auto last = times > 0 && periodsGone >= (double) (times - 1);
+        return waveform::valueAt (shape, periodsGone - std::floor (periodsGone), ! last);
     }
 }

@@ -81,7 +81,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     harmonicDrifts = {};
     noteVelocity = velocity;
 
-    // Each note plays new random waves from the LFOs that run once.
+    // Each note plays new random waves from the LFOs that start with each key.
     for (auto& seed : randomSeeds)
         seed = (std::uint32_t) random.nextInt();
     samplesSinceNoteOn = 0;
@@ -171,14 +171,14 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     using namespace modulation;
 
     // How far through its periods each LFO is. A looping LFO carries on from where it was at the start of the block. One
-    // that runs once started with the note, as the envelopes did.
+    // that starts with each key started with the note, as the envelopes did.
     std::array<double, numLfos> lfoPeriodsGone {};
 
     for (size_t i = 0; i < lfoPeriodsGone.size(); ++i)
     {
         const auto& lfo = patch.lfos[i];
-        lfoPeriodsGone[i] = lfo.once ? (double) samplesSinceNoteOn / lfo.periodSamples
-                                     : (double) lfo.cycle + lfo.phase + startSample / lfo.periodSamples;
+        lfoPeriodsGone[i] = lfo.fromKey ? (double) samplesSinceNoteOn / lfo.periodSamples
+                                        : (double) lfo.cycle + lfo.phase + startSample / lfo.periodSamples;
     }
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
@@ -202,8 +202,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         {
             const auto& lfo = patch.lfos[(size_t) assignment.source];
             const auto periodsGone = lfoPeriodsGone[(size_t) assignment.source] - assignment.phase;
-            const auto value = ! lfo.random ? lfoValue (lfo.shape, periodsGone, lfo.once)
-                             : lfo.once     ? randomwave::onceValueAt (randomSeeds[(size_t) assignment.source], periodsGone, lfo.drawing)
+            const auto value = ! lfo.random ? lfoValue (lfo.shape, periodsGone, lfo.fromKey, lfo.times)
+                             : lfo.fromKey  ? randomwave::fromKeyValueAt (randomSeeds[(size_t) assignment.source], periodsGone,
+                                                                          lfo.drawing, lfo.times)
                                             : randomwave::valueAt (lfo.seed, periodsGone, lfo.drawing);
             position += assignment.offset (value);
         }

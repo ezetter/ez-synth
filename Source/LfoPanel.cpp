@@ -132,6 +132,6 @@ void LfoPanel::paint (juce::Graphics& g)
     g.drawFittedText ("Right-click, or Control-click, a dial, slider, switch or harmonic button to have an LFO move "
                       "it as the LFO's wave rises and falls.\n\n"
                       "Loop runs the LFO all the time. Once runs it through one period each time a key is pressed, "
-                      "then holds its last value, like an envelope.",
+                      "then holds its last value, like an envelope. Click Once to run it up to 5 times, or forever.",
                       footerArea, juce::Justification::bottomLeft, 8);
 }

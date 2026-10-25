@@ -193,12 +193,52 @@ LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
     : SourceCard ("LFO " + juce::String (lfo + 1), parameters, SynthProcessor::lfoOnId (lfo),
                   SynthProcessor::lfoPeriodId (lfo), "RATE"),
       modeAttachment (*parameters.getParameter (SynthProcessor::lfoModeId (lfo)),
-                      [this] (float value) { mode.setChosen (juce::roundToInt (value)); })
+                      [this] (float value) { showMode (juce::roundToInt (value)); })
 {
-    mode.setTitle ("LFO " + juce::String (lfo + 1) + " loops or runs once");
+    mode.setTitle ("LFO " + juce::String (lfo + 1) + " loops, or plays a number of times from each key");
     mode.onChoose = [this] (int index) { modeAttachment.setValueAsCompleteGesture ((float) index); };
+    mode.onClick = [this] (int index)
+    {
+        if (index != 1)
+            return false;
+
+        chooseTimes();
+        return true;
+    };
+
     addAndMakeVisible (mode);
     modeAttachment.sendInitialUpdate();
+}
+
+void LfoCard::showMode (int index)
+{
+    // Looping leaves the other button showing how many times it played from each key, to go back to.
+    if (index != modulation::lfoLoops)
+    {
+        timesMode = index;
+        mode.setLabel (1, modulation::getLfoModeNames()[index]);
+    }
+
+    mode.setChosen (index == modulation::lfoLoops ? 0 : 1);
+}
+
+void LfoCard::chooseTimes()
+{
+    const auto names = modulation::getLfoModeNames();
+    const auto chosen = mode.getChosen() == 0 ? modulation::lfoLoops : timesMode;
+    juce::PopupMenu menu;
+
+    for (int index = 1; index <= modulation::lfoForever; ++index)
+        menu.addItem (index, names[index], true, index == chosen);
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&mode)
+                                                  .withTargetScreenArea (mode.localAreaToGlobal (mode.getButtonBounds (1)))
+                                                  .withMinimumWidth (mode.getButtonBounds (1).getWidth()),
+                        [safeThis = juce::Component::SafePointer (this)] (int result)
+                        {
+                            if (safeThis != nullptr && result > 0)
+                                safeThis->modeAttachment.setValueAsCompleteGesture ((float) result);
+                        });
 }
 
 void LfoCard::setWave (const waveform::Shape& shape, const juce::String& waveName, std::optional<float> end)
