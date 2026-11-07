@@ -117,8 +117,8 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     }
 
     setResizable (true, true);
-    setResizeLimits (1240, 900, 2000, 1400);
-    setSize (1320, 960);
+    setResizeLimits (1420, 900, 2200, 1400);
+    setSize (1440, 960);
 
     // Hears every click and scroll in the window, whichever control it lands on, and takes the keys none of them
     // use, such as Command-Z.
@@ -224,9 +224,27 @@ void SynthEditor::resized()
 
     area.removeFromTop (12);
 
+    // Along the bottom, the keyboard, with the MIDI devices beside it in the standalone app.
+    constexpr auto rowGap = 12;
+    auto keys = area.removeFromBottom (juce::jlimit (90, 130, getHeight() / 8));
+
+    if (midiPanel != nullptr)
+    {
+        midiPanel->setBounds (keys.removeFromLeft (120));
+        keys.removeFromLeft (rowGap);
+    }
+
+    keyboard.setBounds (keys);
+    area.removeFromBottom (12);
+
+    // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
+    // tall enough for big dials.
+    sidePanel = area.removeFromRight (juce::jlimit (400, 460, area.getWidth() * 3 / 10));
+    area.removeFromRight (14);
+
     // The oscillators, then the LFOs, with a wider gap between the two.
-    constexpr auto cardGap = 10;
-    constexpr auto groupGap = 24;
+    constexpr auto cardGap = 8;
+    constexpr auto groupGap = 18;
     auto cardRow = area.removeFromTop (108);
     const auto cardWidth = (cardRow.getWidth() - groupGap - cardGap * (SynthProcessor::numSources - 2)) / SynthProcessor::numSources;
 
@@ -240,32 +258,20 @@ void SynthEditor::resized()
 
     area.removeFromTop (14);
 
-    // Along the bottom, the keyboard, with the MIDI devices beside it in the standalone app, and above them the volume,
-    // the envelopes and the filters.
-    constexpr auto rowGap = 12;
-    auto keys = area.removeFromBottom (juce::jlimit (90, 130, getHeight() / 8));
-
-    if (midiPanel != nullptr)
-    {
-        midiPanel->setBounds (keys.removeFromLeft (120));
-        keys.removeFromLeft (rowGap);
-    }
-
-    keyboard.setBounds (keys);
-    area.removeFromBottom (12);
-
+    // Under the grid, the volume, the envelopes and the filters.
+    constexpr auto controlGap = 10;
     auto controls = area.removeFromBottom (FilterPanel::preferredHeight);
-    volumePanel = controls.removeFromLeft (120);
-    controls.removeFromLeft (rowGap);
-    filterPanel.setBounds (controls.removeFromRight (380));
-    controls.removeFromRight (rowGap);
+    volumePanel = controls.removeFromLeft (90);
+    controls.removeFromLeft (controlGap);
+    filterPanel.setBounds (controls.removeFromRight (juce::jlimit (280, 380, controls.getWidth() / 3)));
+    controls.removeFromRight (controlGap);
 
-    const auto envelopeWidth = (controls.getWidth() - rowGap * (SynthProcessor::numEnvelopes - 1)) / SynthProcessor::numEnvelopes;
+    const auto envelopeWidth = (controls.getWidth() - controlGap * (SynthProcessor::numEnvelopes - 1)) / SynthProcessor::numEnvelopes;
 
     for (auto& panel : envelopePanels)
     {
         panel->setBounds (controls.removeFromLeft (envelopeWidth));
-        controls.removeFromLeft (rowGap);
+        controls.removeFromLeft (controlGap);
     }
 
     auto volume = volumePanel.reduced (10, 10);
@@ -274,10 +280,6 @@ void SynthEditor::resized()
     volumeKnob.setBounds (volume);
 
     area.removeFromBottom (14);
-
-    // Beside the grid, the chosen oscillator's harmonics, or what the chosen LFO moves.
-    sidePanel = area.removeFromRight (380);
-    area.removeFromRight (14);
     grid.setBounds (area);
 
     auto side = sidePanel.reduced (16, 14);
@@ -287,8 +289,7 @@ void SynthEditor::resized()
     harmonicSelector.setBounds (side.removeFromTop (34));
     side.removeFromTop (10);
 
-    // The oscillator's tune, at the foot of the panel. The spacing is tight, so the smallest window still has room
-    // for all nine harmonic sliders.
+    // The oscillator's tune, at the foot of the panel.
     tuneSlider.setBounds (side.removeFromBottom (TuneSlider::preferredHeight));
     side.removeFromBottom (8);
     tuneDivider = side.removeFromBottom (1);

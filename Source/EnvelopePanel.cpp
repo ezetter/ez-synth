@@ -2,6 +2,8 @@
 
 #include "SynthLookAndFeel.h"
 
+#include <algorithm>
+
 EnvelopePanel::EnvelopePanel (SynthProcessor& processor, int envelopeToShow)
     : synthProcessor (processor),
       envelope (envelopeToShow)
@@ -71,7 +73,7 @@ juce::String EnvelopePanel::describeUse() const
 
 void EnvelopePanel::resized()
 {
-    auto area = getLocalBounds().reduced (12, 12);
+    auto area = getLocalBounds().reduced (8, 12);
     captionArea = area.removeFromTop (18);
     area.removeFromTop (4);
     shapeArea = area.removeFromTop (34);
@@ -108,14 +110,20 @@ void EnvelopePanel::paint (juce::Graphics& g)
     // The dials sit close together, so their captions are a little smaller than the others.
     const auto dialCaptionFont = juce::Font (juce::FontOptions (10.0f, juce::Font::bold)).withExtraKerningFactor (0.08f);
 
+    // In a narrow panel, every caption is shortened, to its first three letters, if any of them has to be.
+    const auto shortened = std::any_of (dials.begin(), dials.end(), [&] (const auto& dial)
+    {
+        return juce::GlyphArrangement::getStringWidth (dialCaptionFont, dial.caption) > (float) dial.captionArea.getWidth();
+    });
+
     for (auto& dial : dials)
     {
         g.setFont (dialCaptionFont);
         g.setColour (colours::dimText);
-        g.drawText (dial.caption, dial.captionArea, juce::Justification::centred);
+        fonts::drawFirstThatFits (g, { shortened ? dial.caption.substring (0, 3) : dial.caption }, dial.captionArea, juce::Justification::centred);
         g.setFont (fonts::body (12.0f));
         g.setColour (colours::text);
-        g.drawText (dial.slider.getTextFromValue (dial.slider.getValue()), dial.valueArea, juce::Justification::centred);
+        fonts::drawFirstThatFits (g, { dial.slider.getTextFromValue (dial.slider.getValue()) }, dial.valueArea, juce::Justification::centred);
     }
 }
 

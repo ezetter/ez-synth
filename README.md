@@ -10,6 +10,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ## Using it
 
+- **The window** has the six cards across the top, the grid under them, and the volume, envelopes and filters
+  under that. Down the right, from the cards to the filters, is a tall panel with the chosen oscillator's
+  harmonics, with big dials, or what the chosen LFO moves. The window can be resized, down to 1420 by 900.
 - **Choose an oscillator or LFO.** The six cards across the top are the three oscillators, then the three
   LFOs. Click one to show its wave on the grid; its card is outlined. The presets and the drawing work on
   whichever is shown. Only OSC 1 is on to begin with, playing a sine. The others start as a square and a
@@ -63,7 +66,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   sliders always agree. Raise a sine's 2nd and 3rd harmonics from 0, for instance, and the wave becomes
   Custom. A harmonic you lower to 0 and raise again comes back as it was. Raised harmonics can take a wave
   past −1 and +1, and the grid stretches to show it.
-- **Tune a harmonic** with the small dial beside it, for inharmonic sounds, such as bells, metal and drums,
+- **Tune a harmonic** with the first dial beside it, for inharmonic sounds, such as bells, metal and drums,
   whose overtones aren't whole multiples of the fundamental. Every harmonic above the fundamental has one;
   the fundamental can't be tuned. A harmonic tunes from halfway down to the harmonic below to halfway up to
   the one above: the 3rd, for instance, from 2.5 to 3.5 times the fundamental. In tune is the middle, where

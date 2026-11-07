@@ -38,6 +38,20 @@ namespace fonts
     {
         return juce::FontOptions (height);
     }
+
+    void drawFirstThatFits (juce::Graphics& g, const juce::StringArray& texts, juce::Rectangle<int> area, juce::Justification justification)
+    {
+        for (const auto& text : texts)
+        {
+            if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text) <= (float) area.getWidth())
+            {
+                g.drawText (text, area, justification);
+                return;
+            }
+        }
+
+        g.drawFittedText (texts[texts.size() - 1], area, justification, 1, 0.7f);
+    }
 }
 
 SynthLookAndFeel::SynthLookAndFeel()

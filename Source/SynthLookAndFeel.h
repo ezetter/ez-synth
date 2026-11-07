@@ -36,6 +36,11 @@ namespace fonts
     juce::Font caption();
 
     juce::Font body (float height = 13.0f);
+
+    /** Draws the first of the texts that fits in the area in the font set, such as a word and then a shorter form of
+        it, or the last squeezed in if none fits.
+    */
+    void drawFirstThatFits (juce::Graphics&, const juce::StringArray& texts, juce::Rectangle<int> area, juce::Justification);
 }
 
 /** Dark panels, rounded buttons and an arc-style knob. A control an LFO is moving shows where it's been moved to,

@@ -155,11 +155,11 @@ void FilterPanel::layOutDials (Filter& filter)
 
 void FilterPanel::resized()
 {
-    auto area = getLocalBounds().reduced (16, 12);
+    auto area = getLocalBounds().reduced (12, 12);
     captionArea = area.removeFromTop (18);
     area.removeFromTop (8);
 
-    constexpr auto gap = 24;
+    constexpr auto gap = 16;
     const auto halfWidth = (area.getWidth() - gap) / 2;
     first.area = area.removeFromLeft (halfWidth);
     area.removeFromLeft (gap);
@@ -252,11 +252,11 @@ void FilterPanel::paintFilter (juce::Graphics& g, Filter& filter)
     {
         g.setColour (colours::dimText);
         g.setFont (fonts::caption());
-        g.drawText (dial->caption, dial->captionArea, juce::Justification::centred);
+        fonts::drawFirstThatFits (g, { dial->caption, dial->caption.substring (0, 3) }, dial->captionArea, juce::Justification::centred);
 
         // The parameters' own text, such as "1.00 kHz", "40%", "2.0 oct" and "60 dB".
         g.setColour (on ? colours::text : colours::dimText);
         g.setFont (valueFont);
-        g.drawText (dial->knob.getTextFromValue (dial->knob.getValue()), dial->valueArea, juce::Justification::centred);
+        fonts::drawFirstThatFits (g, { dial->knob.getTextFromValue (dial->knob.getValue()) }, dial->valueArea, juce::Justification::centred);
     }
 }

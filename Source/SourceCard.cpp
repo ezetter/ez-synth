@@ -59,17 +59,17 @@ void SourceCard::setLines (const juce::String& first, const juce::String& second
 
 void SourceCard::resized()
 {
-    auto area = getLocalBounds().reduced (12, 10);
+    auto area = getLocalBounds().reduced (10, 10);
 
-    auto dialColumn = area.removeFromRight (56);
+    auto dialColumn = area.removeFromRight (48);
     dialCaptionArea = dialColumn.removeFromTop (13);
     dialValueArea = dialColumn.removeFromBottom (15);
     dial.setBounds (dialColumn);
     area.removeFromRight (6);
 
     auto top = area.removeFromTop (20);
-    onSwitch.setBounds (top.removeFromLeft (32));
-    top.removeFromLeft (7);
+    onSwitch.setBounds (top.removeFromLeft (28));
+    top.removeFromLeft (6);
     nameArea = top;
 
     area.removeFromTop (3);
@@ -90,7 +90,7 @@ void SourceCard::paint (juce::Graphics& g)
     g.drawRoundedRectangle (bounds, 10.0f, selected ? 1.5f : 1.0f);
 
     g.setColour (on ? colours::text : colours::dimText);
-    g.setFont (juce::Font (juce::FontOptions (13.5f, juce::Font::bold)).withExtraKerningFactor (0.08f));
+    g.setFont (juce::Font (juce::FontOptions (13.0f, juce::Font::bold)).withExtraKerningFactor (0.04f));
     g.drawText (name, nameArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (12.5f));

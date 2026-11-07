@@ -3332,7 +3332,7 @@ namespace
         setParameter (synth, SynthProcessor::filterIds (0).depth, 24.0f);
         setFilterType (synth, 1, FilterType::midPass);
         setFilter (synth, SynthProcessor::filterIds (1), true, 1200.0f);
-        editor->setSize (1240, 900);
+        editor->setSize (editor->getConstrainer()->getMinimumWidth(), editor->getConstrainer()->getMinimumHeight());
         save ("8-smallest");
     }
 }
