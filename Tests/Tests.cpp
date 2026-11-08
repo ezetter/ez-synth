@@ -1758,6 +1758,108 @@ namespace
         }
     }
 
+    /** A MIDI controller's mod wheel can move controls, as velocity can: not at all at the bottom, and up, or down if
+        inverted, by as much as its range at the top.
+    */
+    void testModWheel()
+    {
+        std::cout << "Mod wheel" << std::endl;
+
+        check (modulation::getSourceName (modulation::modWheelSource) == "Mod wheel", "the mod wheel is a source of its own");
+
+        const modulation::Assignment up { modulation::modWheelSource, 0.6f, false }, down { modulation::modWheelSource, 0.6f, true };
+        check (juce::exactlyEqual (up.offset (0.0f), 0.0f) && isNear (up.offset (1.0f), 0.6, 1.0e-6) && isNear (up.offset (0.5f), 0.3, 1.0e-6)
+                 && isNear (down.offset (1.0f), -0.6, 1.0e-6),
+               "at the bottom it leaves a control where it's set, and at the top moves it up by its range, or down inverted");
+
+        SynthProcessor fresh;
+        auto nothingOnWheel = true;
+
+        for (int target = 0; target < modulation::numTargets; ++target)
+            nothingOnWheel = nothingOnWheel && ! fresh.getModWheelAssignment (target).isActive();
+
+        check (nothingOnWheel, "to start with, the mod wheel moves nothing");
+
+        // A sine at a level of 20%, which the mod wheel raises by as much as 60%, to 80% at the top.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.2f);
+        synth.setModWheelAssignment (modulation::oscillatorLevelTarget (0), up);
+        check (synth.getModWheelAssignment (modulation::oscillatorLevelTarget (0)).isActive(), "a control can be given to the mod wheel");
+
+        // A note held for a second, the wheel at the bottom, then pushed to the top half way through.
+        const auto playWithWheel = [&synth] (std::optional<int> wheelBefore, int wheelHalfway)
+        {
+            synth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> output;
+            const auto blocks = (int) (sampleRate / blockSize);
+
+            for (int block = 0; block < blocks + (int) (0.5 * sampleRate / blockSize); ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0 && wheelBefore.has_value())
+                    midi.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, *wheelBefore), 0);
+
+                if (block == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 1);
+
+                if (block == blocks / 2)
+                    midi.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, wheelHalfway), 0);
+
+                if (block == blocks)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, 69), 0);
+
+                synth.processBlock (buffer, midi);
+
+                if (block < blocks)
+                    output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            return output;
+        };
+
+        auto played = playWithWheel (0, 127);
+        const auto atBottom = amplitudeAt (slice (played, 0.2, 0.4), 440.0);
+        const auto atTop = amplitudeAt (slice (played, 0.7, 0.9), 440.0);
+        check (isNear (atTop / atBottom, 4.0, 0.08), "pushing the wheel to the top during a note raises the level from 20% to 80%");
+        check (isNear (synth.getModWheel(), 1.0, 1.0e-6), "...and the window knows where the wheel is");
+
+        const auto shown = synth.getLivePosition (modulation::oscillatorLevelTarget (0));
+        check (shown.has_value() && isNear (*shown, 0.8, 1.0e-4), "...and shows the level moved to 80%");
+
+        // A note started with the wheel already up starts where the wheel has it.
+        played = playWithWheel (std::nullopt, 127);
+        check (isNear (amplitudeAt (slice (played, 0.2, 0.4), 440.0), atTop, 0.02 * atTop), "a new note plays with the wheel where it was left");
+
+        synth.setModWheelAssignment (modulation::oscillatorLevelTarget (0), { modulation::modWheelSource, 0.15f, true });
+        played = playWithWheel (0, 127);
+        check (isNear (amplitudeAt (slice (played, 0.7, 0.9), 440.0) / amplitudeAt (slice (played, 0.2, 0.4), 440.0), 0.25, 0.02),
+               "inverted, it lowers the level instead, here from 20% to 5%");
+
+        // Saved and loaded with the sound, which a save from before has none of.
+        juce::MemoryBlock saved;
+        synth.getStateInformation (saved);
+        SynthProcessor restored;
+        restored.setStateInformation (saved.getData(), (int) saved.getSize());
+        const auto& restoredAssignment = restored.getModWheelAssignment (modulation::oscillatorLevelTarget (0));
+        check (restoredAssignment.source == modulation::modWheelSource && isNear (restoredAssignment.range, 0.15, 1.0e-6)
+                 && restoredAssignment.inverted,
+               "what the mod wheel moves is saved and loaded with the sound");
+
+        auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), (int) saved.getSize());
+        xml->deleteAllChildElementsWithTagName ("MODWHEEL");
+        juce::MemoryBlock older;
+        juce::AudioProcessor::copyXmlToBinary (*xml, older);
+        restored.setStateInformation (older.getData(), (int) older.getSize());
+        check (! restored.getModWheelAssignment (modulation::oscillatorLevelTarget (0)).isActive(),
+               "a sound saved before the mod wheel could move anything loads with it moving nothing");
+
+        synth.setModWheelAssignment (modulation::oscillatorLevelTarget (0), {});
+        check (! synth.getModWheelAssignment (modulation::oscillatorLevelTarget (0)).isActive(), "...and it can be taken off again");
+    }
+
     void testShowingMovedHarmonics()
     {
         std::cout << "Showing moved harmonics" << std::endl;
@@ -3437,6 +3539,7 @@ int main (int argc, char* argv[])
     testEnvelopes();
     testEnvelopeReleases();
     testVelocity();
+    testModWheel();
     testShowingMovedHarmonics();
     testTuning();
     testMidiInputs();

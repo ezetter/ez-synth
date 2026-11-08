@@ -189,6 +189,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
             position += byVelocity.offset (noteVelocity);
 
+        if (const auto& byModWheel = patch.modWheelAssignments[(size_t) target]; byModWheel.isActive())
+            position += byModWheel.offset (patch.modWheel);
+
         const auto& assignment = patch.assignments[(size_t) target];
 
         if (assignment.isActive() && isEnvelope (assignment.source))
@@ -245,14 +248,13 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             const auto target = harmonicTarget (i, harmonic);
             auto amplitude = oscillator.amplitudes[index];
 
-            if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
+            if (patch.isMoved (target))
                 amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
 
             // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. A harmonic's phase can be moved round its whole turn.
             auto phaseSine = oscillator.phaseSines[index], phaseCosine = oscillator.phaseCosines[index];
 
-            if (const auto phaseTarget = harmonicPhaseTarget (i, harmonic);
-                patch.assignments[(size_t) phaseTarget].isActive() || patch.velocityAssignments[(size_t) phaseTarget].isActive())
+            if (const auto phaseTarget = harmonicPhaseTarget (i, harmonic); patch.isMoved (phaseTarget))
             {
                 constexpr auto turn = juce::MathConstants<float>::twoPi;
                 const auto phase = oscillator.phases[index] - turn * std::floor (oscillator.phases[index] / turn);
@@ -272,7 +274,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             const auto target = harmonicTuneTarget (i, harmonic);
             auto tune = oscillator.tunes[(size_t) harmonic - 1];
 
-            if (patch.assignments[(size_t) target].isActive() || patch.velocityAssignments[(size_t) target].isActive())
+            if (patch.isMoved (target))
                 tune = (modulate (target, tune / (2.0f * waveform::furthestTune) + 0.5f) - 0.5f) * 2.0f * waveform::furthestTune;
 
             targets.harmonicTunes[(size_t) i][(size_t) harmonic] = tune;

@@ -406,6 +406,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     updatePatch();
     synth.renderNextBlock (buffer, midi, 0, numSamples);
+    modWheelShown = patch.modWheel;
     shareNewestNote();
 
     for (size_t i = 0; i < lfoPhases.size(); ++i)
@@ -504,6 +505,7 @@ void SynthProcessor::updatePatch()
 
             patch.assignments = received.assignments;
             patch.velocityAssignments = received.velocityAssignments;
+            patch.modWheelAssignments = received.modWheelAssignments;
         }
     }
 
@@ -851,10 +853,28 @@ void SynthProcessor::setVelocityAssignment (int target, const modulation::Assign
     ++modulationVersion;
 }
 
+const modulation::Assignment& SynthProcessor::getModWheelAssignment (int target) const noexcept
+{
+    return modWheelAssignments[(size_t) target];
+}
+
+void SynthProcessor::setModWheelAssignment (int target, const modulation::Assignment& assignment)
+{
+    markEdited();
+
+    modWheelAssignments[(size_t) target] = { assignment.source, assignment.range, assignment.inverted };
+    share();
+    ++modulationVersion;
+}
+
 std::optional<float> SynthProcessor::getSourceValue (int source, float phase) const
 {
     if (source == modulation::velocitySource)
         return noteSounding ? std::optional (newestVelocity.load()) : std::nullopt;
+
+    // The mod wheel is wherever it was last put, whether a note is sounding or not.
+    if (source == modulation::modWheelSource)
+        return modWheelShown.load();
 
     if (modulation::isEnvelope (source))
     {
@@ -872,7 +892,7 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
 
 std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
-    // Moved as the voices move it (HarmonicVoice::getTargets): by velocity, then by the LFO or envelope.
+    // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope.
     auto position = getPosition (target);
     auto moved = false;
 
@@ -883,6 +903,12 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
             position += byVelocity.offset (*velocity);
             moved = true;
         }
+    }
+
+    if (const auto& byModWheel = modWheelAssignments[(size_t) target]; byModWheel.isActive())
+    {
+        position += byModWheel.offset (modWheelShown.load());
+        moved = true;
     }
 
     if (const auto& assignment = assignments[(size_t) target]; assignment.isActive())
@@ -997,6 +1023,7 @@ void SynthProcessor::share()
 
     shared.assignments = assignments;
     shared.velocityAssignments = velocityAssignments;
+    shared.modWheelAssignments = modWheelAssignments;
     ++sharedVersion;
 }
 
@@ -1086,6 +1113,22 @@ juce::ValueTree SynthProcessor::createState()
     }
 
     state.appendChild (velocityTree, nullptr);
+
+    juce::ValueTree modWheelTree ("MODWHEEL");
+
+    for (int target = 0; target < modulation::numTargets; ++target)
+    {
+        if (const auto& assignment = modWheelAssignments[(size_t) target]; assignment.isActive())
+        {
+            juce::ValueTree assignmentTree ("ASSIGNMENT");
+            assignmentTree.setProperty ("target", modulation::getKey (target), nullptr);
+            assignmentTree.setProperty ("range", assignment.range, nullptr);
+            assignmentTree.setProperty ("inverted", assignment.inverted, nullptr);
+            modWheelTree.appendChild (assignmentTree, nullptr);
+        }
+    }
+
+    state.appendChild (modWheelTree, nullptr);
     return state;
 }
 
@@ -1114,6 +1157,8 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     const auto velocityTree = state.getChildWithName ("VELOCITY");
     state.removeChild (velocityTree, nullptr);
+    const auto modWheelTree = state.getChildWithName ("MODWHEEL");
+    state.removeChild (modWheelTree, nullptr);
 
     // A save from before the filters could each be any type names the first filter's parameters "lowPass", and the
     // second's "highPass". The first was a low pass and the second a high pass, as the filters' types start.
@@ -1222,6 +1267,15 @@ void SynthProcessor::loadState (juce::ValueTree state)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false };
+
+    // Saves from before the mod wheel could be assigned have it move nothing.
+    modWheelAssignments = {};
+
+    for (const auto& assignmentTree : modWheelTree)
+        if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
+            modWheelAssignments[(size_t) *target] = { modulation::modWheelSource,
+                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]),
+                                                      (bool) assignmentTree["inverted"] };
 
     share();
     ++modulationVersion;

@@ -21,7 +21,11 @@ namespace modulation
     /** How hard each key is played can move a control too, as well as an LFO or envelope moving it. */
     inline constexpr int velocitySource = numSources;
 
-    /** What a source is called, such as "LFO 2", "Env 1" or "Velocity". */
+    /** So can a MIDI controller's mod wheel, controller 1, from 0 at the bottom to 1 at the top. */
+    inline constexpr int modWheelSource = velocitySource + 1;
+    inline constexpr int modWheelController = 1;
+
+    /** What a source is called, such as "LFO 2", "Env 1", "Velocity" or "Mod wheel". */
     juce::String getSourceName (int source);
 
     /** The two filters, numbered from 0, each of which can be a low pass, a mid pass or a high pass. */
@@ -96,7 +100,8 @@ namespace modulation
         /** How far the control moves, from one end of the source's values to the other, as a proportion of its
             travel. An LFO, from -1 to 1, swings the control evenly either side of where it's set. An envelope, from
             0 to 1, moves it one way from where it's set and back. Velocity, from 0 to 1, leaves the control where
-            it's set for the hardest notes, and moves it down for softer ones.
+            it's set for the hardest notes, and moves it down for softer ones. The mod wheel, from 0 to 1, leaves it
+            where it's set at the bottom, and moves it one way as it's pushed up.
         */
         float range = 0.5f;
 
@@ -115,7 +120,8 @@ namespace modulation
         float offset (float sourceValue) const noexcept
         {
             const auto amount = source == velocitySource ? sourceValue - 1.0f
-                                                         : (isEnvelope (source) ? sourceValue : 0.5f * sourceValue);
+                              : isEnvelope (source) || source == modWheelSource ? sourceValue
+                                                                                : 0.5f * sourceValue;
             return (inverted ? -1.0f : 1.0f) * range * amount;
         }
 

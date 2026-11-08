@@ -71,4 +71,5 @@
   <VELOCITY>
     <ASSIGNMENT target="volume" range="0.3499999940395355"/>
   </VELOCITY>
+  <MODWHEEL/>
 </EZSynth>

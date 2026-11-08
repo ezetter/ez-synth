@@ -223,6 +223,15 @@ public:
     const modulation::Assignment& getVelocityAssignment (int target) const noexcept;
     void setVelocityAssignment (int target, const modulation::Assignment&);
 
+    /** What the mod wheel moves. At the bottom it leaves a control where it's set, and as it's pushed up it moves
+        the control up, or down if inverted, by as much as its range at the top. It has no phase.
+    */
+    const modulation::Assignment& getModWheelAssignment (int target) const noexcept;
+    void setModWheelAssignment (int target, const modulation::Assignment&);
+
+    /** Where the mod wheel is, from 0 to 1, as last played. */
+    float getModWheel() const noexcept   { return modWheelShown.load(); }
+
     /** An LFO's, envelope's or velocity's value now, as the newest note has it, or nothing if it isn't moving
         anything: an LFO that's off, or that starts with each key before any key has been pressed, or an envelope or velocity
         when no note is sounding. An LFO's value is taken the given phase behind, as a control assigned it with that
@@ -230,8 +239,8 @@ public:
     */
     std::optional<float> getSourceValue (int source, float phase = 0.0f) const;
 
-    /** Where the LFO, envelope and velocity moving a control have moved it, from 0 to 1 along its travel, as the
-        newest note has it, or nothing if none of them is moving it now.
+    /** Where the LFO, envelope, velocity and mod wheel moving a control have moved it, from 0 to 1 along its
+        travel, as the newest note has it, or nothing if none of them is moving it now.
     */
     std::optional<float> getLivePosition (int target) const;
 
@@ -382,7 +391,7 @@ private:
         std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {}, tunes {};
         std::array<waveform::Shape, numLfos> lfoShapes {};
         std::array<waveform::Drawing, numLfos> lfoDrawings {};
-        modulation::Assignments assignments, velocityAssignments;
+        modulation::Assignments assignments, velocityAssignments, modWheelAssignments;
     };
 
     struct OscillatorParameters
@@ -448,7 +457,7 @@ private:
 
     std::array<Oscillator, numOscillators> oscillators;
     std::array<Lfo, numLfos> lfos;
-    modulation::Assignments assignments, velocityAssignments;
+    modulation::Assignments assignments, velocityAssignments, modWheelAssignments;
     int shapeVersion = 0;
     int modulationVersion = 0;
 
@@ -491,6 +500,7 @@ private:
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
     std::atomic<bool> noteSounding { false };
     std::atomic<float> newestVelocity { 1.0f };
+    std::atomic<float> modWheelShown { 0.0f };
     std::vector<HarmonicVoice*> voices;
 
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
@@ -508,7 +518,23 @@ private:
     juce::int64 samplesPlayed = 0;
     juce::int64 lastNoteOnSample = -1;
 
-    juce::Synthesiser synth;
+    /** A synthesiser that keeps where the mod wheel is in the patch, as each message comes, for the voices. */
+    struct ModWheelSynthesiser final : public juce::Synthesiser
+    {
+        explicit ModWheelSynthesiser (Patch& patchToMove) : patch (patchToMove) {}
+
+        void handleController (int midiChannel, int controllerNumber, int controllerValue) override
+        {
+            if (controllerNumber == modulation::modWheelController)
+                patch.modWheel = (float) controllerValue / 127.0f;
+
+            juce::Synthesiser::handleController (midiChannel, controllerNumber, controllerValue);
+        }
+
+        Patch& patch;
+    };
+
+    ModWheelSynthesiser synth { patch };
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
     std::array<waveform::Drawing, numSources> drawings;

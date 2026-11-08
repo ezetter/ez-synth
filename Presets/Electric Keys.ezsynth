@@ -71,4 +71,5 @@
     <ASSIGNMENT target="osc2Level" range="0.449999988079071"/>
     <ASSIGNMENT target="filter1Cutoff" range="0.3499999940395355"/>
   </VELOCITY>
+  <MODWHEEL/>
 </EZSynth>

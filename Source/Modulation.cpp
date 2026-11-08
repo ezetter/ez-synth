@@ -15,6 +15,9 @@ namespace modulation
         if (source == velocitySource)
             return "Velocity";
 
+        if (source == modWheelSource)
+            return "Mod wheel";
+
         return isEnvelope (source) ? "Env " + juce::String (source - numLfos + 1) : "LFO " + juce::String (source + 1);
     }
 

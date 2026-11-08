@@ -2,8 +2,9 @@
 
 #include "SynthLookAndFeel.h"
 
-ModulationEditor::Section::Section (juce::StringArray choices, bool withPhaseAndPolarity)
-    : hasPhaseAndPolarity (withPhaseAndPolarity),
+ModulationEditor::Section::Section (juce::StringArray choices, bool withPhase, bool withPolarity)
+    : hasPhase (withPhase),
+      hasPolarity (withPolarity),
       choice (std::move (choices))
 {
 }
@@ -14,10 +15,12 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
 {
     setUp (source);
     setUp (velocity);
+    setUp (modWheel);
 
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
-    setSize (470, 348);
+    show (modWheel, synthProcessor.getModWheelAssignment (target));
+    setSize (470, 500);
 }
 
 void ModulationEditor::setUp (Section& section)
@@ -51,14 +54,15 @@ void ModulationEditor::setUp (Section& section)
 
     section.choice.setVisible (true);
     section.range.setVisible (true);
-    section.phase.setVisible (section.hasPhaseAndPolarity);
-    section.polarity.setVisible (section.hasPhaseAndPolarity);
+    section.phase.setVisible (section.hasPhase);
+    section.polarity.setVisible (section.hasPolarity);
 }
 
 void ModulationEditor::show (Section& section, const modulation::Assignment& assignment)
 {
     const auto isVelocity = &section == &velocity;
-    section.choice.setChosen (isVelocity ? (assignment.isActive() ? 1 : 0) : assignment.source + 1);
+    const auto isSwitched = &section != &source;
+    section.choice.setChosen (isSwitched ? (assignment.isActive() ? 1 : 0) : assignment.source + 1);
 
     // A range it hasn't been given yet is the usual one to start from.
     const auto range = assignment.isActive() || ! isVelocity ? assignment.range : modulation::startingVelocityOnVolume.range;
@@ -68,7 +72,7 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
     section.polarity.setChosen (assignment.inverted ? 1 : 0);
 
     // Range and polarity mean nothing until something is moving the control, and phase nothing unless it's an LFO.
-    const auto isLfo = assignment.isActive() && ! isVelocity && ! modulation::isEnvelope (assignment.source);
+    const auto isLfo = assignment.isActive() && ! isSwitched && ! modulation::isEnvelope (assignment.source);
 
     for (auto* control : std::initializer_list<juce::Component*> { &section.range, &section.phase, &section.polarity })
     {
@@ -88,8 +92,12 @@ void ModulationEditor::apply()
     synthProcessor.setVelocityAssignment (target, { velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
                                                     (float) velocity.range.getValue(), false });
 
+    synthProcessor.setModWheelAssignment (target, { modWheel.choice.getChosen() == 1 ? modulation::modWheelSource : -1,
+                                                    (float) modWheel.range.getValue(), modWheel.polarity.getChosen() == 1 });
+
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
+    show (modWheel, synthProcessor.getModWheelAssignment (target));
 }
 
 juce::String ModulationEditor::describeSource() const
@@ -144,13 +152,26 @@ juce::String ModulationEditor::describeVelocity() const
          + juce::String (juce::roundToInt (assignment.range * 100.0f)) + "% of its travel for the softest.";
 }
 
+juce::String ModulationEditor::describeModWheel() const
+{
+    const auto& assignment = synthProcessor.getModWheelAssignment (target);
+    const auto control = modulation::getName (target).toLowerCase();
+
+    if (! assignment.isActive())
+        return "Switch on to have a MIDI controller's mod wheel move the " + control + ", as well as anything above.";
+
+    return "At the bottom, the mod wheel leaves the " + control + " where it's set. Pushed up, it moves it "
+         + (assignment.inverted ? "down" : "up") + ", by as much as " + juce::String (juce::roundToInt (assignment.range * 100.0f))
+         + "% of its travel at the top.";
+}
+
 void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
 {
     constexpr auto captionWidth = 84;
 
     auto row = area.removeFromTop (26);
     section.choiceCaption = row.removeFromLeft (captionWidth);
-    section.choice.setBounds (&section == &velocity ? row.removeFromLeft (120) : row);
+    section.choice.setBounds (&section != &source ? row.removeFromLeft (120) : row);
     area.removeFromTop (8);
 
     row = area.removeFromTop (22);
@@ -159,14 +180,17 @@ void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
     section.range.setBounds (row);
     area.removeFromTop (8);
 
-    if (section.hasPhaseAndPolarity)
+    if (section.hasPhase)
     {
         row = area.removeFromTop (22);
         section.phaseCaption = row.removeFromLeft (captionWidth);
         section.phaseValue = row.removeFromRight (40);
         section.phase.setBounds (row);
         area.removeFromTop (8);
+    }
 
+    if (section.hasPolarity)
+    {
         row = area.removeFromTop (26);
         section.polarityCaption = row.removeFromLeft (captionWidth);
         section.polarity.setBounds (row.removeFromLeft (180));
@@ -174,7 +198,7 @@ void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
     }
 
     // An LFO's description can run to a third line, saying how its phase shifts it.
-    section.descriptionArea = area.removeFromTop (section.hasPhaseAndPolarity ? 50 : 34);
+    section.descriptionArea = area.removeFromTop (section.hasPhase ? 50 : 34);
 }
 
 void ModulationEditor::resized()
@@ -188,6 +212,10 @@ void ModulationEditor::resized()
     dividerArea = area.removeFromTop (1);
     area.removeFromTop (11);
     layOut (velocity, area);
+    area.removeFromTop (6);
+    secondDividerArea = area.removeFromTop (1);
+    area.removeFromTop (11);
+    layOut (modWheel, area);
 }
 
 void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, const juce::String& choiceCaption,
@@ -199,18 +227,18 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     g.drawText (choiceCaption, section.choiceCaption, juce::Justification::centredLeft);
     g.drawText ("RANGE", section.rangeCaption, juce::Justification::centredLeft);
 
-    if (section.hasPhaseAndPolarity)
-    {
+    if (section.hasPhase)
         g.drawText ("PHASE", section.phaseCaption, juce::Justification::centredLeft);
+
+    if (section.hasPolarity)
         g.drawText ("POLARITY", section.polarityCaption, juce::Justification::centredLeft);
-    }
 
     g.setFont (fonts::body (13.0f));
     g.setColour (active ? colours::text : colours::dimText);
     g.drawText (juce::String (juce::roundToInt (section.range.getValue() * 100.0)) + "%", section.rangeValue,
                 juce::Justification::centredRight);
 
-    if (section.hasPhaseAndPolarity)
+    if (section.hasPhase)
     {
         g.setColour (section.phase.isEnabled() ? colours::text : colours::dimText);
         g.drawText (modulation::phaseToText ((float) section.phase.getValue() / 360.0f), section.phaseValue,
@@ -220,7 +248,7 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     g.setColour (colours::dimText);
     g.setFont (fonts::body (12.5f));
     g.drawFittedText (description, section.descriptionArea, juce::Justification::topLeft,
-                      section.hasPhaseAndPolarity ? 3 : 2);
+                      section.hasPhase ? 3 : 2);
 }
 
 void ModulationEditor::paint (juce::Graphics& g)
@@ -235,4 +263,9 @@ void ModulationEditor::paint (juce::Graphics& g)
     g.fillRect (dividerArea);
 
     paintSection (g, velocity, "VELOCITY", synthProcessor.getVelocityAssignment (target).isActive(), describeVelocity());
+
+    g.setColour (colours::outline);
+    g.fillRect (secondDividerArea);
+
+    paintSection (g, modWheel, "MOD WHEEL", synthProcessor.getModWheelAssignment (target).isActive(), describeModWheel());
 }

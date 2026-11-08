@@ -131,7 +131,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   last note and its frequency. Click the on-screen keys, or in the standalone app type on the computer
   keyboard: A to ; play the white keys from middle C, and W E T Y U O P play the black keys. Or play a
   MIDI keyboard: see below. The pitch wheel bends two semitones either way, and the sustain pedal holds
-  notes. How hard you play can move any control: see *Giving an LFO, envelope or velocity something to
+  notes. How hard you play can move any control: see *Giving an LFO, envelope, velocity or the mod wheel something to
   move*.
 - **Play from a MIDI keyboard in the standalone app.** Plug it in, before or after opening EZ Synth, and
   it plays straight away, with no setting up: the app plays from every MIDI device plugged in, noticing a
@@ -210,16 +210,17 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   than playing on until the envelope's release ends. An envelope on anything else, such as a filter's
   cutoff, is cut off when the note ends.
 
-### Giving an LFO, envelope or velocity something to move
+### Giving an LFO, envelope, velocity or the mod wheel something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
   the harmonic buttons, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
-  in two parts. In the top part you pick an LFO or envelope to move the control; in the bottom part you
-  switch on **Velocity** to have how hard each key is played move it too. Each part has its own **range**,
-  the top part a **phase** and **polarity** too, and both can move the same control at once, their
-  movements adding up.
+  in three parts. In the top part you pick an LFO or envelope to move the control; in the middle part you
+  switch on **Velocity** to have how hard each key is played move it too; and in the bottom part you switch
+  on **Mod wheel** to have a MIDI controller's mod wheel move it. Each part has its own **range**, the top
+  part a **phase** and **polarity** too, and the mod wheel a **polarity**. All three can move the same
+  control at once, their movements adding up.
   - **Moved by** None, LFO 1 to 3, or Env 1 to 3. A control can be moved by one of these at a time, as well
-    as by velocity.
+    as by velocity and the mod wheel.
   - **Range** is how far the control moves, from one end of the source to the other, as a share of its
     travel. An LFO's wave swings the control either side of where it's set: at 0 the control is where you
     set it, and at +1 and −1 it's at either end of its range. An envelope moves it one way, by its whole
@@ -228,6 +229,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     by its whole range for the softest. So what you hear when you click the on-screen keys, which always play
     as hard as they can, is what the controls say. To make softer notes darker, for instance, set the low
     pass cutoff where you want the hardest notes, and give it velocity with a range of 30% or so.
+  - **Mod wheel** leaves the control where it's set with the wheel at the bottom, and moves it up as the wheel
+    is pushed up, by its whole range at the top, or down if its polarity is **Inverted**. It follows the
+    wheel as you move it, during notes as well as between them, and a new note starts with the wheel where
+    it was left. It's MIDI controller 1, which most keyboards' mod wheels send, so in a DAW the wheel can be
+    recorded and drawn like any other MIDI. To open a filter with the wheel, for instance, set its cutoff
+    low and give it the mod wheel with a range of 60% or so.
   - **Phase**, for an LFO, shifts its wave to the right for this control alone, from 0°, in step with the
     LFO, up to 359°, a degree short of a whole period. The control follows where the LFO was that much of a
     period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase
@@ -235,10 +242,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     of a period before the LFO does. Give two controls on the same LFO different phases and they move out of
     step. For an LFO that starts with each key, a phase is a delay: after each key, the control waits where the
     wave starts for that share of the period, then runs through the wave. Double-click the slider to put it
-    back to 0°. Envelopes and velocity have no phase.
+    back to 0°. Envelopes, velocity and the mod wheel have no phase.
   - **Normal** polarity raises the control as the LFO or envelope rises. **Inverted** lowers it. Velocity has
     no polarity: softer notes always move a control down.
-  - Choose **None**, or switch velocity **Off**, to stop it being moved.
+  - Choose **None**, or switch velocity or the mod wheel **Off**, to stop it being moved.
 - **Velocity starts out on the volume**, with a range of 35%, so softer notes are quieter, as on most
   instruments. Switch it off there for every note to play as loud as the hardest, or move it elsewhere.
 - **See them at work.** A control that's being moved shows where it's been moved to, in light blue, as a
@@ -438,8 +445,8 @@ save pictures of the window showing several waves.
   the start of the block; one that runs once, and each envelope (`Source/Envelope.cpp`), counts from the
   note's start. A control given a phase takes the LFO's value that share of a period earlier; an LFO that
   runs once holds its first value until then. A control's position along its travel, from 0 to 1, moves by
-  its range times half an LFO's value, or times an envelope's whole value, and by its velocity range times how far short of full velocity
-  the note was played. The two movements add up before the control is kept within its travel. Once the key is
+  its range times half an LFO's value, or times an envelope's whole value, by its velocity range times how far short of full velocity
+  the note was played, and by its mod wheel range times how far up the wheel is. The movements add up before the control is kept within its travel. Once the key is
   let go, a control an envelope moves goes from where it was then to its rest, the bottom of its travel or in
   tune for a tune, in proportion to how much of the release is left. Cutoffs travel by octave, and harmonic sliders give weak
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
@@ -462,7 +469,7 @@ save pictures of the window showing several waves.
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
-| `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, and velocity, with their ranges, phases and polarities |
+| `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, velocity and the mod wheel, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/PresetBar.*` | Loading, stepping through and saving presets |

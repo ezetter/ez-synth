@@ -61,8 +61,20 @@ struct Patch
     std::array<Lfo, modulation::numLfos> lfos;
     std::array<EnvelopeSettings, modulation::numEnvelopes> envelopes;
 
-    /** What each control is moved by: an LFO or envelope, and its key velocity, each of which can move it. */
-    modulation::Assignments assignments, velocityAssignments;
+    /** What each control is moved by: an LFO or envelope, its key velocity and the mod wheel, each of which can
+        move it.
+    */
+    modulation::Assignments assignments, velocityAssignments, modWheelAssignments;
+
+    /** Where the mod wheel is, from 0 to 1, as the MIDI played so far has put it. */
+    float modWheel = 0.0f;
+
+    /** Whether anything moves a control. */
+    bool isMoved (int target) const noexcept
+    {
+        return assignments[(size_t) target].isActive() || velocityAssignments[(size_t) target].isActive()
+            || modWheelAssignments[(size_t) target].isActive();
+    }
 
     /** The volume knob follows a square law, which sounds more even over its turn than a straight line does. */
     static float volumeToGain (float volume)   { return volume * volume; }

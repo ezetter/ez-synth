@@ -5,8 +5,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** Sets what moves a control: an LFO or envelope, with how far and which way, and the key velocity, with how far.
-    It opens next to the control when the control is right-clicked or Control-clicked.
+/** Sets what moves a control: an LFO or envelope, with how far and which way, the key velocity, with how far, and
+    the mod wheel, with how far and which way. It opens next to the control when the control is right-clicked or
+    Control-clicked.
 */
 class ModulationEditor final : public juce::Component
 {
@@ -17,14 +18,14 @@ public:
     void resized() override;
 
 private:
-    /** The controls for one thing moving the control: what it is, or whether it's on, its range and, for an LFO or
-        envelope, its polarity. The phase only counts for an LFO.
+    /** The controls for one thing moving the control: what it is, or whether it's on, its range and, for an LFO,
+        envelope or the mod wheel, its polarity. The phase only counts for an LFO.
     */
     struct Section
     {
-        Section (juce::StringArray choices, bool hasPhaseAndPolarity);
+        Section (juce::StringArray choices, bool hasPhase, bool hasPolarity);
 
-        const bool hasPhaseAndPolarity;
+        const bool hasPhase, hasPolarity;
 
         ChoiceButtons choice;
         juce::Slider range;
@@ -44,16 +45,20 @@ private:
 
     juce::String describeSource() const;
     juce::String describeVelocity() const;
+    juce::String describeModWheel() const;
 
     SynthProcessor& synthProcessor;
     const int target;
 
-    Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true };
+    Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true, true };
 
     /** Velocity always moves a control down for softer notes, so it has no polarity, nor any phase. */
-    Section velocity { { "Off", "On" }, false };
+    Section velocity { { "Off", "On" }, false, false };
 
-    juce::Rectangle<int> titleArea, dividerArea;
+    /** The mod wheel moves a control up as it's pushed up, or down if inverted. */
+    Section modWheel { { "Off", "On" }, false, true };
+
+    juce::Rectangle<int> titleArea, dividerArea, secondDividerArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationEditor)
 };

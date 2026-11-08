@@ -71,4 +71,5 @@
     <ASSIGNMENT target="volume" range="0.3499999940395355"/>
     <ASSIGNMENT target="filter1Cutoff" range="0.300000011920929"/>
   </VELOCITY>
+  <MODWHEEL/>
 </EZSynth>

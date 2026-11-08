@@ -68,4 +68,5 @@
   <MODULATION target="osc1Harmonic9" source="Env 2" range="0.4000000059604645"
               inverted="0"/>
   <VELOCITY/>
+  <MODWHEEL/>
 </EZSynth>
