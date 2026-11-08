@@ -1858,6 +1858,89 @@ namespace
 
         synth.setModWheelAssignment (modulation::oscillatorLevelTarget (0), {});
         check (! synth.getModWheelAssignment (modulation::oscillatorLevelTarget (0)).isActive(), "...and it can be taken off again");
+
+        // Each LFO's rate is a control too, which only the mod wheel can move.
+        const auto rate = modulation::lfoRateTarget (0);
+        check (modulation::getName (modulation::lfoRateTarget (2)) == "LFO 3 rate" && modulation::getKey (rate) == SynthProcessor::lfoPeriodId (0)
+                 && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (2) == modulation::numTargets - 1,
+               "each LFO's rate is a control the mod wheel can move");
+
+        synth.setAssignment (rate, { 1, 0.5f, false });
+        synth.setVelocityAssignment (rate, { modulation::velocitySource, 0.5f, false });
+        check (! synth.getAssignment (rate).isActive() && ! synth.getVelocityAssignment (rate).isActive(),
+               "...and only the mod wheel: not an LFO, an envelope or velocity");
+
+        // LFO 1, run once over a second, plays a rising sawtooth on the level, which rises from nothing to full over
+        // its period. With the wheel on its rate, at the top it runs twice as fast: doubling the rate is a tenth of
+        // the way along the rate dial, which goes from 0.1 to 100 Hz.
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 1.0f, true, waveform::Preset::sawtooth);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+        const auto doubling = std::log (2.0f) / std::log (modulation::longestPeriod / modulation::shortestPeriod);
+
+        const auto playWithWheelAt = [&synth] (int wheelBefore, double wheelTopAt)
+        {
+            synth.prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> output;
+            const auto blocks = (int) (0.6 * sampleRate / blockSize);
+
+            for (int block = 0; block < blocks + (int) (0.5 * sampleRate / blockSize); ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                {
+                    midi.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, wheelBefore), 0);
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+                }
+
+                if (block == (int) (wheelTopAt * sampleRate / blockSize))
+                    midi.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, 127), 0);
+
+                if (block == blocks)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, 69), 0);
+
+                synth.processBlock (buffer, midi);
+
+                if (block < blocks)
+                    output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            return output;
+        };
+
+        synth.setModWheelAssignment (rate, { modulation::modWheelSource, doubling, false });
+        const auto steady = playWithWheelAt (0, 10.0);
+        const auto fast = playWithWheelAt (127, 10.0);
+        check (isNear (amplitudeAt (slice (fast, 0.18, 0.22), 440.0), amplitudeAt (slice (steady, 0.38, 0.42), 440.0),
+                       0.04),
+               "with the wheel at the top, an LFO's rate is moved up by its range: here twice as fast");
+
+        // Pushed up during the note, it carries on from where it had got to, at its new rate: 0.3 seconds slowly
+        // and 0.1 quickly is half its period.
+        const auto pushed = playWithWheelAt (0, 0.3);
+        check (isNear (amplitudeAt (slice (pushed, 0.385, 0.415), 440.0), amplitudeAt (slice (steady, 0.48, 0.52), 440.0),
+                       0.04),
+               "...and pushing it up during a note speeds the LFO up from where it had got to, without a jump");
+        // Played in whole blocks: slowly until the wheel's block, then quickly to the last.
+        const auto wheelBlock = (int) (0.3 * sampleRate / blockSize);
+        const auto totalBlocks = (int) (0.6 * sampleRate / blockSize) + (int) (0.5 * sampleRate / blockSize);
+        const auto expectedPeriods = (double) (wheelBlock + 2 * (totalBlocks - wheelBlock)) * blockSize / sampleRate;
+        check (isNear (*synth.getLfoProgress (0), expectedPeriods, 0.002),
+               "...which the window shows too");
+
+        synth.setModWheelAssignment (rate, { modulation::modWheelSource, doubling, true });
+        const auto slow = playWithWheelAt (127, 10.0);
+        check (isNear (amplitudeAt (slice (slow, 0.38, 0.42), 440.0), amplitudeAt (slice (steady, 0.18, 0.22), 440.0),
+                       0.04),
+               "inverted, it slows the LFO down instead");
+
+        juce::MemoryBlock withRate;
+        synth.getStateInformation (withRate);
+        restored.setStateInformation (withRate.getData(), (int) withRate.getSize());
+        check (restored.getModWheelAssignment (rate).isActive() && restored.getModWheelAssignment (rate).inverted,
+               "the mod wheel on an LFO's rate is saved with the sound");
     }
 
     void testShowingMovedHarmonics()
@@ -2184,7 +2267,7 @@ namespace
 
         check (modulation::getName (modulation::harmonicPhaseTarget (0, 1)) == "Osc 1 harmonic 1 phase"
                  && modulation::findTarget ("osc3Harmonic9Phase") == modulation::harmonicPhaseTarget (2, 9)
-                 && modulation::harmonicPhaseTarget (2, 9) == modulation::numTargets - 1,
+                 && modulation::harmonicPhaseTarget (2, 9) == modulation::lfoRateTarget (0) - 1,
                "every harmonic's phase, the fundamental's too, is a control of its own");
 
         // The dials: one beside every harmonic, the fundamental too.
@@ -3343,6 +3426,7 @@ namespace
 
         saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
+        saveModulationEditor (modulation::lfoRateTarget (0), "11b-modulation-editor-lfo-rate");
 
         // Waves drawn in steps: the Step Filter preset's LFO, in its 8 steps, and an oscillator drawn in 12.
         {

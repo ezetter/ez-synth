@@ -213,7 +213,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Giving an LFO, envelope, velocity or the mod wheel something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
-  the harmonic buttons, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth. A small window opens,
+  the harmonic buttons, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth, or an LFO's rate. A small window opens,
   in three parts. In the top part you pick an LFO or envelope to move the control; in the middle part you
   switch on **Velocity** to have how hard each key is played move it too; and in the bottom part you switch
   on **Mod wheel** to have a MIDI controller's mod wheel move it. Each part has its own **range**, the top
@@ -235,6 +235,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     it was left. It's MIDI controller 1, which most keyboards' mod wheels send, so in a DAW the wheel can be
     recorded and drawn like any other MIDI. To open a filter with the wheel, for instance, set its cutoff
     low and give it the mod wheel with a range of 60% or so.
+  - **An LFO's rate** can be given to the mod wheel too: right-click the **Rate** dial on its card. Only the
+    mod wheel can move a rate, so the window shows only its part. Pushed up, the wheel makes the LFO faster,
+    or slower if **Inverted**, by as much as its range of the dial's travel at the top. The dial runs from
+    0.1 to 100 Hz, so each 10% of range is about twice as fast: give it 10% for the wheel to double the rate,
+    for a vibrato or tremolo that quickens as you push it. The LFO speeds up from wherever it's got to, so it
+    never jumps, and the dial shows the rate the wheel has moved it to in light blue.
   - **Phase**, for an LFO, shifts its wave to the right for this control alone, from 0°, in step with the
     LFO, up to 359°, a degree short of a whole period. The control follows where the LFO was that much of a
     period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase

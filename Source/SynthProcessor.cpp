@@ -405,14 +405,26 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     updatePatch();
+
+    // How far through its periods an LFO that starts with each key is, from the last key pressed.
+    for (size_t i = 0; i < periodsSinceLastNote.size(); ++i)
+    {
+        if (lastNoteOnSample >= samplesPlayed)
+            periodsSinceLastNote[i] = (double) (samplesPlayed + numSamples - lastNoteOnSample) / patch.getLfoPeriodSamples (i);
+        else
+            periodsSinceLastNote[i] += numSamples / patch.getLfoPeriodSamples (i);
+    }
+
     synth.renderNextBlock (buffer, midi, 0, numSamples);
     modWheelShown = patch.modWheel;
     shareNewestNote();
 
     for (size_t i = 0; i < lfoPhases.size(); ++i)
     {
+        // The mod wheel can change an LFO's rate, so it moves on by the periods it's been through at that rate.
         const auto& lfo = patch.lfos[i];
-        lfoPhases[i] += numSamples / lfo.periodSamples;
+        const auto periodSamples = patch.getLfoPeriodSamples (i);
+        lfoPhases[i] += numSamples / periodSamples;
         const auto periodsDone = std::floor (lfoPhases[i]);
         lfoPhases[i] -= periodsDone;
         lfoCycles[i] += (std::int64_t) periodsDone;
@@ -421,7 +433,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         if (! lfo.fromKey)
             lfoProgress[i] = lfoPhases[i];
         else if (lastNoteOnSample >= 0)
-            lfoProgress[i] = (double) (samplesPlayed + numSamples - lastNoteOnSample) / lfo.periodSamples;
+            lfoProgress[i] = periodsSinceLastNote[i];
         else
             lfoProgress[i] = -1.0;
     }
@@ -538,7 +550,8 @@ void SynthProcessor::updatePatch()
         const auto mode = getLfoMode ((int) i);
         lfo.fromKey = mode != modulation::lfoLoops;
         lfo.times = modulation::getLfoTimes (mode);
-        lfo.periodSamples = std::max (1.0, lfoParameters[i].period->load() * playingSampleRate);
+        lfo.periodSeconds = lfoParameters[i].period->load();
+        lfo.periodSamples = std::max (1.0, lfo.periodSeconds * playingSampleRate);
         lfo.phase = lfoPhases[i];
         lfo.cycle = lfoCycles[i];
         lfo.random = lfoParameters[i].random->load() >= 0.5f;
@@ -823,6 +836,9 @@ const modulation::Assignment& SynthProcessor::getAssignment (int target) const n
 
 void SynthProcessor::setAssignment (int target, const modulation::Assignment& assignment)
 {
+    if (modulation::isMovedOnlyByModWheel (target))
+        return;
+
     markEdited();
 
     assignments[(size_t) target] = assignment;
@@ -846,6 +862,9 @@ const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target)
 
 void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
 {
+    if (modulation::isMovedOnlyByModWheel (target))
+        return;
+
     markEdited();
 
     velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
@@ -1249,7 +1268,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
             if (modulationTree["source"].toString() == modulation::getSourceName (i))
                 source = i;
 
-        if (target.has_value() && source >= 0 && source < modulation::numSources)
+        if (target.has_value() && source >= 0 && source < modulation::numSources && ! modulation::isMovedOnlyByModWheel (*target))
             assignments[(size_t) *target] = { source, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
                                                (bool) modulationTree["inverted"],
                                                modulation::isEnvelope (source)
@@ -1264,7 +1283,8 @@ void SynthProcessor::loadState (juce::ValueTree state)
         velocityAssignments[(size_t) modulation::volumeTarget] = modulation::startingVelocityOnVolume;
 
     for (const auto& assignmentTree : velocityTree)
-        if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
+        if (const auto target = modulation::findTarget (assignmentTree["target"].toString());
+            target.has_value() && ! modulation::isMovedOnlyByModWheel (*target))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false };
 

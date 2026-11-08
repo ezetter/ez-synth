@@ -196,6 +196,9 @@ LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
                       [this] (float value) { showMode (juce::roundToInt (value)); })
 {
     mode.setTitle ("LFO " + juce::String (lfo + 1) + " loops, or plays a number of times from each key");
+
+    // The rate can be given to the mod wheel.
+    modulatable::setTarget (dial, modulation::lfoRateTarget (lfo));
     mode.onChoose = [this] (int index) { modeAttachment.setValueAsCompleteGesture ((float) index); };
     mode.onClick = [this] (int index)
     {

@@ -27,6 +27,8 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= lfoRateTarget (0))
+            info = { Kind::lfoRate, 0, 1, 0, target - lfoRateTarget (0) };
         else if (target >= harmonicPhaseTarget (0, 1))
             info = { Kind::harmonicPhase, (target - harmonicPhaseTarget (0, 1)) / waveform::maxHarmonics,
                      (target - harmonicPhaseTarget (0, 1)) % waveform::maxHarmonics + 1 };
@@ -82,6 +84,7 @@ namespace modulation
             case Kind::harmonicTune:         return oscillator + " harmonic " + juce::String (info.harmonic) + " tune";
             case Kind::harmonicPhase:        return oscillator + " harmonic " + juce::String (info.harmonic) + " phase";
             case Kind::oscillatorTune:       return oscillator + " tune";
+            case Kind::lfoRate:              return "LFO " + juce::String (info.lfo + 1) + " rate";
         }
 
         return {};
@@ -109,6 +112,7 @@ namespace modulation
             case Kind::harmonicTune:         return oscillator + "Harmonic" + juce::String (info.harmonic) + "Tune";
             case Kind::harmonicPhase:        return oscillator + "Harmonic" + juce::String (info.harmonic) + "Phase";
             case Kind::oscillatorTune:       return oscillator + "Tune";
+            case Kind::lfoRate:              return "lfo" + juce::String (info.lfo + 1) + "Period";
         }
 
         return {};
@@ -138,6 +142,11 @@ namespace modulation
     {
         const auto kind = describe (target).kind;
         return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase;
+    }
+
+    bool isMovedOnlyByModWheel (int target)
+    {
+        return describe (target).kind == Kind::lfoRate;
     }
 
     bool isLoudness (int target)

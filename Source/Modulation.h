@@ -50,10 +50,13 @@ namespace modulation
 
     /** The phase of a harmonic, from the 1st up, from 0 at the bottom of its travel round to a whole turn at the top. */
     constexpr int harmonicPhaseTarget (int oscillator, int harmonic) { return 76 + oscillator * waveform::maxHarmonics + harmonic - 1; }
-    inline constexpr int numTargets = 103;
+
+    /** An LFO's rate, which only the mod wheel can move. */
+    constexpr int lfoRateTarget (int lfo)                           { return 103 + lfo; }
+    inline constexpr int numTargets = 106;
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase };
+                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate };
 
     struct TargetInfo
     {
@@ -61,6 +64,7 @@ namespace modulation
         int oscillator = 0;
         int harmonic = 1;
         int filter = 0;
+        int lfo = 0;
     };
 
     TargetInfo describe (int target);
@@ -85,6 +89,11 @@ namespace modulation
 
     /** Whether a target is a plugin parameter, rather than one of a wave's harmonics or their tunes or phases. */
     bool isParameter (int target);
+
+    /** Whether only the mod wheel can move a control, as for an LFO's rate, which the LFOs, envelopes and velocity
+        can't, as each LFO runs the same for every note.
+    */
+    bool isMovedOnlyByModWheel (int target);
 
     /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on
         sounding until an envelope moving one of these has finished.

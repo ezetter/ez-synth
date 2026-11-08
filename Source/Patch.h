@@ -32,6 +32,7 @@ struct Patch
     {
         bool on = false;
         double periodSamples = 48000.0;
+        float periodSeconds = 1.0f;
 
         /** Whether it starts with each note rather than looping all the time, and how many times it plays its wave
             then, or 0 for forever.
@@ -68,6 +69,21 @@ struct Patch
 
     /** Where the mod wheel is, from 0 to 1, as the MIDI played so far has put it. */
     float modWheel = 0.0f;
+
+    /** How long an LFO's period is now, in samples: as it's set, or as the mod wheel has moved its rate. */
+    double getLfoPeriodSamples (size_t lfo) const noexcept
+    {
+        const auto& settings = lfos[lfo];
+        const auto& byModWheel = modWheelAssignments[(size_t) modulation::lfoRateTarget ((int) lfo)];
+
+        if (! byModWheel.isActive())
+            return settings.periodSamples;
+
+        // Along the rate dial's travel, the slowest is at 0 and the fastest at 1.
+        const auto set = 1.0f - modulation::periodToPosition (settings.periodSeconds);
+        const auto moved = juce::jlimit (0.0f, 1.0f, set + byModWheel.offset (modWheel));
+        return settings.periodSamples * (double) (modulation::positionToPeriod (1.0f - moved) / settings.periodSeconds);
+    }
 
     /** Whether anything moves a control. */
     bool isMoved (int target) const noexcept

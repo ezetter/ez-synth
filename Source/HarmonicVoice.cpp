@@ -85,6 +85,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     for (auto& seed : randomSeeds)
         seed = (std::uint32_t) random.nextInt();
     samplesSinceNoteOn = 0;
+    periodsSinceNoteOn = {};
 
     for (auto& run : envelopeRuns)
         run.start();
@@ -177,8 +178,8 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (size_t i = 0; i < lfoPeriodsGone.size(); ++i)
     {
         const auto& lfo = patch.lfos[i];
-        lfoPeriodsGone[i] = lfo.fromKey ? (double) samplesSinceNoteOn / lfo.periodSamples
-                                        : (double) lfo.cycle + lfo.phase + startSample / lfo.periodSamples;
+        lfoPeriodsGone[i] = lfo.fromKey ? periodsSinceNoteOn[i]
+                                        : (double) lfo.cycle + lfo.phase + startSample / patch.getLfoPeriodSamples (i);
     }
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
@@ -488,6 +489,10 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     }
 
     samplesSinceNoteOn += numSamples;
+
+    // An LFO that starts with each key moves on at its rate now, which the mod wheel can change during the note.
+    for (size_t i = 0; i < periodsSinceNoteOn.size(); ++i)
+        periodsSinceNoteOn[i] += numSamples / patch.getLfoPeriodSamples (i);
 
     if (waitingForEnvelopes)
         samplesSinceKeyUp += numSamples;

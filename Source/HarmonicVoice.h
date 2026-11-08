@@ -109,6 +109,9 @@ private:
     bool waitingForEnvelopes = false;   // the key's been let go, but an envelope moving the loudness is still releasing
     juce::int64 samplesSinceKeyUp = 0;   // while waiting for the envelopes
     juce::int64 samplesSinceNoteOn = 0;
+
+    /** How many periods each LFO that starts with each key has been through since the note started. */
+    std::array<double, modulation::numLfos> periodsSinceNoteOn {};
     std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
     double frequency = 440.0;
     int noteNumber = 69;

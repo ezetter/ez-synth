@@ -50,6 +50,9 @@ private:
     SynthProcessor& synthProcessor;
     const int target;
 
+    /** For a control only the mod wheel can move, such as an LFO's rate, only the mod wheel's part is shown. */
+    const bool onlyModWheel;
+
     Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true, true };
 
     /** Velocity always moves a control down for softer notes, so it has no polarity, nor any phase. */
