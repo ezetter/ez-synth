@@ -222,8 +222,8 @@ namespace modulation
     /** The rates an LFO synced to the tempo can run at, in cycles a beat, from one every 8 beats up to 8 a beat. At
         1 a beat, a cycle lasts a quarter note in 4/4; at 1/4, a whole bar.
     */
-    inline constexpr std::array<double, 9> beatRates { 0.125, 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0 };
-    inline constexpr int oneCycleABeat = 3;
+    inline constexpr std::array<double, 11> beatRates { 0.125, 1.0 / 6.0, 0.25, 1.0 / 3.0, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0 };
+    inline constexpr int oneCycleABeat = 5;
 
     /** The beat rates' names, such as "1/2 per beat" and "3 per beat". */
     juce::StringArray getBeatRateNames();

@@ -1980,9 +1980,10 @@ namespace
     {
         std::cout << "LFOs synced to the tempo" << std::endl;
 
-        check (modulation::getBeatRateNames() == juce::StringArray { "1/8 per beat", "1/4 per beat", "1/2 per beat", "1 per beat", "2 per beat",
-                                                                     "3 per beat", "4 per beat", "6 per beat", "8 per beat" },
-               "a synced LFO runs 1/8, 1/4, 1/2, 1, 2, 3, 4, 6 or 8 cycles a beat");
+        check (modulation::getBeatRateNames() == juce::StringArray { "1/8 per beat", "1/6 per beat", "1/4 per beat", "1/3 per beat",
+                                                                     "1/2 per beat", "1 per beat", "2 per beat", "3 per beat",
+                                                                     "4 per beat", "6 per beat", "8 per beat" },
+               "a synced LFO runs 1/8, 1/6, 1/4, 1/3, 1/2, 1, 2, 3, 4, 6 or 8 cycles a beat");
 
         SynthProcessor synth;
         check (! synth.isLfoSynced (0) && isNear (synth.getLfoCyclesPerBeat (0), 1.0, 1.0e-9), "an LFO starts unsynced, ready to run a cycle a beat");
@@ -1991,7 +1992,7 @@ namespace
         host.info.setBpm (90.0);
         synth.setPlayHead (&host);
         setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 5.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 7.0f);
 
         synth.prepareToPlay (sampleRate, blockSize);
         juce::AudioBuffer<float> buffer (2, blockSize);
@@ -2011,7 +2012,7 @@ namespace
 
         // While the host plays, a looping LFO at 1/4 a beat lasts a bar, and starts each one on a bar: at beat 10.25
         // it's 2.25 beats, or 0.5625 of a bar, into its period, and moves on by the block from there.
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 1.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 2.0f);
         host.info.setBpm (120.0);
         host.info.setIsPlaying (true);
         host.info.setPpqPosition (10.25);
@@ -2037,7 +2038,7 @@ namespace
             setParameter (played, SynthProcessor::levelId (0), 0.5f);
             setLfo (played, 0, synced ? 1.0f : 0.25f, false, waveform::Preset::sine);
             setParameter (played, SynthProcessor::lfoSyncId (0), synced ? 1.0f : 0.0f);
-            setParameter (played, SynthProcessor::lfoBeatRateId (0), 6.0f);
+            setParameter (played, SynthProcessor::lfoBeatRateId (0), 8.0f);
             played.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
             const auto signal = playNotes (played, { { 0.0, 69 } }, 0.6);
             played.setPlayHead (nullptr);
@@ -2072,10 +2073,14 @@ namespace
 
         if (dial != nullptr)
         {
-            dial->setValue (6.4, juce::sendNotificationSync);
+            dial->setValue (8.4, juce::sendNotificationSync);
             check (isNear (synth.getLfoCyclesPerBeat (0), 4.0, 1.0e-9) && card.getShownRate().first == "4 per beat"
-                     && isNear (dial->getValue(), 6.0, 1.0e-9),
+                     && isNear (dial->getValue(), 8.0, 1.0e-9),
                    "...and turning it snaps to the rates a beat it can run");
+
+            dial->setValue (1.2, juce::sendNotificationSync);
+            check (isNear (synth.getLfoCyclesPerBeat (0), 1.0 / 6.0, 1.0e-9) && card.getShownRate().first == "1/6 per beat",
+                   "...including 1/6 a beat, a cycle every 6 beats");
         }
 
         card.showSynced (false);
@@ -3634,7 +3639,7 @@ namespace
         setParameter (synth, SynthProcessor::lfoModeId (1), 5.0f);
         setParameter (synth, SynthProcessor::lfoModeId (2), (float) modulation::lfoForever);
         setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 2.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 4.0f);
         synth.editedSource = SynthProcessor::numOscillators;
 
         // Plays on a while, so the LFOs are partway through their periods.
