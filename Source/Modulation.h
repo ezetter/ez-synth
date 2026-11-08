@@ -148,6 +148,16 @@ namespace modulation
     */
     float getRestPosition (int target);
 
+    /** Whether a control goes round and round, as a harmonic's phase does, so being moved past either end of its
+        travel brings it back round from the other, rather than stopping it there.
+    */
+    bool goesRound (int target);
+
+    /** A position a control's been moved to, kept in its travel, from 0 to 1: brought back round for a control that
+        goes round, and otherwise stopped at the end it's gone past.
+    */
+    float keepInTravel (int target, float position);
+
     /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope
         moves it by its range times its level. Once the key is let go, the control falls steadily from where it was
         then to its rest, which it reaches as the release ends, so an envelope on the volume fades the note out.

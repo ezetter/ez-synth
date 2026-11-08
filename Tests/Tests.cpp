@@ -2029,6 +2029,57 @@ namespace
                "an envelope on a harmonic's phase turns it");
         synth.setAssignment (modulation::harmonicPhaseTarget (0, 2), {});
 
+        // Moved below 0, a phase goes on round backwards, rather than stopping there: here an LFO held at -1, with
+        // a range of 50%, turns the 2nd harmonic back a quarter turn from 0.
+        const auto phase2 = modulation::harmonicPhaseTarget (0, 2);
+        check (isNear (modulation::keepInTravel (phase2, -0.25f), 0.75, 1.0e-6) && isNear (modulation::keepInTravel (phase2, 1.25f), 0.25, 1.0e-6)
+                 && juce::exactlyEqual (modulation::keepInTravel (modulation::harmonicTarget (0, 2), -0.25f), 0.0f),
+               "a phase moved past either end of its turn comes back round from the other, where other controls stop");
+
+        synth.setHarmonicPhase (0, 2, 0.0f);
+        const auto atZero = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        waveform::Shape low;
+        low.fill (-1.0f);
+        setParameter (synth, SynthProcessor::lfoModeId (0), 1.0f);
+        synth.setLfoShape (0, low);
+        synth.setAssignment (phase2, { 0, 0.5f, false });
+        const auto turnedBack = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (turnedBy (relativePhase (atZero, 440.0, 2), relativePhase (turnedBack, 440.0, 2), -turn / 4.0),
+               "an LFO below 0 turns a harmonic's phase back past 0");
+
+        // While a key is held, the window shows where the LFO has turned it.
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> heldBuffer (2, blockSize);
+
+        for (int block = 0; block < 8; ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+            synth.processBlock (heldBuffer, midi);
+        }
+
+        const auto shown = synth.getLivePosition (phase2);
+        check (shown.has_value() && isNear (*shown, 0.75, 1.0e-4), "...and the window shows it three quarters of the way round");
+
+        juce::MidiBuffer release;
+        release.addEvent (juce::MidiMessage::noteOff (1, 69), 0);
+
+        for (int block = 0; block < (int) (sampleRate / blockSize); ++block)
+        {
+            synth.processBlock (heldBuffer, release);
+            release.clear();
+        }
+
+        synth.setAssignment (phase2, {});
+
+        // An envelope's release brings a phase back to rest the shorter way round, through its nearest whole turn.
+        const modulation::Assignment byEnvelope { modulation::envelopeSource (0), 0.3f, false };
+        check (isNear (modulation::applyEnvelope (phase2, byEnvelope, 0.8f, { 1.0f, true, 1.0f, 0.5f }), 0.05, 1.0e-5),
+               "an envelope's release brings a phase back round to rest the shorter way");
+
         check (modulation::getName (modulation::harmonicPhaseTarget (0, 1)) == "Osc 1 harmonic 1 phase"
                  && modulation::findTarget ("osc3Harmonic9Phase") == modulation::harmonicPhaseTarget (2, 9)
                  && modulation::harmonicPhaseTarget (2, 9) == modulation::numTargets - 1,
@@ -2066,6 +2117,35 @@ namespace
             third->setValue (180.0, juce::sendNotificationSync);
 
         check (turned.has_value() && turned->first == 3 && isNear (turned->second, turn / 2.0, 1.0e-5), "...which sets its phase");
+
+        // Dragged down past 0, a dial carries on round, and dragged up past a whole turn, round again.
+        if (auto* dial = dynamic_cast<ModulatableSlider*> (third))
+        {
+            dial->setValue (30.0, juce::sendNotificationSync);
+            const auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            const auto centre = dial->getLocalBounds().getCentre().toFloat();
+            const auto drag = [&] (float dy)
+            {
+                const auto event = [&] (juce::Point<float> position, bool dragged)
+                {
+                    return juce::MouseEvent (source, position, juce::ModifierKeys::leftButtonModifier, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                             dial, dial, now, centre, now, 1, dragged);
+                };
+
+                dial->mouseDown (event (centre, false));
+                dial->mouseDrag (event (centre.translated (0.0f, dy), true));
+                dial->mouseUp (event (centre.translated (0.0f, dy), true));
+            };
+
+            // 360 degrees for each drag sensitivity's worth of pixels: 50 pixels is 72 degrees.
+            const auto pixels = 50.0f * (float) dial->getMouseDragSensitivity() / 250.0f;
+            drag (pixels);
+            check (isNear (dial->getValue(), 318.0, 1.0e-3) && turned.has_value() && isNear (turned->second, juce::degreesToRadians (318.0), 1.0e-4),
+                   "a phase dial turned back past 0 carries on round, to 318 degrees, rather than stopping");
+            drag (-2.0f * pixels);
+            check (isNear (dial->getValue(), 102.0, 1.0e-3), "...and turned on past a whole turn, round again, to 102 degrees");
+        }
     }
 
     void testTuning()

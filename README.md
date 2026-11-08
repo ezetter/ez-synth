@@ -79,12 +79,16 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   tune can be moved by an LFO, an envelope or velocity; an envelope's release brings it back into tune.
 - **Set a harmonic's phase** with the ring-shaped dial beside its tune dial: where its sine wave starts in the
   cycle, from 0° at the top of the dial round to a whole turn. Every harmonic has one, the fundamental too,
-  and the coloured ring fills round as far as the phase goes. Dragging snaps to each quarter turn, and a
+  and the coloured ring fills round as far as the phase goes. The dial has no stops: drag up or right to turn
+  it on, down or left to turn it back, and past 0° it carries on round, to 359° and below, or past a whole
+  turn back to 0° and beyond. Dragging snaps to each quarter turn, and a
   double-click sets it to 0°; hover over it to see the phase. Turning a harmonic's phase turns its sine wave
   within the wave and leaves the others alone, so the drawing and the grid's lines change with it and the
   wave becomes Custom, though the harmonic is just as loud: a sawtooth with its 2nd harmonic turned a
   quarter turn has the same harmonics but a different shape. A harmonic that's at 0 keeps the phase you give
-  it, and comes in at it when you raise it. The phase can be moved by an LFO, an envelope or velocity too.
+  it, and comes in at it when you raise it. The phase can be moved by an LFO, an envelope or velocity too,
+  and goes round in the same way: an LFO swinging below 0° turns it back past 0° rather than holding it there,
+  and an envelope's release brings it back to rest the shorter way round.
 - **Read the grid.** The faint band is the wave as drawn, the key's **Target wave**. Each coloured line is one
   harmonic, at its true size and phase, coloured like its slider. The white line is their sum, the key's
   **Actual wave**, which is the wave that oscillator plays.

@@ -46,6 +46,11 @@ public:
     */
     std::optional<double> fillOrigin;
 
+    /** Whether it goes round and round without stopping, as a phase does: dragged past either end of its range, it
+        comes back round from the other.
+    */
+    bool goesRound = false;
+
     double snapValue (double attemptedValue, DragMode) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -54,6 +59,7 @@ public:
 
 private:
     bool alternateClick = false;
+    double valueOnMouseDown = 0.0;
 };
 
 /** A switch that, on a right-click or Control-click, asks for the modulation editor rather than switching. */

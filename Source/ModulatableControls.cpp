@@ -65,19 +65,38 @@ void ModulatableSlider::mouseDown (const juce::MouseEvent& e)
 
     if (alternateClick)
         modulatable::requestEditor (*this);
+    else if (goesRound)
+        valueOnMouseDown = getValue();
     else
         Slider::mouseDown (e);
 }
 
 void ModulatableSlider::mouseDrag (const juce::MouseEvent& e)
 {
-    if (! alternateClick)
+    if (alternateClick)
+        return;
+
+    if (! goesRound)
+    {
         Slider::mouseDrag (e);
+        return;
+    }
+
+    // Dragging right or up turns it on, and left or down back, as far as the drag goes, the range once for each
+    // sensitivity's worth of pixels, and round again past either end.
+    if (e.mouseWasDraggedSinceMouseDown())
+    {
+        const auto start = getMinimum(), length = getMaximum() - getMinimum();
+        const auto pixels = (double) (e.getDistanceFromDragStartX() - e.getDistanceFromDragStartY());
+        auto value = snapValue (valueOnMouseDown + pixels * length / (double) getMouseDragSensitivity(), absoluteDrag);
+        value -= length * std::floor ((value - start) / length);
+        setValue (value, juce::sendNotificationSync);
+    }
 }
 
 void ModulatableSlider::mouseUp (const juce::MouseEvent& e)
 {
-    if (! alternateClick)
+    if (! alternateClick && ! goesRound)
         Slider::mouseUp (e);
 }
 

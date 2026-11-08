@@ -209,7 +209,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             position += assignment.offset (value);
         }
 
-        return juce::jlimit (0.0f, 1.0f, position);
+        return keepInTravel (target, position);
     };
 
     // Once the key's let go, while the note plays on for the envelopes shaping how loud some of it is, an oscillator

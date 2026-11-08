@@ -82,12 +82,14 @@ HarmonicSliders::HarmonicSliders()
 
         addChildComponent (slider);
 
-        // Every harmonic's phase goes round a whole turn, from the top of its dial, snapping to each quarter turn.
+        // Every harmonic's phase goes round a whole turn, from the top of its dial, snapping to each quarter turn. It
+        // turns either way without stopping, past 0 and round again.
         auto& phaseDial = phaseDials[i];
         phaseDial.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         phaseDial.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        phaseDial.setRotaryParameters (0.0f, juce::MathConstants<float>::twoPi, true);
+        phaseDial.setRotaryParameters (0.0f, juce::MathConstants<float>::twoPi, false);
         phaseDial.setRange (0.0, 360.0);
+        phaseDial.goesRound = true;
         phaseDial.setDoubleClickReturnValue (true, 0.0);
         phaseDial.snap = [] (double degrees)
         {

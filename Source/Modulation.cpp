@@ -185,14 +185,29 @@ namespace modulation
         return kind == Kind::harmonicTune ? 0.5f : 0.0f;
     }
 
+    bool goesRound (int target)
+    {
+        return describe (target).kind == Kind::harmonicPhase;
+    }
+
+    float keepInTravel (int target, float position)
+    {
+        if (goesRound (target))
+            return position - std::floor (position);
+
+        return juce::jlimit (0.0f, 1.0f, position);
+    }
+
     float applyEnvelope (int target, const Assignment& assignment, float position, const EnvelopeState& envelope)
     {
         if (! envelope.releasing)
-            return juce::jlimit (0.0f, 1.0f, position + assignment.offset (envelope.level));
+            return keepInTravel (target, position + assignment.offset (envelope.level));
 
-        const auto rest = getRestPosition (target);
-        const auto atKeyUp = juce::jlimit (0.0f, 1.0f, position + assignment.offset (envelope.releaseFrom));
-        return rest + (atKeyUp - rest) * juce::jlimit (0.0f, 1.0f, envelope.releaseLeft);
+        // A control that goes round comes back to rest the shorter way, to its nearest whole turn.
+        const auto atKeyUp = position + assignment.offset (envelope.releaseFrom);
+        const auto rest = goesRound (target) ? std::round (atKeyUp) : getRestPosition (target);
+        const auto from = goesRound (target) ? atKeyUp : juce::jlimit (0.0f, 1.0f, atKeyUp);
+        return keepInTravel (target, rest + (from - rest) * juce::jlimit (0.0f, 1.0f, envelope.releaseLeft));
     }
 
     juce::String phaseToText (float phase)

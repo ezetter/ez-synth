@@ -899,7 +899,7 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
         }
     }
 
-    return moved ? std::optional (juce::jlimit (0.0f, 1.0f, position)) : std::nullopt;
+    return moved ? std::optional (modulation::keepInTravel (target, position)) : std::nullopt;
 }
 
 bool SynthProcessor::LiveWave::operator== (const LiveWave& other) const noexcept
