@@ -55,6 +55,9 @@ public:
     /** How hard the note's key was played, from 0 to 1. */
     float getVelocity() const noexcept   { return noteVelocity; }
 
+    /** How many periods an LFO has been through, as this note plays it. */
+    double getLfoPeriods (int lfo) const noexcept   { return lfoPeriods[(size_t) lfo]; }
+
     /** The seed of the random wave an LFO that starts with each key plays for this note, new with each note. */
     std::uint32_t getRandomSeed (int lfo) const noexcept   { return randomSeeds[(size_t) lfo]; }
 
@@ -74,6 +77,11 @@ private:
         Harmonics harmonicTunes {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
+
+        /** How many periods each LFO has been through, and how long its period is now, in samples, for the note to
+            move each on by.
+        */
+        std::array<double, modulation::numLfos> lfoPeriods {}, lfoPeriodSamples {};
     };
 
     Targets getTargets (int startSample) const;
@@ -110,8 +118,11 @@ private:
     juce::int64 samplesSinceKeyUp = 0;   // while waiting for the envelopes
     juce::int64 samplesSinceNoteOn = 0;
 
-    /** How many periods each LFO that starts with each key has been through since the note started. */
-    std::array<double, modulation::numLfos> periodsSinceNoteOn {};
+    /** How many periods each LFO has been through as this note plays it. One that starts with each key counts from
+        the note's start. A looping one is where every note has it, unless its rate is moved by something the note
+        has its own of, when it carries on from where it was as the note started, at the note's own rate.
+    */
+    std::array<double, modulation::numLfos> lfoPeriods {};
     std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
     double frequency = 440.0;
     int noteNumber = 69;

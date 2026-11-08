@@ -1865,10 +1865,21 @@ namespace
                  && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (2) == modulation::numTargets - 1,
                "each LFO's rate is a control the mod wheel can move");
 
+        // Other LFOs can move an LFO's rate too, but never so that an LFO moves its own, even through others.
+        const auto rate2 = modulation::lfoRateTarget (1), rate3 = modulation::lfoRateTarget (2);
+        synth.setAssignment (rate, { 0, 0.5f, false });
+        check (! synth.getAssignment (rate).isActive(), "an LFO can't move its own rate");
         synth.setAssignment (rate, { 1, 0.5f, false });
-        synth.setVelocityAssignment (rate, { modulation::velocitySource, 0.5f, false });
-        check (! synth.getAssignment (rate).isActive() && ! synth.getVelocityAssignment (rate).isActive(),
-               "...and only the mod wheel: not an LFO, an envelope or velocity");
+        synth.setAssignment (rate2, { 0, 0.5f, false });
+        check (synth.getAssignment (rate).source == 1 && ! synth.getAssignment (rate2).isActive(),
+               "...nor the rate of an LFO that moves its rate");
+        synth.setAssignment (rate2, { 2, 0.5f, false });
+        synth.setAssignment (rate3, { 0, 0.5f, false });
+        check (synth.getAssignment (rate2).source == 2 && ! synth.getAssignment (rate3).isActive() && synth.wouldMakeLoop (rate3, 0)
+                 && ! synth.wouldMakeLoop (rate3, modulation::envelopeSource (0)),
+               "...even through another LFO, though an envelope can move it");
+        synth.setAssignment (rate, {});
+        synth.setAssignment (rate2, {});
 
         // LFO 1, run once over a second, plays a rising sawtooth on the level, which rises from nothing to full over
         // its period. With the wheel on its rate, at the top it runs twice as fast: doubling the rate is a tenth of
@@ -1953,6 +1964,113 @@ namespace
         check (setRate.first == "1.00 Hz" && ! setRate.second && movedRate.first == "2.0 Hz" && movedRate.second
                  && card.getShownRate() == setRate,
                "an LFO's card shows its rate as the wheel has moved it, here from 1 Hz to 2 Hz");
+    }
+
+    /** An envelope, velocity or another LFO can move an LFO's rate, for each note on its own. */
+    void testLfoRates()
+    {
+        std::cout << "LFO rates moved by envelopes and LFOs" << std::endl;
+
+        // LFO 1, over a second, plays a rising sawtooth on the level, which rises from nothing to full over its
+        // period. Doubling its rate is a tenth of the way along the rate dial, which goes from 0.1 to 100 Hz.
+        const auto doubling = std::log (2.0f) / std::log (modulation::longestPeriod / modulation::shortestPeriod);
+        const auto rate = modulation::lfoRateTarget (0);
+
+        for (const auto once : { true, false })
+        {
+            SynthProcessor synth;
+            setPreset (synth, 0, waveform::Preset::sine);
+            setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+            setLfo (synth, 0, 1.0f, once, waveform::Preset::sawtooth);
+            synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+            const auto steady = playNotes (synth, { { 0.0, 69 } }, 0.6);
+            const auto steadyAt = [&steady] (double seconds) { return amplitudeAt (slice (steady, seconds - 0.02, seconds + 0.02), 440.0); };
+            const auto kind = juce::String (once ? "an LFO run once" : "a looping LFO");
+
+            // An envelope held at full, from the moment the key is pressed, doubles the rate.
+            setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
+            synth.setAssignment (rate, { modulation::envelopeSource (0), doubling, false });
+            const auto byEnvelope = playNotes (synth, { { 0.0, 69 } }, 0.6);
+            check (isNear (amplitudeAt (slice (byEnvelope, 0.18, 0.22), 440.0), steadyAt (0.4), 0.04),
+                   "an envelope can move the rate of " + kind + ": here twice as fast");
+
+            // While the note is held, the window shows the LFO as the note plays it.
+            if (! once)
+            {
+                synth.prepareToPlay (sampleRate, blockSize);
+                juce::AudioBuffer<float> buffer (2, blockSize);
+                const auto blocks = (int) (0.25 * sampleRate / blockSize);
+
+                for (int block = 0; block < blocks; ++block)
+                {
+                    juce::MidiBuffer midi;
+
+                    if (block == 0)
+                        midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+                    synth.processBlock (buffer, midi);
+                }
+
+                check (isNear (*synth.getLfoProgress (0), 2.0 * blocks * blockSize / sampleRate, 0.02),
+                       "...and the window shows the LFO as the newest note plays it");
+
+                juce::MidiBuffer release;
+                release.addEvent (juce::MidiMessage::noteOff (1, 69), 0);
+
+                for (int block = 0; block < (int) (sampleRate / blockSize); ++block)
+                {
+                    synth.processBlock (buffer, release);
+                    release.clear();
+                }
+            }
+
+            // Another LFO, drawn held at the top, does the same: an LFO swings a control by half its range either way.
+            synth.setAssignment (rate, {});
+            waveform::Shape high;
+            high.fill (1.0f);
+            synth.setLfoShape (1, high);
+            synth.setAssignment (rate, { 1, 2.0f * doubling, false });
+            const auto byLfo = playNotes (synth, { { 0.0, 69 } }, 0.6);
+            check (isNear (amplitudeAt (slice (byLfo, 0.18, 0.22), 440.0), steadyAt (0.4), 0.04),
+                   "...and so can another LFO");
+        }
+
+        // Once the key is let go, an envelope brings an LFO's rate back to where it's set, not to the slowest.
+        const modulation::Assignment byEnvelope { modulation::envelopeSource (0), 0.3f, false };
+        check (isNear (modulation::applyEnvelope (rate, byEnvelope, 0.4f, { 1.0f, true, 1.0f, 0.0f }), 0.4, 1.0e-6)
+                 && isNear (modulation::applyEnvelope (rate, byEnvelope, 0.4f, { 1.0f, true, 1.0f, 0.5f }), 0.55, 1.0e-6),
+               "an envelope's release brings an LFO's rate back to where it's set");
+
+        // Each note has its own: velocity on the rate, softer notes run the LFO more slowly, here a quarter as fast
+        // for a note played at a velocity of 0.5 with the range two doublings.
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+        setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+        setLfo (synth, 0, 1.0f, true, waveform::Preset::sawtooth);
+        synth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+        synth.setVelocityAssignment (modulation::volumeTarget, {});
+        synth.setVelocityAssignment (rate, { modulation::velocitySource, 4.0f * doubling, false });
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> both;
+
+        for (int block = 0; block < (int) (0.6 * sampleRate / blockSize); ++block)
+        {
+            juce::MidiBuffer midi;
+
+            if (block == 0)
+            {
+                midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+                midi.addEvent (juce::MidiMessage::noteOn (1, 76, 0.5f), 0);
+            }
+
+            synth.processBlock (buffer, midi);
+            both.insert (both.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        const auto e5 = juce::MidiMessage::getMidiNoteInHertz (76);
+        const auto hard = amplitudeAt (slice (both, 0.38, 0.42), 440.0), soft = amplitudeAt (slice (both, 0.38, 0.42), e5);
+        check (isNear (soft / hard, 0.25, 0.08), "velocity on an LFO's rate runs it at each note's own rate");
     }
 
     void testShowingMovedHarmonics()
@@ -3636,6 +3754,7 @@ int main (int argc, char* argv[])
     testEnvelopeReleases();
     testVelocity();
     testModWheel();
+    testLfoRates();
     testShowingMovedHarmonics();
     testTuning();
     testMidiInputs();

@@ -18,6 +18,19 @@ void ChoiceButtons::setChosen (int index)
     }
 }
 
+void ChoiceButtons::setButtonEnabled (int index, bool enabled)
+{
+    if (enabled == isButtonEnabled (index))
+        return;
+
+    if (enabled)
+        disabled.removeFirstMatchingValue (index);
+    else
+        disabled.add (index);
+
+    repaint();
+}
+
 void ChoiceButtons::setLabel (int index, const juce::String& label)
 {
     if (labels[index] != label)
@@ -55,13 +68,13 @@ void ChoiceButtons::paint (juce::Graphics& g)
             g.setColour (colours::accent);
             g.fillRoundedRectangle (area, corner - 1.0f);
         }
-        else if (i == hovered)
+        else if (i == hovered && isButtonEnabled (i))
         {
             g.setColour (juce::Colours::white.withAlpha (0.08f));
             g.fillRoundedRectangle (area, corner - 1.0f);
         }
 
-        g.setColour (i == chosen ? colours::background : colours::dimText);
+        g.setColour (i == chosen ? colours::background : colours::dimText.withAlpha (isButtonEnabled (i) ? 1.0f : 0.3f));
 
         if (drawPicture != nullptr)
         {
@@ -88,6 +101,9 @@ void ChoiceButtons::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto index = getIndexAt (e.position);
+
+    if (! isButtonEnabled (index))
+        return;
 
     if (onClick != nullptr && onClick (index))
         return;

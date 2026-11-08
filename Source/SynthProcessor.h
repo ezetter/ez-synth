@@ -213,20 +213,23 @@ public:
     const modulation::Assignment& getAssignment (int target) const noexcept;
 
     /** Has an LFO or envelope move a control, or stops one moving it. Assigning an LFO that's off switches it on.
-        Only an LFO's phase counts. A control only the mod wheel can move, such as an LFO's rate, is left alone.
+        Only an LFO's phase counts. An assignment that would have an LFO move its own rate, even through other LFOs,
+        is refused.
     */
     void setAssignment (int target, const modulation::Assignment&);
 
+    /** Whether a source moving a control would have an LFO move its own rate, directly or through other LFOs. */
+    bool wouldMakeLoop (int target, int source) const;
+
     /** What the key velocity moves. Velocity can move a control as well as an LFO or envelope does. It always moves
-        a control down for softer notes, so an assignment's polarity is ignored. Like an LFO or envelope, it can't
-        move a control only the mod wheel can.
+        a control down for softer notes, so an assignment's polarity is ignored.
     */
     const modulation::Assignment& getVelocityAssignment (int target) const noexcept;
     void setVelocityAssignment (int target, const modulation::Assignment&);
 
     /** What the mod wheel moves. At the bottom it leaves a control where it's set, and as it's pushed up it moves
         the control up, or down if inverted, by as much as its range at the top. It has no phase. It can also move
-        each LFO's rate, faster as it's pushed up, or slower if inverted.
+        each LFO's rate, faster as it's pushed up, or slower if inverted, for every note alike.
     */
     const modulation::Assignment& getModWheelAssignment (int target) const noexcept;
     void setModWheelAssignment (int target, const modulation::Assignment&);
@@ -518,6 +521,7 @@ private:
     std::array<std::atomic<std::uint32_t>, numLfos> newestOnceSeeds {};
     std::array<std::atomic<double>, numLfos> lfoProgress {};
     std::array<double, numLfos> periodsSinceLastNote {};
+    std::array<double, numLfos> newestLfoPeriods {};
     juce::int64 samplesPlayed = 0;
     juce::int64 lastNoteOnSample = -1;
 

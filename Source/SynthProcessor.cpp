@@ -430,12 +430,27 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         lfoCycles[i] += (std::int64_t) periodsDone;
         lfoCyclesShown[i] = lfoCycles[i];
 
-        if (! lfo.fromKey)
+        // An LFO whose rate each note moves for itself is shown as the newest note plays it.
+        if (patch.isLfoRateMovedByNote (i) && noteSounding)
+        {
+            const auto periods = newestLfoPeriods[i];
+            lfoProgress[i] = lfo.fromKey ? periods : periods - std::floor (periods);
+
+            if (! lfo.fromKey)
+                lfoCyclesShown[i] = (std::int64_t) std::floor (periods);
+        }
+        else if (! lfo.fromKey)
+        {
             lfoProgress[i] = lfoPhases[i];
+        }
         else if (lastNoteOnSample >= 0)
+        {
             lfoProgress[i] = periodsSinceLastNote[i];
+        }
         else
+        {
             lfoProgress[i] = -1.0;
+        }
     }
 
     samplesPlayed += numSamples;
@@ -457,7 +472,10 @@ void SynthProcessor::shareNewestNote()
     newestVelocity = newest->getVelocity();
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
+    {
         newestOnceSeeds[i] = newest->getRandomSeed ((int) i);
+        newestLfoPeriods[i] = newest->getLfoPeriods ((int) i);
+    }
 
     for (int i = 0; i < numEnvelopes; ++i)
     {
@@ -836,7 +854,8 @@ const modulation::Assignment& SynthProcessor::getAssignment (int target) const n
 
 void SynthProcessor::setAssignment (int target, const modulation::Assignment& assignment)
 {
-    if (modulation::isMovedOnlyByModWheel (target))
+    // An LFO can't move its own rate, even through other LFOs.
+    if (wouldMakeLoop (target, assignment.source))
         return;
 
     markEdited();
@@ -855,6 +874,11 @@ void SynthProcessor::setAssignment (int target, const modulation::Assignment& as
     ++modulationVersion;
 }
 
+bool SynthProcessor::wouldMakeLoop (int target, int source) const
+{
+    return modulation::makesLoop (assignments, target, source);
+}
+
 const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target) const noexcept
 {
     return velocityAssignments[(size_t) target];
@@ -862,9 +886,6 @@ const modulation::Assignment& SynthProcessor::getVelocityAssignment (int target)
 
 void SynthProcessor::setVelocityAssignment (int target, const modulation::Assignment& assignment)
 {
-    if (modulation::isMovedOnlyByModWheel (target))
-        return;
-
     markEdited();
 
     velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
@@ -1268,7 +1289,8 @@ void SynthProcessor::loadState (juce::ValueTree state)
             if (modulationTree["source"].toString() == modulation::getSourceName (i))
                 source = i;
 
-        if (target.has_value() && source >= 0 && source < modulation::numSources && ! modulation::isMovedOnlyByModWheel (*target))
+        if (target.has_value() && source >= 0 && source < modulation::numSources
+             && ! modulation::makesLoop (assignments, *target, source))
             assignments[(size_t) *target] = { source, juce::jlimit (0.0f, 1.0f, (float) modulationTree["range"]),
                                                (bool) modulationTree["inverted"],
                                                modulation::isEnvelope (source)
@@ -1283,8 +1305,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
         velocityAssignments[(size_t) modulation::volumeTarget] = modulation::startingVelocityOnVolume;
 
     for (const auto& assignmentTree : velocityTree)
-        if (const auto target = modulation::findTarget (assignmentTree["target"].toString());
-            target.has_value() && ! modulation::isMovedOnlyByModWheel (*target))
+        if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false };
 

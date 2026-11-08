@@ -30,6 +30,10 @@ public:
     void setChosen (int index);
     int getChosen() const noexcept   { return chosen; }
 
+    /** Greys a button out, so it can't be chosen, or lets it be chosen again. */
+    void setButtonEnabled (int index, bool);
+    bool isButtonEnabled (int index) const   { return ! disabled.contains (index); }
+
     /** Changes a button's label, such as to show what's been chosen from its menu. */
     void setLabel (int index, const juce::String&);
     juce::String getLabel (int index) const   { return labels[index]; }
@@ -47,6 +51,7 @@ private:
     int getIndexAt (juce::Point<float>) const;
 
     juce::StringArray labels;
+    juce::Array<int> disabled;
     int chosen = 0;
     int hovered = -1;
 

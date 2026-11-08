@@ -85,7 +85,7 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     for (auto& seed : randomSeeds)
         seed = (std::uint32_t) random.nextInt();
     samplesSinceNoteOn = 0;
-    periodsSinceNoteOn = {};
+    lfoPeriods = {};
 
     for (auto& run : envelopeRuns)
         run.start();
@@ -171,15 +171,17 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 {
     using namespace modulation;
 
-    // How far through its periods each LFO is. A looping LFO carries on from where it was at the start of the block. One
-    // that starts with each key started with the note, as the envelopes did.
+    // How far through its periods each LFO is. A looping LFO carries on from where it was at the start of the block,
+    // or for one whose rate the note moves, from where the note has got to. One that starts with each key started
+    // with the note, as the envelopes did.
     std::array<double, numLfos> lfoPeriodsGone {};
 
     for (size_t i = 0; i < lfoPeriodsGone.size(); ++i)
     {
         const auto& lfo = patch.lfos[i];
-        lfoPeriodsGone[i] = lfo.fromKey ? periodsSinceNoteOn[i]
-                                        : (double) lfo.cycle + lfo.phase + startSample / patch.getLfoPeriodSamples (i);
+        lfoPeriodsGone[i] = lfo.fromKey || (patch.isLfoRateMovedByNote (i) && ! startingNote)
+                                ? lfoPeriods[i]
+                                : (double) lfo.cycle + lfo.phase + startSample / patch.getLfoPeriodSamples (i);
     }
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
@@ -302,6 +304,17 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     }
 
     targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch.volume));
+
+    // Each LFO's rate, which the mod wheel, or another LFO, an envelope or velocity, can move.
+    for (size_t i = 0; i < targets.lfoPeriods.size(); ++i)
+    {
+        targets.lfoPeriods[i] = lfoPeriodsGone[i];
+        const auto rateTarget = lfoRateTarget ((int) i);
+        targets.lfoPeriodSamples[i] = patch.isMoved (rateTarget)
+                                          ? patch.getLfoPeriodSamplesAt (i, modulate (rateTarget, patch.getLfoRatePosition (i)))
+                                          : patch.lfos[i].periodSamples;
+    }
+
     return targets;
 }
 
@@ -490,9 +503,9 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
     samplesSinceNoteOn += numSamples;
 
-    // An LFO that starts with each key moves on at its rate now, which the mod wheel can change during the note.
-    for (size_t i = 0; i < periodsSinceNoteOn.size(); ++i)
-        periodsSinceNoteOn[i] += numSamples / patch.getLfoPeriodSamples (i);
+    // Each LFO moves on at its rate now, which the mod wheel, or the note's LFOs, envelopes and velocity, can change.
+    for (size_t i = 0; i < lfoPeriods.size(); ++i)
+        lfoPeriods[i] = targets.lfoPeriods[i] + numSamples / targets.lfoPeriodSamples[i];
 
     if (waitingForEnvelopes)
         samplesSinceKeyUp += numSamples;

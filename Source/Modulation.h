@@ -51,7 +51,9 @@ namespace modulation
     /** The phase of a harmonic, from the 1st up, from 0 at the bottom of its travel round to a whole turn at the top. */
     constexpr int harmonicPhaseTarget (int oscillator, int harmonic) { return 76 + oscillator * waveform::maxHarmonics + harmonic - 1; }
 
-    /** An LFO's rate, which only the mod wheel can move. */
+    /** An LFO's rate, which another LFO, an envelope, velocity or the mod wheel can move, but never the LFO itself,
+        even through others.
+    */
     constexpr int lfoRateTarget (int lfo)                           { return 103 + lfo; }
     inline constexpr int numTargets = 106;
 
@@ -90,10 +92,6 @@ namespace modulation
     /** Whether a target is a plugin parameter, rather than one of a wave's harmonics or their tunes or phases. */
     bool isParameter (int target);
 
-    /** Whether only the mod wheel can move a control, as for an LFO's rate, which the LFOs, envelopes and velocity
-        can't, as each LFO runs the same for every note.
-    */
-    bool isMovedOnlyByModWheel (int target);
 
     /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on
         sounding until an envelope moving one of these has finished.
@@ -159,7 +157,7 @@ namespace modulation
     };
 
     /** Where an envelope's release takes a control: the bottom of its travel, or for an oscillator's or a harmonic's
-        tune, in tune.
+        tune, in tune. (An LFO's rate goes back to where it's set instead.)
     */
     float getRestPosition (int target);
 
@@ -186,6 +184,11 @@ namespace modulation
     juce::String phaseToText (float phase);
 
     using Assignments = std::array<Assignment, numTargets>;
+
+    /** Whether having a source move a control would make LFOs go round in a loop: an LFO moving its own rate, or
+        the rate of an LFO whose rate it's moved by, directly or through other LFOs.
+    */
+    bool makesLoop (const Assignments&, int target, int source);
 
     /** Velocity starts out moving the volume, so softer notes are quieter, as they are on most instruments. */
     inline constexpr Assignment startingVelocityOnVolume { velocitySource, 0.35f, false };

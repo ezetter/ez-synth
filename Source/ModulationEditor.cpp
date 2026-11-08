@@ -11,8 +11,7 @@ ModulationEditor::Section::Section (juce::StringArray choices, bool withPhase, b
 
 ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     : synthProcessor (processor),
-      target (targetToEdit),
-      onlyModWheel (modulation::isMovedOnlyByModWheel (targetToEdit))
+      target (targetToEdit)
 {
     setUp (source);
     setUp (velocity);
@@ -21,16 +20,7 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
     show (modWheel, synthProcessor.getModWheelAssignment (target));
-
-    if (onlyModWheel)
-    {
-        for (auto* section : { &source, &velocity })
-            for (auto* control : std::initializer_list<juce::Component*> { &section->choice, &section->range, &section->phase,
-                                                                           &section->polarity })
-                control->setVisible (false);
-    }
-
-    setSize (470, onlyModWheel ? 190 : 500);
+    setSize (470, 500);
 }
 
 void ModulationEditor::setUp (Section& section)
@@ -74,6 +64,11 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
     const auto isSwitched = &section != &source;
     section.choice.setChosen (isSwitched ? (assignment.isActive() ? 1 : 0) : assignment.source + 1);
 
+    // An LFO that would end up moving its own rate can't be chosen.
+    if (! isSwitched)
+        for (int lfo = 0; lfo < modulation::numLfos; ++lfo)
+            section.choice.setButtonEnabled (lfo + 1, ! synthProcessor.wouldMakeLoop (target, lfo));
+
     // A range it hasn't been given yet is the usual one to start from.
     const auto range = assignment.isActive() || ! isVelocity ? assignment.range : modulation::startingVelocityOnVolume.range;
     section.range.setValue (range, juce::dontSendNotification);
@@ -96,14 +91,11 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
 
 void ModulationEditor::apply()
 {
-    if (! onlyModWheel)
-    {
-        synthProcessor.setAssignment (target, { source.choice.getChosen() - 1, (float) source.range.getValue(),
-                                                source.polarity.getChosen() == 1, (float) (source.phase.getValue() / 360.0) });
+    synthProcessor.setAssignment (target, { source.choice.getChosen() - 1, (float) source.range.getValue(),
+                                            source.polarity.getChosen() == 1, (float) (source.phase.getValue() / 360.0) });
 
-        synthProcessor.setVelocityAssignment (target, { velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
-                                                        (float) velocity.range.getValue(), false });
-    }
+    synthProcessor.setVelocityAssignment (target, { velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
+                                                    (float) velocity.range.getValue(), false });
 
     synthProcessor.setModWheelAssignment (target, { modWheel.choice.getChosen() == 1 ? modulation::modWheelSource : -1,
                                                     (float) modWheel.range.getValue(), modWheel.polarity.getChosen() == 1 });
@@ -119,8 +111,21 @@ juce::String ModulationEditor::describeSource() const
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
     if (! assignment.isActive())
+    {
+        // An LFO can't move its own rate, nor the rate of an LFO that moves its own, so those are greyed out.
+        const auto anyLoop = [this]
+        {
+            for (int lfo = 0; lfo < modulation::numLfos; ++lfo)
+                if (synthProcessor.wouldMakeLoop (target, lfo))
+                    return true;
+
+            return false;
+        }();
+
         return "Choose an LFO to swing the " + control + " back and forth as its wave rises and falls, or an envelope "
-               "to move it each time a key is pressed.";
+               "to move it each time a key is pressed."
+             + juce::String (anyLoop ? " An LFO that would end up moving its own rate can't be chosen." : "");
+    }
 
     const auto name = modulation::getSourceName (assignment.source);
     const auto direction = juce::String (assignment.inverted ? "down" : "up");
@@ -171,8 +176,7 @@ juce::String ModulationEditor::describeModWheel() const
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
     if (! assignment.isActive())
-        return "Switch on to have a MIDI controller's mod wheel move the " + control
-             + (onlyModWheel ? juce::String (".") : juce::String (", as well as anything above."));
+        return "Switch on to have a MIDI controller's mod wheel move the " + control + ", as well as anything above.";
 
     if (modulation::describe (target).kind == modulation::Kind::lfoRate)
         return "At the bottom, the mod wheel leaves the " + control + " where it's set. Pushed up, it makes the LFO "
@@ -226,12 +230,6 @@ void ModulationEditor::resized()
     titleArea = area.removeFromTop (18);
     area.removeFromTop (10);
 
-    if (onlyModWheel)
-    {
-        layOut (modWheel, area);
-        return;
-    }
-
     layOut (source, area);
     area.removeFromTop (6);
     dividerArea = area.removeFromTop (1);
@@ -281,12 +279,6 @@ void ModulationEditor::paint (juce::Graphics& g)
     g.setFont (fonts::caption());
     g.setColour (colours::modulation);
     g.drawText ("MODULATE  " + modulation::getName (target).toUpperCase(), titleArea, juce::Justification::centredLeft, true);
-
-    if (onlyModWheel)
-    {
-        paintSection (g, modWheel, "MOD WHEEL", synthProcessor.getModWheelAssignment (target).isActive(), describeModWheel());
-        return;
-    }
 
     paintSection (g, source, "MOVED BY", synthProcessor.getAssignment (target).isActive(), describeSource());
 

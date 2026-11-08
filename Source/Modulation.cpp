@@ -144,9 +144,28 @@ namespace modulation
         return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase;
     }
 
-    bool isMovedOnlyByModWheel (int target)
+    bool makesLoop (const Assignments& assignments, int target, int source)
     {
-        return describe (target).kind == Kind::lfoRate;
+        const auto info = describe (target);
+
+        if (info.kind != Kind::lfoRate || source < 0 || source >= numLfos)
+            return false;
+
+        // Follows what moves each LFO's rate, from the source back, looking for the LFO whose rate it would move.
+        for (int lfo = source, step = 0; step <= numLfos; ++step)
+        {
+            if (lfo == info.lfo)
+                return true;
+
+            const auto& movingRate = assignments[(size_t) lfoRateTarget (lfo)];
+
+            if (! movingRate.isActive() || movingRate.source >= numLfos)
+                return false;
+
+            lfo = movingRate.source;
+        }
+
+        return false;
     }
 
     bool isLoudness (int target)
@@ -215,9 +234,12 @@ namespace modulation
         if (! envelope.releasing)
             return keepInTravel (target, position + assignment.offset (envelope.level));
 
-        // A control that goes round comes back to rest the shorter way, to its nearest whole turn.
+        // A control that goes round comes back to rest the shorter way, to its nearest whole turn. An LFO's rate
+        // comes back to where it's set, so the LFO carries on at its own rate.
         const auto atKeyUp = position + assignment.offset (envelope.releaseFrom);
-        const auto rest = goesRound (target) ? std::round (atKeyUp) : getRestPosition (target);
+        const auto rest = goesRound (target) ? std::round (atKeyUp)
+                        : describe (target).kind == Kind::lfoRate ? position
+                                                                  : getRestPosition (target);
         const auto from = goesRound (target) ? atKeyUp : juce::jlimit (0.0f, 1.0f, atKeyUp);
         return keepInTravel (target, rest + (from - rest) * juce::jlimit (0.0f, 1.0f, envelope.releaseLeft));
     }

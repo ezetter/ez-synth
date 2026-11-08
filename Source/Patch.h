@@ -70,19 +70,40 @@ struct Patch
     /** Where the mod wheel is, from 0 to 1, as the MIDI played so far has put it. */
     float modWheel = 0.0f;
 
-    /** How long an LFO's period is now, in samples: as it's set, or as the mod wheel has moved its rate. */
-    double getLfoPeriodSamples (size_t lfo) const noexcept
+    /** Where an LFO's rate is set along its dial's travel, from the slowest at 0 to the fastest at 1. */
+    float getLfoRatePosition (size_t lfo) const noexcept
+    {
+        return 1.0f - modulation::periodToPosition (lfos[lfo].periodSeconds);
+    }
+
+    /** How long an LFO's period is, in samples, with its rate at a position along its dial's travel. */
+    double getLfoPeriodSamplesAt (size_t lfo, float position) const noexcept
     {
         const auto& settings = lfos[lfo];
+        const auto moved = juce::jlimit (0.0f, 1.0f, position);
+        return settings.periodSamples * (double) (modulation::positionToPeriod (1.0f - moved) / settings.periodSeconds);
+    }
+
+    /** How long an LFO's period is now, in samples, for every note: as it's set, or as the mod wheel has moved its
+        rate.
+    */
+    double getLfoPeriodSamples (size_t lfo) const noexcept
+    {
         const auto& byModWheel = modWheelAssignments[(size_t) modulation::lfoRateTarget ((int) lfo)];
 
         if (! byModWheel.isActive())
-            return settings.periodSamples;
+            return lfos[lfo].periodSamples;
 
-        // Along the rate dial's travel, the slowest is at 0 and the fastest at 1.
-        const auto set = 1.0f - modulation::periodToPosition (settings.periodSeconds);
-        const auto moved = juce::jlimit (0.0f, 1.0f, set + byModWheel.offset (modWheel));
-        return settings.periodSamples * (double) (modulation::positionToPeriod (1.0f - moved) / settings.periodSeconds);
+        return getLfoPeriodSamplesAt (lfo, getLfoRatePosition (lfo) + byModWheel.offset (modWheel));
+    }
+
+    /** Whether an LFO's rate is moved by something each note has its own of, an LFO, an envelope or velocity, so
+        each note runs the LFO at its own rate.
+    */
+    bool isLfoRateMovedByNote (size_t lfo) const noexcept
+    {
+        const auto target = (size_t) modulation::lfoRateTarget ((int) lfo);
+        return assignments[target].isActive() || velocityAssignments[target].isActive();
     }
 
     /** Whether anything moves a control. */

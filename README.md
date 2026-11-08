@@ -235,13 +235,18 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     it was left. It's MIDI controller 1, which most keyboards' mod wheels send, so in a DAW the wheel can be
     recorded and drawn like any other MIDI. To open a filter with the wheel, for instance, set its cutoff
     low and give it the mod wheel with a range of 60% or so.
-  - **An LFO's rate** can be given to the mod wheel too: right-click the **Rate** dial on its card. Only the
-    mod wheel can move a rate, so the window shows only its part. Pushed up, the wheel makes the LFO faster,
-    or slower if **Inverted**, by as much as its range of the dial's travel at the top. The dial runs from
-    0.1 to 100 Hz, so each 10% of range is about twice as fast: give it 10% for the wheel to double the rate,
-    for a vibrato or tremolo that quickens as you push it. The LFO speeds up from wherever it's got to, so it
-    never jumps. The dial shows the rate the wheel has moved it to in light blue, and the rate under it, in
-    Hz, changes to match, in light blue too, going back to the rate it's set to when nothing moves it.
+  - **An LFO's rate** can be moved too: right-click the **Rate** dial on its card. Another LFO, an envelope,
+    velocity and the mod wheel can each move it, faster as they rise, or slower if **Inverted**. The dial runs
+    from 0.1 to 100 Hz, so each 10% of range is about twice as fast: give the mod wheel 10% for it to double
+    the rate at the top, for a vibrato or tremolo that quickens as you push it. An envelope or velocity moves
+    each note's LFO on its own, so a vibrato can speed up as each note goes on, or run faster for harder notes;
+    a looping LFO then carries on from where it was when the note started, at that note's rate. An envelope's
+    release brings the rate back to where it's set. An LFO speeds up and slows down from wherever it's got to,
+    so it never jumps. The dial shows the rate it's been moved to in light blue, as the newest note has it, and
+    the rate under it, in Hz, changes to match.
+  - **No LFO loops.** An LFO can't move its own rate, nor the rate of an LFO that moves its rate, directly or
+    through a third: if LFO 2 moves LFO 1's rate, LFO 1 can't move LFO 2's. Those LFOs are greyed out in the
+    window, which says why.
   - **Phase**, for an LFO, shifts its wave to the right for this control alone, from 0°, in step with the
     LFO, up to 359°, a degree short of a whole period. The control follows where the LFO was that much of a
     period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase
