@@ -544,6 +544,10 @@ void SynthEditor::showModulation()
     // The window itself counts as visible, as it is to whoever's looking at it, even before a host shows it.
     for (auto* child : getChildren())
         show (*child, true);
+
+    // An LFO's rate, as the mod wheel has moved it, is shown under its dial too.
+    for (int lfo = 0; lfo < SynthProcessor::numLfos; ++lfo)
+        lfoCards[(size_t) lfo]->showMovedRate (synthProcessor.getLivePosition (modulation::lfoRateTarget (lfo)));
 }
 
 void SynthEditor::showModulationEditor (juce::Component& control)

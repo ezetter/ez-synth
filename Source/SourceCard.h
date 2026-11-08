@@ -37,6 +37,12 @@ protected:
     */
     void setLines (const juce::String& first, const juce::String& second, const juce::String& firstDetail = {});
 
+    /** The value shown under the dial, and whether it's been moved from where the dial is set, so it's shown in the
+        modulation colour. It's the dial's own value, unless a card shows another.
+    */
+    virtual std::pair<juce::String, bool> getDialText();
+    void repaintDialValue()   { repaint (dialValueArea); }
+
     juce::Rectangle<int> getSecondLineArea() const noexcept   { return secondLineArea; }
     bool isOn() const   { return onSwitch.getToggleState(); }
 
@@ -83,12 +89,21 @@ public:
 
     void resized() override;
 
+    /** Shows the rate as the mod wheel has moved it, as a position along the dial's travel, or as it's set. */
+    void showMovedRate (std::optional<float> position);
+
+    /** The rate shown under the dial, such as "2.00 Hz", and whether it's as the mod wheel has moved it. */
+    std::pair<juce::String, bool> getShownRate()   { return getDialText(); }
+
     /** The second button's label: how many times the LFO plays from each key, as last chosen. */
     juce::String getTimesLabel() const   { return mode.getLabel (1); }
 
 private:
     void showMode (int);
     void chooseTimes();
+    std::pair<juce::String, bool> getDialText() override;
+
+    std::optional<float> movedRate;
 
     // Loop, or a button showing how many times it plays from each key, which opens a menu of them.
     ChoiceButtons mode { { "Loop", modulation::getLfoModeNames()[1] } };

@@ -1941,6 +1941,18 @@ namespace
         restored.setStateInformation (withRate.getData(), (int) withRate.getSize());
         check (restored.getModWheelAssignment (rate).isActive() && restored.getModWheelAssignment (rate).inverted,
                "the mod wheel on an LFO's rate is saved with the sound");
+
+        // Under the LFO's dial, its card shows the rate as the wheel has moved it, in the modulation colour, or as
+        // it's set when nothing is moving it.
+        synth.setModWheelAssignment (rate, { modulation::modWheelSource, doubling, false });
+        LfoCard card (0, synth.parameters);
+        const auto setRate = card.getShownRate();
+        card.showMovedRate (synth.getLivePosition (rate));
+        const auto movedRate = card.getShownRate();
+        card.showMovedRate (std::nullopt);
+        check (setRate.first == "1.00 Hz" && ! setRate.second && movedRate.first == "2.0 Hz" && movedRate.second
+                 && card.getShownRate() == setRate,
+               "an LFO's card shows its rate as the wheel has moved it, here from 1 Hz to 2 Hz");
     }
 
     void testShowingMovedHarmonics()

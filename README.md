@@ -240,7 +240,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     or slower if **Inverted**, by as much as its range of the dial's travel at the top. The dial runs from
     0.1 to 100 Hz, so each 10% of range is about twice as fast: give it 10% for the wheel to double the rate,
     for a vibrato or tremolo that quickens as you push it. The LFO speeds up from wherever it's got to, so it
-    never jumps, and the dial shows the rate the wheel has moved it to in light blue.
+    never jumps. The dial shows the rate the wheel has moved it to in light blue, and the rate under it, in
+    Hz, changes to match, in light blue too, going back to the rate it's set to when nothing moves it.
   - **Phase**, for an LFO, shifts its wave to the right for this control alone, from 0°, in step with the
     LFO, up to 359°, a degree short of a whole period. The control follows where the LFO was that much of a
     period ago, so at 90° it peaks a quarter of a period after the LFO does. As the wave repeats, a phase

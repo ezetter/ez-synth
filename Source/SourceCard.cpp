@@ -114,9 +114,15 @@ void SourceCard::paint (juce::Graphics& g)
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
     g.drawText (dialCaption, dialCaptionArea, juce::Justification::centred);
-    g.setColour (on ? colours::text : colours::dimText);
+    const auto [dialText, moved] = getDialText();
+    g.setColour (! on ? colours::dimText : moved ? colours::modulation : colours::text);
     g.setFont (fonts::body (12.5f));
-    g.drawText (dial.getTextFromValue (dial.getValue()), dialValueArea, juce::Justification::centred);
+    g.drawText (dialText, dialValueArea, juce::Justification::centred);
+}
+
+std::pair<juce::String, bool> SourceCard::getDialText()
+{
+    return { dial.getTextFromValue (dial.getValue()), false };
 }
 
 void SourceCard::paintWave (juce::Graphics& g) const
@@ -211,6 +217,24 @@ LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
 
     addAndMakeVisible (mode);
     modeAttachment.sendInitialUpdate();
+}
+
+void LfoCard::showMovedRate (std::optional<float> position)
+{
+    if (position != movedRate)
+    {
+        movedRate = position;
+        repaintDialValue();
+    }
+}
+
+std::pair<juce::String, bool> LfoCard::getDialText()
+{
+    if (! movedRate.has_value())
+        return SourceCard::getDialText();
+
+    // The dial's travel is the parameter's, from the slowest rate to the fastest.
+    return { dial.getTextFromValue (dial.proportionOfLengthToValue ((double) *movedRate)), true };
 }
 
 void LfoCard::showMode (int index)
