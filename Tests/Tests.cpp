@@ -1966,6 +1966,106 @@ namespace
                "an LFO's card shows its rate as the wheel has moved it, here from 1 Hz to 2 Hz");
     }
 
+    /** A host's transport, at a tempo, and if it's playing, at a beat. */
+    struct TestPlayHead final : public juce::AudioPlayHead
+    {
+        juce::Optional<PositionInfo> getPosition() const override   { return info; }
+        PositionInfo info;
+    };
+
+    /** An LFO can be synced to the host's tempo, its period lasting a note length rather than as its rate dial says,
+        and while the host plays, starting each period on its beat.
+    */
+    void testLfoSync()
+    {
+        std::cout << "LFOs synced to the tempo" << std::endl;
+
+        check (modulation::getDivisionNames() == juce::StringArray { "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32" }
+                 && modulation::getFeelNames() == juce::StringArray { "Straight", "Dotted", "Triplet" },
+               "a synced LFO's period lasts from 4 bars down to a 32nd note, straight, dotted or as a triplet");
+        check (isNear (modulation::getSyncedBeats (4, 0), 1.0, 1.0e-9) && isNear (modulation::getSyncedBeats (5, 1), 0.75, 1.0e-9)
+                 && isNear (modulation::getSyncedBeats (6, 2), 1.0 / 6.0, 1.0e-9) && isNear (modulation::getSyncedBeats (0, 0), 16.0, 1.0e-9)
+                 && modulation::getSyncedName (5, 2) == "1/8 T" && modulation::getSyncedName (4, 1) == "1/4 D",
+               "...a quarter note lasting a beat, a dotted eighth three quarters of one, and a sixteenth triplet a sixth");
+
+        SynthProcessor synth;
+        check (! synth.isLfoSynced (0) && synth.getLfoSyncedName (0) == "1/4", "an LFO starts unsynced, ready to sync to quarter notes");
+
+        TestPlayHead host;
+        host.info.setBpm (90.0);
+        synth.setPlayHead (&host);
+        setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
+        setParameter (synth, SynthProcessor::lfoDivisionId (0), 5.0f);
+        setParameter (synth, SynthProcessor::lfoFeelId (0), 1.0f);
+
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        juce::MidiBuffer noMidi;
+        synth.processBlock (buffer, noMidi);
+        check (synth.isLfoSynced (0) && isNear (synth.getTempo(), 90.0, 1.0e-9) && synth.isTempoFromHost()
+                 && isNear (synth.getLfoPeriod (0), 0.5, 1.0e-6),
+               "synced at 90 BPM, a dotted eighth note period lasts half a second");
+
+        // The mod wheel on its rate does nothing while it's synced.
+        synth.setModWheelAssignment (modulation::lfoRateTarget (0), { modulation::modWheelSource, 0.5f, false });
+        juce::MidiBuffer wheelUp;
+        wheelUp.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, 127), 0);
+        synth.processBlock (buffer, wheelUp);
+        check (! synth.getLivePosition (modulation::lfoRateTarget (0)).has_value(), "nothing moves a synced LFO's rate");
+        synth.setModWheelAssignment (modulation::lfoRateTarget (0), {});
+
+        // While the host plays, a looping LFO lasting a bar starts each period on a bar: at beat 10.25 it's 2.25
+        // beats, or 0.5625 of a bar, into its period, and moves on by the block from there.
+        setParameter (synth, SynthProcessor::lfoDivisionId (0), 2.0f);
+        setParameter (synth, SynthProcessor::lfoFeelId (0), 0.0f);
+        host.info.setBpm (120.0);
+        host.info.setIsPlaying (true);
+        host.info.setPpqPosition (10.25);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (*synth.getLfoProgress (0), 0.5625 + blockSize / (2.0 * sampleRate), 1.0e-6),
+               "while the host plays, a synced LFO follows its beat, each period starting on one");
+
+        // Without a host, it follows 120 BPM.
+        synth.setPlayHead (nullptr);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (synth.getTempo(), 120.0, 1.0e-9) && ! synth.isTempoFromHost() && isNear (synth.getLfoPeriod (0), 2.0, 1.0e-6),
+               "without a host's tempo, it follows 120 BPM");
+
+        // It sounds as the same LFO unsynced at the same rate does: a sine on the level, at 4 Hz, synced to 16th
+        // notes at 60 BPM.
+        const auto playWith = [] (bool synced)
+        {
+            SynthProcessor played;
+            TestPlayHead tempo;
+            tempo.info.setBpm (60.0);
+            played.setPlayHead (&tempo);
+            setPreset (played, 0, waveform::Preset::sine);
+            setParameter (played, SynthProcessor::levelId (0), 0.5f);
+            setLfo (played, 0, synced ? 1.0f : 0.25f, false, waveform::Preset::sine);
+            setParameter (played, SynthProcessor::lfoSyncId (0), synced ? 1.0f : 0.0f);
+            setParameter (played, SynthProcessor::lfoDivisionId (0), 6.0f);
+            played.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
+            const auto signal = playNotes (played, { { 0.0, 69 } }, 0.6);
+            played.setPlayHead (nullptr);
+            return signal;
+        };
+
+        const auto synced = playWith (true), free = playWith (false);
+        auto same = true;
+
+        for (double at = 0.05; at < 0.55; at += 0.05)
+            same = same && isNear (amplitudeAt (slice (synced, at, at + 0.03), 440.0), amplitudeAt (slice (free, at, at + 0.03), 440.0), 0.02);
+
+        check (same, "synced to 16th notes at 60 BPM, an LFO plays as one at 4 Hz does");
+
+        // The card greys its rate dial out, and shows the note length under it.
+        LfoCard card (0, synth.parameters);
+        card.showSynced (synth.getLfoSyncedName (0));
+        check (card.getShownRate().first == "1 bar", "the LFO's card shows the note length in place of the rate");
+        card.showSynced (std::nullopt);
+        check (card.getShownRate().first.endsWith ("Hz"), "...and the rate again once it's not synced");
+    }
+
     /** An envelope, velocity or another LFO can move an LFO's rate, for each note on its own. */
     void testLfoRates()
     {
@@ -3515,6 +3615,9 @@ namespace
         synth.setAssignment (modulation::filterResonanceTarget (0), { modulation::envelopeSource (1), 0.6f, false });
         setParameter (synth, SynthProcessor::lfoModeId (1), 5.0f);
         setParameter (synth, SynthProcessor::lfoModeId (2), (float) modulation::lfoForever);
+        setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
+        setParameter (synth, SynthProcessor::lfoDivisionId (0), 5.0f);
+        setParameter (synth, SynthProcessor::lfoFeelId (0), 1.0f);
         synth.editedSource = SynthProcessor::numOscillators;
 
         // Plays on a while, so the LFOs are partway through their periods.
@@ -3755,6 +3858,7 @@ int main (int argc, char* argv[])
     testVelocity();
     testModWheel();
     testLfoRates();
+    testLfoSync();
     testShowingMovedHarmonics();
     testTuning();
     testMidiInputs();

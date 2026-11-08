@@ -57,12 +57,65 @@ void LfoPanel::Row::mouseDown (const juce::MouseEvent&)
 LfoPanel::LfoPanel (SynthProcessor& processor)
     : synthProcessor (processor)
 {
+    for (auto* control : std::initializer_list<juce::Component*> { &syncSwitch, &division, &feel })
+    {
+        control->setMouseClickGrabsKeyboardFocus (false);
+        control->setWantsKeyboardFocus (false);
+        addAndMakeVisible (control);
+    }
+
+    syncSwitch.onStateChange = [this] { showSync(); };
+    setLfo (0);
 }
 
 void LfoPanel::setLfo (int newLfo)
 {
     lfo = newLfo;
+
+    // The switch and note lengths are this LFO's.
+    auto& parameters = synthProcessor.parameters;
+    syncAttachment = std::make_unique<juce::ButtonParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoSyncId (lfo)),
+                                                                        syncSwitch);
+    divisionAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoDivisionId (lfo)),
+                                                                      [this] (float value) { division.setChosen (juce::roundToInt (value)); });
+    feelAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoFeelId (lfo)),
+                                                                  [this] (float value) { feel.setChosen (juce::roundToInt (value)); });
+    division.onChoose = [this] (int index) { divisionAttachment->setValueAsCompleteGesture ((float) index); };
+    feel.onChoose = [this] (int index) { feelAttachment->setValueAsCompleteGesture ((float) index); };
+    divisionAttachment->sendInitialUpdate();
+    feelAttachment->sendInitialUpdate();
+
+    syncSwitch.setTitle ("LFO " + juce::String (lfo + 1) + " synced to the tempo");
+    division.setTitle ("LFO " + juce::String (lfo + 1) + " synced note length");
+    feel.setTitle ("LFO " + juce::String (lfo + 1) + " synced note feel");
+    showSync();
     refresh();
+}
+
+void LfoPanel::showSync()
+{
+    // The note lengths only count while the LFO is synced.
+    const auto synced = syncSwitch.getToggleState();
+
+    for (auto* choices : { &division, &feel })
+    {
+        choices->setEnabled (synced);
+        choices->setAlpha (synced ? 1.0f : 0.4f);
+    }
+
+    repaint();
+}
+
+void LfoPanel::showTempo()
+{
+    const auto tempo = juce::String (synthProcessor.getTempo(), 1).trimCharactersAtEnd ("0").trimCharactersAtEnd (".") + " BPM"
+                     + (synthProcessor.isTempoFromHost() ? juce::String() : juce::String (", no host tempo"));
+
+    if (tempo != shownTempo)
+    {
+        shownTempo = tempo;
+        repaint (tempoArea);
+    }
 }
 
 void LfoPanel::refresh()
@@ -85,6 +138,21 @@ void LfoPanel::refresh()
 void LfoPanel::resized()
 {
     auto area = getLocalBounds();
+
+    // The tempo sync: its caption, then the switch and the tempo, then the note lengths and their feel.
+    syncCaptionArea = area.removeFromTop (18);
+    area.removeFromTop (8);
+    auto row = area.removeFromTop (24);
+    syncSwitch.setBounds (row.removeFromLeft (36));
+    row.removeFromLeft (10);
+    tempoArea = row.removeFromRight (150);
+    syncLabelArea = row;
+    area.removeFromTop (10);
+    division.setBounds (area.removeFromTop (26));
+    area.removeFromTop (8);
+    feel.setBounds (area.removeFromTop (26).withWidth (juce::jmin (area.getWidth(), 240)));
+    area.removeFromTop (22);
+
     captionArea = area.removeFromTop (18);
     area.removeFromTop (10);
     footerArea = area.removeFromBottom (juce::jmin (112, area.getHeight() / 2));
@@ -112,7 +180,15 @@ void LfoPanel::paint (juce::Graphics& g)
 {
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
+    g.drawText ("LFO " + juce::String (lfo + 1) + " TEMPO", syncCaptionArea, juce::Justification::centredLeft);
     g.drawText ("LFO " + juce::String (lfo + 1) + " MOVES", captionArea, juce::Justification::centredLeft);
+
+    g.setFont (fonts::body (13.0f));
+    g.setColour (syncSwitch.getToggleState() ? colours::text : colours::dimText);
+    g.drawText ("Sync rate to tempo", syncLabelArea, juce::Justification::centredLeft, true);
+    g.setColour (colours::dimText);
+    g.setFont (fonts::body (12.5f));
+    g.drawText (shownTempo, tempoArea, juce::Justification::centredRight, true);
 
     g.setFont (fonts::body (13.0f));
 

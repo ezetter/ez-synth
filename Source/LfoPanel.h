@@ -1,11 +1,13 @@
 #pragma once
 
+#include "ChoiceButtons.h"
+#include "ModulatableControls.h"
 #include "SynthProcessor.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** Shown beside the grid in place of the harmonics when an LFO is chosen: the controls the LFO moves, and how to
-    give it more.
+/** Shown beside the grid in place of the harmonics when an LFO is chosen: a switch to sync its rate to the host's
+    tempo, with the note length each period lasts, then the controls the LFO moves, and how to give it more.
 */
 class LfoPanel final : public juce::Component
 {
@@ -16,6 +18,14 @@ public:
 
     /** Brings the list of controls up to date with the synth. */
     void refresh();
+
+    /** Brings the tempo shown up to date, which the window does many times a second. */
+    void showTempo();
+
+    /** The switch that syncs the LFO's rate to the tempo, and the note lengths. */
+    ModulatableToggle syncSwitch;
+    ChoiceButtons division { modulation::getDivisionNames() };
+    ChoiceButtons feel { modulation::getFeelNames() };
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -45,7 +55,13 @@ private:
     std::vector<std::unique_ptr<Row>> rows;
     int numHidden = 0;
 
-    juce::Rectangle<int> captionArea, listArea, footerArea;
+    void showSync();
+
+    std::unique_ptr<juce::ButtonParameterAttachment> syncAttachment;
+    std::unique_ptr<juce::ParameterAttachment> divisionAttachment, feelAttachment;
+    juce::String shownTempo;
+
+    juce::Rectangle<int> syncCaptionArea, syncLabelArea, tempoArea, captionArea, listArea, footerArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LfoPanel)
 };

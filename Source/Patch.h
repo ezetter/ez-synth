@@ -34,6 +34,9 @@ struct Patch
         double periodSamples = 48000.0;
         float periodSeconds = 1.0f;
 
+        /** Whether its rate is synced to the host's tempo, so nothing moves it. */
+        bool synced = false;
+
         /** Whether it starts with each note rather than looping all the time, and how many times it plays its wave
             then, or 0 for forever.
         */
@@ -91,7 +94,7 @@ struct Patch
     {
         const auto& byModWheel = modWheelAssignments[(size_t) modulation::lfoRateTarget ((int) lfo)];
 
-        if (! byModWheel.isActive())
+        if (! byModWheel.isActive() || lfos[lfo].synced)
             return lfos[lfo].periodSamples;
 
         return getLfoPeriodSamplesAt (lfo, getLfoRatePosition (lfo) + byModWheel.offset (modWheel));
@@ -103,7 +106,7 @@ struct Patch
     bool isLfoRateMovedByNote (size_t lfo) const noexcept
     {
         const auto target = (size_t) modulation::lfoRateTarget ((int) lfo);
-        return assignments[target].isActive() || velocityAssignments[target].isActive();
+        return ! lfos[lfo].synced && (assignments[target].isActive() || velocityAssignments[target].isActive());
     }
 
     /** Whether anything moves a control. */

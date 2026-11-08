@@ -92,6 +92,11 @@ public:
     /** Shows the rate as the mod wheel has moved it, as a position along the dial's travel, or as it's set. */
     void showMovedRate (std::optional<float> position);
 
+    /** Shows the LFO synced to the tempo, with the dial greyed out and the note length, such as "1/4", under it,
+        or not synced.
+    */
+    void showSynced (std::optional<juce::String> noteLength);
+
     /** The rate shown under the dial, such as "2.00 Hz", and whether it's as the mod wheel has moved it. */
     std::pair<juce::String, bool> getShownRate()   { return getDialText(); }
 
@@ -104,6 +109,7 @@ private:
     std::pair<juce::String, bool> getDialText() override;
 
     std::optional<float> movedRate;
+    std::optional<juce::String> syncedLength;
 
     // Loop, or a button showing how many times it plays from each key, which opens a menu of them.
     ChoiceButtons mode { { "Loop", modulation::getLfoModeNames()[1] } };

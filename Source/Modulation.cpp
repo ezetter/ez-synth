@@ -249,6 +249,28 @@ namespace modulation
         return juce::String (juce::roundToInt (phase * 360.0f)) + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0"));
     }
 
+    juce::StringArray getDivisionNames()
+    {
+        return { "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32" };
+    }
+
+    juce::StringArray getFeelNames()
+    {
+        return { "Straight", "Dotted", "Triplet" };
+    }
+
+    double getSyncedBeats (int division, int feel)
+    {
+        return divisionBeats[(size_t) juce::jlimit (0, (int) divisionBeats.size() - 1, division)]
+             * feelLengths[(size_t) juce::jlimit (0, (int) feelLengths.size() - 1, feel)];
+    }
+
+    juce::String getSyncedName (int division, int feel)
+    {
+        const auto name = getDivisionNames()[juce::jlimit (0, (int) divisionBeats.size() - 1, division)];
+        return name + (feel == 1 ? " D" : feel == 2 ? " T" : "");
+    }
+
     juce::StringArray getLfoModeNames()
     {
         return { "Loop", "Once", "Twice", "3 times", "4 times", "5 times", juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x9e")) };

@@ -228,8 +228,23 @@ void LfoCard::showMovedRate (std::optional<float> position)
     }
 }
 
+void LfoCard::showSynced (std::optional<juce::String> noteLength)
+{
+    if (noteLength == syncedLength)
+        return;
+
+    // Synced to the tempo, the rate dial does nothing, so it's greyed out.
+    syncedLength = std::move (noteLength);
+    dial.setEnabled (! syncedLength.has_value());
+    dial.setAlpha (syncedLength.has_value() ? 0.35f : 1.0f);
+    repaintDialValue();
+}
+
 std::pair<juce::String, bool> LfoCard::getDialText()
 {
+    if (syncedLength.has_value())
+        return { *syncedLength, false };
+
     if (! movedRate.has_value())
         return SourceCard::getDialText();
 

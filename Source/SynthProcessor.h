@@ -49,12 +49,16 @@ public:
     static FilterIds filterIds (int filter);
 
     /** The IDs of each LFO's parameters: whether it's on, its period in seconds, which is shown as its rate, in
-        hertz, and whether it loops or starts with each key, and how many times it plays then.
+        hertz, whether it loops or starts with each key, and how many times it plays then, and whether it's synced
+        to the host's tempo, and if so, the note length each period lasts, straight, dotted or as a triplet.
     */
     static juce::String lfoOnId (int lfo);
     static juce::String lfoPeriodId (int lfo);
     static juce::String lfoModeId (int lfo);
     static juce::String lfoRandomId (int lfo);
+    static juce::String lfoSyncId (int lfo);
+    static juce::String lfoDivisionId (int lfo);
+    static juce::String lfoFeelId (int lfo);
 
     /** The IDs of each envelope's parameters: its attack, decay and release in seconds, and its sustain level. */
     static juce::String attackId (int envelope);
@@ -133,6 +137,20 @@ public:
 
     bool isLfoOn (int lfo) const noexcept;
     float getLfoPeriod (int lfo) const noexcept;
+    /** Whether an LFO's rate is synced to the host's tempo, its period lasting a note length rather than as long as
+        its rate dial says. A looping LFO synced to the tempo follows the host's beat while it plays, so its periods
+        start on the beat. Nothing moves a synced LFO's rate.
+    */
+    bool isLfoSynced (int lfo) const noexcept;
+
+    /** How many beats a synced LFO's period lasts, and the note length's name, such as "1/8 T". */
+    double getLfoSyncedBeats (int lfo) const noexcept;
+    juce::String getLfoSyncedName (int lfo) const;
+
+    /** The tempo synced LFOs follow, in beats a minute: the host's, or 120 if it doesn't give one, as last played. */
+    double getTempo() const noexcept   { return hostTempo.load(); }
+    bool isTempoFromHost() const noexcept   { return hostGivesTempo.load(); }
+
     /** How the LFO runs: modulation::lfoLoops, a number of times from each key, or modulation::lfoForever. */
     int getLfoMode (int lfo) const noexcept;
 
@@ -424,6 +442,9 @@ private:
         std::atomic<float>* period = nullptr;
         std::atomic<float>* mode = nullptr;
         std::atomic<float>* random = nullptr;
+        std::atomic<float>* sync = nullptr;
+        std::atomic<float>* division = nullptr;
+        std::atomic<float>* feel = nullptr;
     };
 
     struct EnvelopeParameters
@@ -506,6 +527,12 @@ private:
     std::atomic<bool> noteSounding { false };
     std::atomic<float> newestVelocity { 1.0f };
     std::atomic<float> modWheelShown { 0.0f };
+
+    // The tempo synced LFOs follow, and where the host is, in beats, while it plays.
+    double playingTempo = modulation::defaultTempo;
+    std::optional<double> playingBeat;
+    std::atomic<double> hostTempo { modulation::defaultTempo };
+    std::atomic<bool> hostGivesTempo { false };
     std::vector<HarmonicVoice*> voices;
 
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,

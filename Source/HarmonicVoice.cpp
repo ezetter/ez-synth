@@ -310,7 +310,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     {
         targets.lfoPeriods[i] = lfoPeriodsGone[i];
         const auto rateTarget = lfoRateTarget ((int) i);
-        targets.lfoPeriodSamples[i] = patch.isMoved (rateTarget)
+        targets.lfoPeriodSamples[i] = patch.isMoved (rateTarget) && ! patch.lfos[i].synced
                                           ? patch.getLfoPeriodSamplesAt (i, modulate (rateTarget, patch.getLfoRatePosition (i)))
                                           : patch.lfos[i].periodSamples;
     }

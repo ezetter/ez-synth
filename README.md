@@ -154,6 +154,15 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the card to draw its wave on the grid, or pick a preset for it. An LFO follows its drawing exactly, rather
   than rebuilding it from harmonics, so a square LFO switches cleanly between its two values. The grid marks
   the LFO's period in time, and a line shows where the LFO has got to.
+- **Sync rate to tempo.** Click an LFO's card, and at the top of the panel beside the grid, a switch syncs its
+  rate to your DAW's tempo. Each period then lasts a note length rather than as long as the **Rate** dial says:
+  **4 bars**, **2 bars**, **1 bar**, **1/2**, **1/4**, **1/8**, **1/16** or **1/32**, played **Straight**,
+  **Dotted**, half as long again, or as a **Triplet**, two thirds as long. A quarter note lasts a beat. The
+  Rate dial is greyed out, and the note length, such as **1/8 D** or **1/4 T**, shows under it. While the DAW
+  plays, a looping LFO follows its beat, so each period starts on one: an LFO lasting a bar starts each bar.
+  When it's stopped, the LFO runs on at the tempo. The panel shows the tempo it's following; the standalone app
+  has no DAW to give one, so it follows 120 BPM. Nothing moves a synced LFO's rate: an LFO, envelope, velocity
+  or mod wheel given its rate leaves it alone until it's unsynced.
 - **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each
   time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
   rises from −1 to +1 and holds there, for instance, to swell each note in.

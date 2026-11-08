@@ -202,7 +202,13 @@ namespace
                 std::make_unique<juce::AudioParameterChoice> (
                     juce::ParameterID { SynthProcessor::lfoModeId (i), 1 }, name + " Mode",
                     modulation::getLfoModeNames(), modulation::lfoLoops),
-                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoRandomId (i), 1 }, name + " Random", false)));
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoRandomId (i), 1 }, name + " Random", false),
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoSyncId (i), 1 }, name + " Sync", false),
+                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::lfoDivisionId (i), 1 },
+                                                              name + " Sync Length", modulation::getDivisionNames(),
+                                                              modulation::quarterNoteDivision),
+                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::lfoFeelId (i), 1 },
+                                                              name + " Sync Feel", modulation::getFeelNames(), 0)));
         }
 
         for (int i = 0; i < SynthProcessor::numEnvelopes; ++i)
@@ -276,6 +282,9 @@ juce::String SynthProcessor::lfoOnId (int lfo)              { return "lfo" + juc
 juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Period"; }
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
 juce::String SynthProcessor::lfoRandomId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Random"; }
+juce::String SynthProcessor::lfoSyncId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Sync"; }
+juce::String SynthProcessor::lfoDivisionId (int lfo)        { return "lfo" + juce::String (lfo + 1) + "Division"; }
+juce::String SynthProcessor::lfoFeelId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Feel"; }
 juce::String SynthProcessor::attackId (int envelope)        { return "env" + juce::String (envelope + 1) + "Attack"; }
 juce::String SynthProcessor::decayId (int envelope)         { return "env" + juce::String (envelope + 1) + "Decay"; }
 juce::String SynthProcessor::sustainId (int envelope)       { return "env" + juce::String (envelope + 1) + "Sustain"; }
@@ -309,7 +318,10 @@ SynthProcessor::SynthProcessor()
         lfoParameters[(size_t) i] = { parameters.getRawParameterValue (lfoOnId (i)),
                                       parameters.getRawParameterValue (lfoPeriodId (i)),
                                       parameters.getRawParameterValue (lfoModeId (i)),
-                                      parameters.getRawParameterValue (lfoRandomId (i)) };
+                                      parameters.getRawParameterValue (lfoRandomId (i)),
+                                      parameters.getRawParameterValue (lfoSyncId (i)),
+                                      parameters.getRawParameterValue (lfoDivisionId (i)),
+                                      parameters.getRawParameterValue (lfoFeelId (i)) };
 
     // Each looping LFO's random wave is its own.
     for (auto& seed : randomSeeds)
@@ -403,6 +415,29 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             lastNoteOnSample = samplesPlayed + metadata.samplePosition;
         }
     }
+
+    // The host's tempo, for LFOs synced to it, and while it plays, where it is in beats, from the start of its song.
+    playingTempo = modulation::defaultTempo;
+    playingBeat.reset();
+    auto tempoFromHost = false;
+
+    if (auto* playHead = getPlayHead())
+    {
+        if (const auto position = playHead->getPosition())
+        {
+            if (const auto bpm = position->getBpm(); bpm.hasValue() && *bpm > 0.0)
+            {
+                playingTempo = *bpm;
+                tempoFromHost = true;
+            }
+
+            if (const auto beat = position->getPpqPosition(); position->getIsPlaying() && beat.hasValue())
+                playingBeat = *beat;
+        }
+    }
+
+    hostTempo = playingTempo;
+    hostGivesTempo = tempoFromHost;
 
     updatePatch();
 
@@ -568,7 +603,27 @@ void SynthProcessor::updatePatch()
         const auto mode = getLfoMode ((int) i);
         lfo.fromKey = mode != modulation::lfoLoops;
         lfo.times = modulation::getLfoTimes (mode);
-        lfo.periodSeconds = lfoParameters[i].period->load();
+        lfo.synced = isLfoSynced ((int) i);
+
+        // Synced to the tempo, a period lasts its note length, and while the host plays, a looping LFO follows its
+        // beat, so each period starts on one, as a bar does.
+        if (lfo.synced)
+        {
+            const auto beats = getLfoSyncedBeats ((int) i);
+            lfo.periodSeconds = (float) (beats * 60.0 / playingTempo);
+
+            if (playingBeat.has_value())
+            {
+                const auto periods = *playingBeat / beats;
+                lfoCycles[i] = (std::int64_t) std::floor (periods);
+                lfoPhases[i] = periods - std::floor (periods);
+            }
+        }
+        else
+        {
+            lfo.periodSeconds = lfoParameters[i].period->load();
+        }
+
         lfo.periodSamples = std::max (1.0, lfo.periodSeconds * playingSampleRate);
         lfo.phase = lfoPhases[i];
         lfo.cycle = lfoCycles[i];
@@ -723,7 +778,27 @@ bool SynthProcessor::isLfoOn (int lfo) const noexcept
 
 float SynthProcessor::getLfoPeriod (int lfo) const noexcept
 {
+    if (isLfoSynced (lfo))
+        return (float) (getLfoSyncedBeats (lfo) * 60.0 / getTempo());
+
     return lfoParameters[(size_t) lfo].period->load();
+}
+
+bool SynthProcessor::isLfoSynced (int lfo) const noexcept
+{
+    return lfoParameters[(size_t) lfo].sync->load() >= 0.5f;
+}
+
+double SynthProcessor::getLfoSyncedBeats (int lfo) const noexcept
+{
+    const auto& source = lfoParameters[(size_t) lfo];
+    return modulation::getSyncedBeats (juce::roundToInt (source.division->load()), juce::roundToInt (source.feel->load()));
+}
+
+juce::String SynthProcessor::getLfoSyncedName (int lfo) const
+{
+    const auto& source = lfoParameters[(size_t) lfo];
+    return modulation::getSyncedName (juce::roundToInt (source.division->load()), juce::roundToInt (source.feel->load()));
 }
 
 int SynthProcessor::getLfoMode (int lfo) const noexcept
@@ -932,6 +1007,10 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
 
 std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
+    // A synced LFO's rate is the tempo's, which nothing moves.
+    if (const auto info = modulation::describe (target); info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
+        return std::nullopt;
+
     // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope.
     auto position = getPosition (target);
     auto moved = false;
