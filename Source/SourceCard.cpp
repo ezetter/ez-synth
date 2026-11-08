@@ -4,12 +4,12 @@
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
 
-SourceCard::SourceCard (const juce::String& cardName, juce::AudioProcessorValueTreeState& parameters,
+SourceCard::SourceCard (const juce::String& cardName, juce::AudioProcessorValueTreeState& parameterTree,
                         const juce::String& onId, const juce::String& dialId, const juce::String& caption)
     : name (cardName),
       dialCaption (caption),
-      onAttachment (parameters, onId, onSwitch),
-      dialAttachment (parameters, dialId, dial)
+      onAttachment (parameterTree, onId, onSwitch),
+      parameters (parameterTree)
 {
     onSwitch.setTitle (name + " on");
     onSwitch.setMouseClickGrabsKeyboardFocus (false);
@@ -17,11 +17,10 @@ SourceCard::SourceCard (const juce::String& cardName, juce::AudioProcessorValueT
     onSwitch.onStateChange = [this] { repaint(); };
     addAndMakeVisible (onSwitch);
 
-    const auto& dialParameter = *parameters.getParameter (dialId);
     dial.setTitle (name + " " + caption.toLowerCase());
     dial.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     dial.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    dial.setDoubleClickReturnValue (true, dialParameter.convertFrom0to1 (dialParameter.getDefaultValue()));
+    attachDial (dialId);
     dial.setMouseClickGrabsKeyboardFocus (false);
     dial.setWantsKeyboardFocus (false);
     dial.onValueChange = [this] { repaint (dialValueArea); };
@@ -57,6 +56,24 @@ void SourceCard::setLines (const juce::String& first, const juce::String& second
     }
 }
 
+void SourceCard::attachDial (const juce::String& parameterId)
+{
+    // The old attachment goes first, so it stops setting its parameter as the dial moves to the new one's value.
+    dialAttachment.reset();
+    dialAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (parameters, parameterId, dial);
+
+    const auto& parameter = *parameters.getParameter (parameterId);
+    dial.setDoubleClickReturnValue (true, parameter.convertFrom0to1 (parameter.getDefaultValue()));
+    repaintDialValue();
+}
+
+void SourceCard::setDialValueWidth (int width)
+{
+    dialValueWidth = width;
+    resized();
+    repaint();
+}
+
 void SourceCard::resized()
 {
     auto area = getLocalBounds().reduced (10, 10);
@@ -64,6 +81,10 @@ void SourceCard::resized()
     auto dialColumn = area.removeFromRight (48);
     dialCaptionArea = dialColumn.removeFromTop (13);
     dialValueArea = dialColumn.removeFromBottom (15);
+
+    // A wider value reaches out to the left, and a little into the card's edge on the right.
+    const auto extra = dialValueWidth - dialValueArea.getWidth();
+    dialValueArea = dialValueArea.withLeft (dialValueArea.getX() - extra + juce::jmin (6, extra / 3)).withWidth (dialValueWidth);
     dial.setBounds (dialColumn);
     area.removeFromRight (6);
 
@@ -76,7 +97,7 @@ void SourceCard::resized()
     firstLineArea = area.removeFromTop (15);
     secondLineArea = area.removeFromTop (17);
     area.removeFromTop (4);
-    waveArea = area;
+    waveArea = area.withRight (juce::jmin (area.getRight(), dialValueArea.getX() - 4));
 }
 
 void SourceCard::paint (juce::Graphics& g)
@@ -198,6 +219,7 @@ void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, c
 LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
     : SourceCard ("LFO " + juce::String (lfo + 1), parameters, SynthProcessor::lfoOnId (lfo),
                   SynthProcessor::lfoPeriodId (lfo), "RATE"),
+      lfoNumber (lfo),
       modeAttachment (*parameters.getParameter (SynthProcessor::lfoModeId (lfo)),
                       [this] (float value) { showMode (juce::roundToInt (value)); })
 {
@@ -228,22 +250,22 @@ void LfoCard::showMovedRate (std::optional<float> position)
     }
 }
 
-void LfoCard::showSynced (std::optional<juce::String> noteLength)
+void LfoCard::showSynced (bool shouldBeSynced)
 {
-    if (noteLength == syncedLength)
+    if (shouldBeSynced == synced)
         return;
 
-    // Synced to the tempo, the rate dial does nothing, so it's greyed out.
-    syncedLength = std::move (noteLength);
-    dial.setEnabled (! syncedLength.has_value());
-    dial.setAlpha (syncedLength.has_value() ? 0.35f : 1.0f);
-    repaintDialValue();
+    // Synced to the tempo, the dial turns through the cycles a beat the LFO can run, snapping to each, and its value,
+    // such as "1/2 per beat", needs more room.
+    synced = shouldBeSynced;
+    attachDial (synced ? SynthProcessor::lfoBeatRateId (lfoNumber) : SynthProcessor::lfoPeriodId (lfoNumber));
+    setDialValueWidth (synced ? 76 : 48);
 }
 
 std::pair<juce::String, bool> LfoCard::getDialText()
 {
-    if (syncedLength.has_value())
-        return { *syncedLength, false };
+    if (synced)
+        return SourceCard::getDialText();
 
     if (! movedRate.has_value())
         return SourceCard::getDialText();

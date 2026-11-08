@@ -50,15 +50,14 @@ public:
 
     /** The IDs of each LFO's parameters: whether it's on, its period in seconds, which is shown as its rate, in
         hertz, whether it loops or starts with each key, and how many times it plays then, and whether it's synced
-        to the host's tempo, and if so, the note length each period lasts, straight, dotted or as a triplet.
+        to the host's tempo, and if so, how many cycles it runs a beat.
     */
     static juce::String lfoOnId (int lfo);
     static juce::String lfoPeriodId (int lfo);
     static juce::String lfoModeId (int lfo);
     static juce::String lfoRandomId (int lfo);
     static juce::String lfoSyncId (int lfo);
-    static juce::String lfoDivisionId (int lfo);
-    static juce::String lfoFeelId (int lfo);
+    static juce::String lfoBeatRateId (int lfo);
 
     /** The IDs of each envelope's parameters: its attack, decay and release in seconds, and its sustain level. */
     static juce::String attackId (int envelope);
@@ -137,15 +136,15 @@ public:
 
     bool isLfoOn (int lfo) const noexcept;
     float getLfoPeriod (int lfo) const noexcept;
-    /** Whether an LFO's rate is synced to the host's tempo, its period lasting a note length rather than as long as
-        its rate dial says. A looping LFO synced to the tempo follows the host's beat while it plays, so its periods
+    /** Whether an LFO's rate is synced to the host's tempo, running a number of cycles a beat rather than as its rate
+        dial says in hertz. A looping LFO synced to the tempo follows the host's beat while it plays, so its periods
         start on the beat. Nothing moves a synced LFO's rate.
     */
     bool isLfoSynced (int lfo) const noexcept;
 
-    /** How many beats a synced LFO's period lasts, and the note length's name, such as "1/8 T". */
-    double getLfoSyncedBeats (int lfo) const noexcept;
-    juce::String getLfoSyncedName (int lfo) const;
+    /** How many cycles a beat a synced LFO runs, and so how many beats each of its periods lasts. */
+    double getLfoCyclesPerBeat (int lfo) const noexcept;
+    double getLfoSyncedBeats (int lfo) const noexcept   { return 1.0 / getLfoCyclesPerBeat (lfo); }
 
     /** The tempo synced LFOs follow, in beats a minute: the host's, or 120 if it doesn't give one, as last played. */
     double getTempo() const noexcept   { return hostTempo.load(); }
@@ -443,8 +442,7 @@ private:
         std::atomic<float>* mode = nullptr;
         std::atomic<float>* random = nullptr;
         std::atomic<float>* sync = nullptr;
-        std::atomic<float>* division = nullptr;
-        std::atomic<float>* feel = nullptr;
+        std::atomic<float>* beatRate = nullptr;
     };
 
     struct EnvelopeParameters

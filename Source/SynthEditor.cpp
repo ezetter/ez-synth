@@ -546,12 +546,11 @@ void SynthEditor::showModulation()
         show (*child, true);
 
     // An LFO's rate, as the mod wheel has moved it, is shown under its dial too.
-    // Synced to the tempo, its note length instead.
+    // Synced to the tempo, its dial sets how many cycles it runs a beat instead.
     for (int lfo = 0; lfo < SynthProcessor::numLfos; ++lfo)
     {
         lfoCards[(size_t) lfo]->showMovedRate (synthProcessor.getLivePosition (modulation::lfoRateTarget (lfo)));
-        lfoCards[(size_t) lfo]->showSynced (synthProcessor.isLfoSynced (lfo) ? std::optional (synthProcessor.getLfoSyncedName (lfo))
-                                                                            : std::nullopt);
+        lfoCards[(size_t) lfo]->showSynced (synthProcessor.isLfoSynced (lfo));
     }
 
     lfoPanel.showTempo();

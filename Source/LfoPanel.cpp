@@ -57,14 +57,10 @@ void LfoPanel::Row::mouseDown (const juce::MouseEvent&)
 LfoPanel::LfoPanel (SynthProcessor& processor)
     : synthProcessor (processor)
 {
-    for (auto* control : std::initializer_list<juce::Component*> { &syncSwitch, &division, &feel })
-    {
-        control->setMouseClickGrabsKeyboardFocus (false);
-        control->setWantsKeyboardFocus (false);
-        addAndMakeVisible (control);
-    }
-
-    syncSwitch.onStateChange = [this] { showSync(); };
+    syncSwitch.setMouseClickGrabsKeyboardFocus (false);
+    syncSwitch.setWantsKeyboardFocus (false);
+    syncSwitch.onStateChange = [this] { repaint(); };
+    addAndMakeVisible (syncSwitch);
     setLfo (0);
 }
 
@@ -72,38 +68,12 @@ void LfoPanel::setLfo (int newLfo)
 {
     lfo = newLfo;
 
-    // The switch and note lengths are this LFO's.
-    auto& parameters = synthProcessor.parameters;
-    syncAttachment = std::make_unique<juce::ButtonParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoSyncId (lfo)),
-                                                                        syncSwitch);
-    divisionAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoDivisionId (lfo)),
-                                                                      [this] (float value) { division.setChosen (juce::roundToInt (value)); });
-    feelAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::lfoFeelId (lfo)),
-                                                                  [this] (float value) { feel.setChosen (juce::roundToInt (value)); });
-    division.onChoose = [this] (int index) { divisionAttachment->setValueAsCompleteGesture ((float) index); };
-    feel.onChoose = [this] (int index) { feelAttachment->setValueAsCompleteGesture ((float) index); };
-    divisionAttachment->sendInitialUpdate();
-    feelAttachment->sendInitialUpdate();
-
+    // The switch is this LFO's.
+    syncAttachment.reset();
+    syncAttachment = std::make_unique<juce::ButtonParameterAttachment> (
+        *synthProcessor.parameters.getParameter (SynthProcessor::lfoSyncId (lfo)), syncSwitch);
     syncSwitch.setTitle ("LFO " + juce::String (lfo + 1) + " synced to the tempo");
-    division.setTitle ("LFO " + juce::String (lfo + 1) + " synced note length");
-    feel.setTitle ("LFO " + juce::String (lfo + 1) + " synced note feel");
-    showSync();
     refresh();
-}
-
-void LfoPanel::showSync()
-{
-    // The note lengths only count while the LFO is synced.
-    const auto synced = syncSwitch.getToggleState();
-
-    for (auto* choices : { &division, &feel })
-    {
-        choices->setEnabled (synced);
-        choices->setAlpha (synced ? 1.0f : 0.4f);
-    }
-
-    repaint();
 }
 
 void LfoPanel::showTempo()
@@ -147,11 +117,9 @@ void LfoPanel::resized()
     row.removeFromLeft (10);
     tempoArea = row.removeFromRight (150);
     syncLabelArea = row;
-    area.removeFromTop (10);
-    division.setBounds (area.removeFromTop (26));
-    area.removeFromTop (8);
-    feel.setBounds (area.removeFromTop (26).withWidth (juce::jmin (area.getWidth(), 240)));
-    area.removeFromTop (22);
+    area.removeFromTop (6);
+    syncHintArea = area.removeFromTop (34);
+    area.removeFromTop (16);
 
     captionArea = area.removeFromTop (18);
     area.removeFromTop (10);
@@ -189,6 +157,11 @@ void LfoPanel::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
     g.setFont (fonts::body (12.5f));
     g.drawText (shownTempo, tempoArea, juce::Justification::centredRight, true);
+    g.drawFittedText (syncSwitch.getToggleState()
+                          ? "The Rate dial sets how many cycles it runs a beat, from 1/8 to 8. At 1 per beat, a cycle "
+                            "lasts a quarter note in 4/4."
+                          : "Synced, the Rate dial sets how many cycles it runs a beat, rather than how many a second.",
+                      syncHintArea, juce::Justification::topLeft, 2);
 
     g.setFont (fonts::body (13.0f));
 

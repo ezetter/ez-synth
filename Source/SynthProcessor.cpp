@@ -204,11 +204,9 @@ namespace
                     modulation::getLfoModeNames(), modulation::lfoLoops),
                 std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoRandomId (i), 1 }, name + " Random", false),
                 std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::lfoSyncId (i), 1 }, name + " Sync", false),
-                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::lfoDivisionId (i), 1 },
-                                                              name + " Sync Length", modulation::getDivisionNames(),
-                                                              modulation::quarterNoteDivision),
-                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::lfoFeelId (i), 1 },
-                                                              name + " Sync Feel", modulation::getFeelNames(), 0)));
+                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::lfoBeatRateId (i), 1 },
+                                                              name + " Beat Rate", modulation::getBeatRateNames(),
+                                                              modulation::oneCycleABeat)));
         }
 
         for (int i = 0; i < SynthProcessor::numEnvelopes; ++i)
@@ -283,8 +281,7 @@ juce::String SynthProcessor::lfoPeriodId (int lfo)          { return "lfo" + juc
 juce::String SynthProcessor::lfoModeId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Mode"; }
 juce::String SynthProcessor::lfoRandomId (int lfo)          { return "lfo" + juce::String (lfo + 1) + "Random"; }
 juce::String SynthProcessor::lfoSyncId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Sync"; }
-juce::String SynthProcessor::lfoDivisionId (int lfo)        { return "lfo" + juce::String (lfo + 1) + "Division"; }
-juce::String SynthProcessor::lfoFeelId (int lfo)            { return "lfo" + juce::String (lfo + 1) + "Feel"; }
+juce::String SynthProcessor::lfoBeatRateId (int lfo)        { return "lfo" + juce::String (lfo + 1) + "BeatRate"; }
 juce::String SynthProcessor::attackId (int envelope)        { return "env" + juce::String (envelope + 1) + "Attack"; }
 juce::String SynthProcessor::decayId (int envelope)         { return "env" + juce::String (envelope + 1) + "Decay"; }
 juce::String SynthProcessor::sustainId (int envelope)       { return "env" + juce::String (envelope + 1) + "Sustain"; }
@@ -320,8 +317,7 @@ SynthProcessor::SynthProcessor()
                                       parameters.getRawParameterValue (lfoModeId (i)),
                                       parameters.getRawParameterValue (lfoRandomId (i)),
                                       parameters.getRawParameterValue (lfoSyncId (i)),
-                                      parameters.getRawParameterValue (lfoDivisionId (i)),
-                                      parameters.getRawParameterValue (lfoFeelId (i)) };
+                                      parameters.getRawParameterValue (lfoBeatRateId (i)) };
 
     // Each looping LFO's random wave is its own.
     for (auto& seed : randomSeeds)
@@ -605,8 +601,8 @@ void SynthProcessor::updatePatch()
         lfo.times = modulation::getLfoTimes (mode);
         lfo.synced = isLfoSynced ((int) i);
 
-        // Synced to the tempo, a period lasts its note length, and while the host plays, a looping LFO follows its
-        // beat, so each period starts on one, as a bar does.
+        // Synced to the tempo, it runs a number of cycles a beat, and while the host plays, a looping LFO follows its
+        // beat, so its periods line up with the beats, as a bar's do.
         if (lfo.synced)
         {
             const auto beats = getLfoSyncedBeats ((int) i);
@@ -789,16 +785,10 @@ bool SynthProcessor::isLfoSynced (int lfo) const noexcept
     return lfoParameters[(size_t) lfo].sync->load() >= 0.5f;
 }
 
-double SynthProcessor::getLfoSyncedBeats (int lfo) const noexcept
+double SynthProcessor::getLfoCyclesPerBeat (int lfo) const noexcept
 {
-    const auto& source = lfoParameters[(size_t) lfo];
-    return modulation::getSyncedBeats (juce::roundToInt (source.division->load()), juce::roundToInt (source.feel->load()));
-}
-
-juce::String SynthProcessor::getLfoSyncedName (int lfo) const
-{
-    const auto& source = lfoParameters[(size_t) lfo];
-    return modulation::getSyncedName (juce::roundToInt (source.division->load()), juce::roundToInt (source.feel->load()));
+    const auto index = juce::roundToInt (lfoParameters[(size_t) lfo].beatRate->load());
+    return modulation::beatRates[(size_t) juce::jlimit (0, (int) modulation::beatRates.size() - 1, index)];
 }
 
 int SynthProcessor::getLfoMode (int lfo) const noexcept

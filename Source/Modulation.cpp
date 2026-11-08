@@ -249,26 +249,10 @@ namespace modulation
         return juce::String (juce::roundToInt (phase * 360.0f)) + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0"));
     }
 
-    juce::StringArray getDivisionNames()
+    juce::StringArray getBeatRateNames()
     {
-        return { "4 bars", "2 bars", "1 bar", "1/2", "1/4", "1/8", "1/16", "1/32" };
-    }
-
-    juce::StringArray getFeelNames()
-    {
-        return { "Straight", "Dotted", "Triplet" };
-    }
-
-    double getSyncedBeats (int division, int feel)
-    {
-        return divisionBeats[(size_t) juce::jlimit (0, (int) divisionBeats.size() - 1, division)]
-             * feelLengths[(size_t) juce::jlimit (0, (int) feelLengths.size() - 1, feel)];
-    }
-
-    juce::String getSyncedName (int division, int feel)
-    {
-        const auto name = getDivisionNames()[juce::jlimit (0, (int) divisionBeats.size() - 1, division)];
-        return name + (feel == 1 ? " D" : feel == 2 ? " T" : "");
+        return { "1/8 per beat", "1/4 per beat", "1/2 per beat", "1 per beat", "2 per beat", "3 per beat", "4 per beat",
+                 "6 per beat", "8 per beat" };
     }
 
     juce::StringArray getLfoModeNames()

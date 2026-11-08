@@ -43,6 +43,12 @@ protected:
     virtual std::pair<juce::String, bool> getDialText();
     void repaintDialValue()   { repaint (dialValueArea); }
 
+    /** Has the dial set a parameter, in place of the one it set before. */
+    void attachDial (const juce::String& parameterId);
+
+    /** Widens the area for the dial's value, out to the left over the picture of the wave, for longer values. */
+    void setDialValueWidth (int width);
+
     juce::Rectangle<int> getSecondLineArea() const noexcept   { return secondLineArea; }
     bool isOn() const   { return onSwitch.getToggleState(); }
 
@@ -57,7 +63,9 @@ private:
     bool selected = false;
 
     juce::AudioProcessorValueTreeState::ButtonAttachment onAttachment;
-    juce::AudioProcessorValueTreeState::SliderAttachment dialAttachment;
+    juce::AudioProcessorValueTreeState& parameters;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dialAttachment;
+    int dialValueWidth = 48;
 
     juce::Rectangle<int> nameArea, firstLineArea, secondLineArea, waveArea, dialCaptionArea, dialValueArea;
 
@@ -92,12 +100,14 @@ public:
     /** Shows the rate as the mod wheel has moved it, as a position along the dial's travel, or as it's set. */
     void showMovedRate (std::optional<float> position);
 
-    /** Shows the LFO synced to the tempo, with the dial greyed out and the note length, such as "1/4", under it,
-        or not synced.
+    /** Shows the LFO synced to the tempo, its dial turning through the cycles a beat it can run, such as
+        "1/2 per beat", or not synced, its dial setting its rate in hertz.
     */
-    void showSynced (std::optional<juce::String> noteLength);
+    void showSynced (bool);
 
-    /** The rate shown under the dial, such as "2.00 Hz", and whether it's as the mod wheel has moved it. */
+    /** The rate shown under the dial, such as "2.00 Hz" or "1/2 per beat", and whether it's as the mod wheel has
+        moved it.
+    */
     std::pair<juce::String, bool> getShownRate()   { return getDialText(); }
 
     /** The second button's label: how many times the LFO plays from each key, as last chosen. */
@@ -108,8 +118,9 @@ private:
     void chooseTimes();
     std::pair<juce::String, bool> getDialText() override;
 
+    const int lfoNumber;
     std::optional<float> movedRate;
-    std::optional<juce::String> syncedLength;
+    bool synced = false;
 
     // Loop, or a button showing how many times it plays from each key, which opens a menu of them.
     ChoiceButtons mode { { "Loop", modulation::getLfoModeNames()[1] } };

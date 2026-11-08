@@ -27,22 +27,19 @@
   <PARAM id="filter2Resonance" value="0.0"/>
   <PARAM id="filter2Type" value="2.0"/>
   <PARAM id="filter2Width" value="1.999999761581421"/>
-  <PARAM id="lfo1Division" value="4.0"/>
-  <PARAM id="lfo1Feel" value="0.0"/>
+  <PARAM id="lfo1BeatRate" value="3.0"/>
   <PARAM id="lfo1Mode" value="1.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="10.0"/>
   <PARAM id="lfo1Random" value="0.0"/>
   <PARAM id="lfo1Sync" value="0.0"/>
-  <PARAM id="lfo2Division" value="4.0"/>
-  <PARAM id="lfo2Feel" value="0.0"/>
+  <PARAM id="lfo2BeatRate" value="3.0"/>
   <PARAM id="lfo2Mode" value="0.0"/>
   <PARAM id="lfo2On" value="0.0"/>
   <PARAM id="lfo2Period" value="1.999999642372131"/>
   <PARAM id="lfo2Random" value="0.0"/>
   <PARAM id="lfo2Sync" value="0.0"/>
-  <PARAM id="lfo3Division" value="4.0"/>
-  <PARAM id="lfo3Feel" value="0.0"/>
+  <PARAM id="lfo3BeatRate" value="3.0"/>
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="0.0"/>
   <PARAM id="lfo3Period" value="3.999999523162842"/>

@@ -219,20 +219,14 @@ namespace modulation
     inline constexpr int mostLfoTimes = 5;
     inline constexpr int lfoForever = mostLfoTimes + 1;
 
-    /** An LFO synced to the tempo plays each period over a note length, from 4 bars down to a 32nd note, of 4/4,
-        played straight, dotted, half as long again, or as a triplet, two thirds as long.
+    /** The rates an LFO synced to the tempo can run at, in cycles a beat, from one every 8 beats up to 8 a beat. At
+        1 a beat, a cycle lasts a quarter note in 4/4; at 1/4, a whole bar.
     */
-    inline constexpr std::array<double, 8> divisionBeats { 16.0, 8.0, 4.0, 2.0, 1.0, 0.5, 0.25, 0.125 };
-    inline constexpr int quarterNoteDivision = 4;
-    inline constexpr std::array<double, 3> feelLengths { 1.0, 1.5, 2.0 / 3.0 };
-    juce::StringArray getDivisionNames();
-    juce::StringArray getFeelNames();
+    inline constexpr std::array<double, 9> beatRates { 0.125, 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0 };
+    inline constexpr int oneCycleABeat = 3;
 
-    /** How many beats a note length lasts, and what it's called, such as "1/8 T" for an eighth note triplet, or
-        "1/8 D" for a dotted one.
-    */
-    double getSyncedBeats (int division, int feel);
-    juce::String getSyncedName (int division, int feel);
+    /** The beat rates' names, such as "1/2 per beat" and "3 per beat". */
+    juce::StringArray getBeatRateNames();
 
     /** The tempo an LFO synced to it follows when there's no host to give one, as in the standalone app. */
     inline constexpr double defaultTempo = 120.0;
