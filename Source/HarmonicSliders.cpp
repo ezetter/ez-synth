@@ -121,7 +121,7 @@ HarmonicSliders::HarmonicSliders()
         tuner.setRange (-waveform::furthestTune, waveform::furthestTune);
         tuner.setDoubleClickReturnValue (true, 0.0);
         tuner.fillOrigin = 0.0;
-        tuner.snap = [] (double tune) { return std::abs (tune) < 0.015 ? 0.0 : tune; };
+        tuner.snap = [] (double tune) { return std::abs (tune) < 0.03 * waveform::furthestTune ? 0.0 : tune; };
         tuner.setScrollWheelEnabled (false);
         tuner.setColour (juce::Slider::rotarySliderFillColourId, colours::forPartial ((int) i));
         tuner.setTitle ("Harmonic " + juce::String (harmonic) + " tune");

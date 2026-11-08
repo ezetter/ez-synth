@@ -99,8 +99,8 @@ public:
     /** Raises or lowers one harmonic of an oscillator's wave, numbered from 1, leaving the others as they are. */
     void setHarmonicAmplitude (int oscillator, int harmonic, float amplitude);
 
-    /** How far a harmonic, numbered from 2, is tuned from its whole number, in harmonics, from halfway to the one
-        below to halfway to the one above. The fundamental can't be tuned. Tuning harmonics makes the sound
+    /** How far a harmonic, numbered from 2, is tuned from its whole number, in harmonics, from the one below to
+        the one above. The fundamental can't be tuned. Tuning harmonics makes the sound
         inharmonic, as a bell's or a drum's is. Changing the wave keeps them tuned.
     */
     float getHarmonicTune (int oscillator, int harmonic) const noexcept;

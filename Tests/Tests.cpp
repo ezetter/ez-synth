@@ -1834,20 +1834,20 @@ namespace
                "harmonics start in tune");
 
         // The 2nd harmonic a quarter of a harmonic sharp, at 2.25 times the fundamental, and the 3rd as flat as it
-        // goes, halfway down to the 2nd, at 2.5 times.
+        // goes, all the way up to the 4th's whole number, at 4 times.
         synth.setHarmonicTune (0, 2, 0.25f);
-        synth.setHarmonicTune (0, 3, -0.5f);
+        synth.setHarmonicTune (0, 3, 1.0f);
         const auto tuned = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (amplitudeAt (tuned, 990.0), second, 0.03) && amplitudeAt (tuned, 880.0) < 0.05 * second,
                "a harmonic tuned a quarter sharp plays at 2.25 times the fundamental, and not at its whole number");
-        check (isNear (amplitudeAt (tuned, 1100.0), third, 0.03) && amplitudeAt (tuned, 1320.0) < 0.05 * third,
-               "...and one tuned as flat as it goes, halfway to the harmonic below");
+        check (isNear (amplitudeAt (tuned, 1760.0), third, 0.03) && amplitudeAt (tuned, 1320.0) < 0.05 * third,
+               "...and one tuned as sharp as it goes, at the harmonic above");
         check (isNear (amplitudeAt (tuned, 440.0), amplitudeAt (inTune, 440.0), 0.01), "...leaving the fundamental as it was");
 
-        synth.setHarmonicTune (0, 2, 0.8f);
+        synth.setHarmonicTune (0, 2, 1.6f);
         synth.setHarmonicTune (0, 1, 0.3f);
-        check (juce::exactlyEqual (synth.getHarmonicTune (0, 2), 0.5f) && juce::exactlyEqual (synth.getHarmonicTune (0, 1), 0.0f),
-               "a harmonic can be tuned no further than halfway to the next, and the fundamental not at all");
+        check (juce::exactlyEqual (synth.getHarmonicTune (0, 2), 1.0f) && juce::exactlyEqual (synth.getHarmonicTune (0, 1), 0.0f),
+               "a harmonic can be tuned no further than the next, and the fundamental not at all");
         synth.setHarmonicTune (0, 2, 0.25f);
 
         // The wave as shown: a tuned harmonic's sine wave doesn't fit the cycle a whole number of times.
@@ -1857,7 +1857,7 @@ namespace
 
         // Choosing a new wave keeps the harmonics tuned.
         setPreset (synth, 0, waveform::Preset::square);
-        check (juce::exactlyEqual (synth.getHarmonicTune (0, 3), -0.5f), "choosing another wave keeps the harmonics tuned");
+        check (juce::exactlyEqual (synth.getHarmonicTune (0, 3), 1.0f), "choosing another wave keeps the harmonics tuned");
         setPreset (synth, 0, waveform::Preset::sawtooth);
 
         // Retuning a harmonic while a note plays glides there without a click.
@@ -1891,7 +1891,7 @@ namespace
         // fundamental, and holds there.
         synth.setHarmonicTune (0, 2, -0.3f);
         setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
-        synth.setAssignment (modulation::harmonicTuneTarget (0, 2), { modulation::envelopeSource (0), 0.55f, false });
+        synth.setAssignment (modulation::harmonicTuneTarget (0, 2), { modulation::envelopeSource (0), 0.275f, false });
         const auto moved = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
         check (isNear (amplitudeAt (moved, 990.0), second, 0.03), "an envelope on a harmonic's tune moves its frequency");
         check (modulation::getName (modulation::harmonicTuneTarget (2, 9)) == "Osc 3 harmonic 9 tune"
@@ -1906,7 +1906,7 @@ namespace
         synth.getStateInformation (state);
         SynthProcessor restored;
         restored.setStateInformation (state.getData(), (int) state.getSize());
-        check (isNear (restored.getHarmonicTune (0, 2), -0.3, 1.0e-6) && isNear (restored.getHarmonicTune (0, 3), -0.5, 1.0e-6)
+        check (isNear (restored.getHarmonicTune (0, 2), -0.3, 1.0e-6) && isNear (restored.getHarmonicTune (0, 3), 1.0, 1.0e-6)
                  && juce::exactlyEqual (restored.getHarmonicTune (1, 2), 0.0f),
                "each oscillator's harmonic tunes are saved and restored");
 

@@ -68,8 +68,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   past −1 and +1, and the grid stretches to show it.
 - **Tune a harmonic** with the first dial beside it, for inharmonic sounds, such as bells, metal and drums,
   whose overtones aren't whole multiples of the fundamental. Every harmonic above the fundamental has one;
-  the fundamental can't be tuned. A harmonic tunes from halfway down to the harmonic below to halfway up to
-  the one above: the 3rd, for instance, from 2.5 to 3.5 times the fundamental. In tune is the middle, where
+  the fundamental can't be tuned. A harmonic tunes all the way from the harmonic below to the one above:
+  the 3rd, for instance, from 2 to 4 times the fundamental. In tune is the middle, where
   the dial snaps, and its coloured arc shows which way and how far a harmonic is tuned. Double-click a dial
   to put its harmonic back in tune, and hover over it to see the multiple it plays at. Once you've played a
   note, the frequencies beside the sliders are the tuned ones; until then, a tuned harmonic shows its

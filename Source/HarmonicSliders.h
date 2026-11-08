@@ -11,7 +11,7 @@
 
 /** A slider for each harmonic the oscillator plays, to raise or lower it, with its strength and, once a note has
     been played, its frequency. Beside each harmonic above the fundamental, a small dial tunes it away from its whole
-    number, up to halfway to the harmonics either side, for inharmonic sounds. Beside every harmonic, another sets its
+    number, as far as the harmonics either side, for inharmonic sounds. Beside every harmonic, another sets its
     phase, from 0 round to a whole turn. Above them, a key to the grid's lines.
 */
 class HarmonicSliders final : public juce::Component
