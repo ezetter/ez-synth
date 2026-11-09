@@ -174,8 +174,9 @@ namespace modulation
     /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope
         moves it by its range times its level. Once the key is let go, the control falls steadily from where it was
         then to its rest, which it reaches as the release ends, so an envelope on the volume fades the note out.
+        Its range is scaled by the given amount, as an oscillator's tune is by its zoom.
     */
-    float applyEnvelope (int target, const Assignment&, float position, const EnvelopeState&);
+    float applyEnvelope (int target, const Assignment&, float position, const EnvelopeState&, float scale = 1.0f);
 
     /** The furthest an LFO's wave can be shifted for a control: a degree short of a whole period. */
     inline constexpr float latestPhase = 359.0f / 360.0f;

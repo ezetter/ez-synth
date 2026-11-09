@@ -6,7 +6,6 @@
 namespace
 {
     const juce::String dot (juce::CharPointer_UTF8 ("\xc2\xb7"));
-    const juce::String plusOrMinus (juce::CharPointer_UTF8 ("\xc2\xb1"));
 
     /** How near a whole semitone, on screen, dragging the tune snaps to it, however far it's zoomed in. */
     constexpr double snapPixels = 3.0;
@@ -72,20 +71,23 @@ TuneSlider::TuneSlider()
     moveWindow();
 }
 
-void TuneSlider::setOscillator (juce::RangedAudioParameter& tuneParameter, int oscillator)
+void TuneSlider::setOscillator (juce::RangedAudioParameter& tuneParameter, juce::RangedAudioParameter& zoomParameter, int oscillator)
 {
     slider.setTitle ("Osc " + juce::String (oscillator + 1) + " tune");
+    zoomSlider.setTitle ("Osc " + juce::String (oscillator + 1) + " tune zoom");
     modulatable::setTarget (slider, modulation::oscillatorTuneTarget (oscillator));
 
     attachment.reset();
+    zoomAttachment.reset();
     attachment = std::make_unique<juce::ParameterAttachment> (tuneParameter, [this] (float semitones) { showTune (semitones); });
     attachment->sendInitialUpdate();
+    zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (zoomParameter, zoomSlider);
     moveWindow();
 }
 
 void TuneSlider::setZoom (float zoom)
 {
-    zoomSlider.setValue (zoom, juce::dontSendNotification);
+    zoomSlider.setValue (zoom, juce::sendNotificationSync);
     moveWindow();
 }
 
@@ -152,11 +154,9 @@ void TuneSlider::paint (juce::Graphics& g)
                 captionArea, juce::Justification::centredRight);
 
     // How far either side the scale reaches.
-    const auto reach = (window.high - window.low) / 2.0f;
     g.setFont (fonts::body (12.0f));
     g.setColour (colours::dimText);
-    g.drawText (plusOrMinus + (tuning::toWholeSemitones (reach).has_value() ? juce::String (juce::roundToInt (reach)) : juce::String (reach, 1)) + " st",
-                zoomValueArea, juce::Justification::centredRight);
+    g.drawText (tuning::reachToText ((window.high - window.low) / 2.0f), zoomValueArea, juce::Justification::centredRight);
 
     const auto ticksTop = (float) tickArea.getY();
     const auto xOf = [this] (float semitones) { return (float) slider.getX() + (float) slider.getPositionOfValue (semitones); };

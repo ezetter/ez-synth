@@ -3,6 +3,7 @@
 #include "Envelope.h"
 #include "FilterStage.h"
 #include "Modulation.h"
+#include "Tuning.h"
 
 /** Everything the voices need to play a block: the oscillators, filters and volume as they're set, the LFOs and
     envelopes, and which controls they move. The processor fills it in on the audio thread before each block.
@@ -15,6 +16,11 @@ struct Patch
         float level = 0.0f;
         int numHarmonics = 1;
         float tune = 0.0f;   // how many semitones away from the note it plays, below it if negative
+
+        /** How far either side its tune slider's zoom reaches, in semitones, which scales how far modulation moves its
+            tune: a full range moves it across the part of the scale shown, rather than the whole two octaves.
+        */
+        float tuneReach = tuning::widestReach;
 
         /** Each harmonic's amplitude, its phase, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phases {}, phaseSines {}, phaseCosines {};

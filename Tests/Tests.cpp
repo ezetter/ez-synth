@@ -2680,7 +2680,44 @@ namespace
         auto signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
         check (isNear (amplitudeAt (signal, 440.0 * std::pow (2.0, 7.0 / 12.0)) / amplitudeAt (signal, 440.0), 1.0, 0.03),
                "an envelope on an oscillator's tune moves its pitch");
+
+        // The tune's zoom sets how far modulation moves it. Zoomed in to a semitone either side, the envelope at its
+        // full range sweeps the tune across the 2 semitones shown, rather than the 2 octaves.
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 1.0f, false });
+        setParameter (synth, SynthProcessor::tuneZoomId (1), 1.0f);
+        signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
+        check (amplitudeAt (signal, 440.0 * std::pow (2.0, 2.0 / 12.0)) > 0.9 * amplitudeAt (signal, 440.0),
+               "zoomed right in, a full range moves the tune across the 2 semitones the slider shows");
+
+        // Zoomed in partway, to 3.46 semitones either side, half the range moves it by 3.46 semitones. Zooming out
+        // again brings back the whole two octaves, so half the range moves it an octave.
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 0.5f, false });
+        setParameter (synth, SynthProcessor::tuneZoomId (1), 0.5f);
+        signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
+        check (amplitudeAt (signal, 440.0 * std::pow (2.0, std::sqrt (12.0) / 12.0)) > 0.9 * amplitudeAt (signal, 440.0),
+               "zoomed in partway, modulation moves the tune by as much less as the slider shows");
+
+        setParameter (synth, SynthProcessor::tuneZoomId (1), 0.0f);
+        signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
+        check (amplitudeAt (signal, 880.0) > 0.9 * amplitudeAt (signal, 440.0),
+               "zoomed out, modulation moves the tune across the whole two octaves, as before");
+
+        // The window shows the tune as modulation moves it, by as much as it sounds: the mod wheel at the top moves
+        // the tune, zoomed right in, up by its range times the 2 semitones shown.
         synth.setAssignment (modulation::oscillatorTuneTarget (1), {});
+        synth.setModWheelAssignment (modulation::oscillatorTuneTarget (1), { modulation::modWheelSource, 0.75f, false });
+        setParameter (synth, SynthProcessor::tuneZoomId (1), 1.0f);
+        {
+            juce::AudioBuffer<float> wheelBuffer (2, blockSize);
+            juce::MidiBuffer midi;
+            midi.addEvent (juce::MidiMessage::controllerEvent (1, modulation::modWheelController, 127), 0);
+            synth.processBlock (wheelBuffer, midi);
+        }
+        const auto shownTune = synth.getLivePosition (modulation::oscillatorTuneTarget (1));
+        check (shownTune.has_value() && isNear (tuning::fromPosition (*shownTune), 1.5, 1.0e-4),
+               "the tune shown as the mod wheel moves it follows the zoom");
+        synth.setModWheelAssignment (modulation::oscillatorTuneTarget (1), {});
+        setParameter (synth, SynthProcessor::tuneZoomId (1), 0.0f);
 
         // Retuning while a note plays glides there without a click. A sine's steepest step between samples grows with
         // its pitch, by half as much again for a 5th up.
@@ -2744,7 +2781,8 @@ namespace
             SynthProcessor zoomed;
             TuneSlider tuneSlider;
             tuneSlider.setBounds (0, 0, 340, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (0)), 0);
+            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (0)),
+                                     *zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (0)), 0);
             const auto shows = [&tuneSlider] (float from, float to)
             {
                 return juce::exactlyEqual (tuneSlider.getWindow().low, from) && juce::exactlyEqual (tuneSlider.getWindow().high, to);
@@ -2763,6 +2801,19 @@ namespace
 
             tuneSlider.setZoom (0.0f);
             check (shows (-12.0f, 12.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5), "zooming out shows the whole range again");
+
+            // The zoom is the oscillator's own control, saved with the sound: setting it from elsewhere, as undoing
+            // or loading a sound does, zooms the slider.
+            tuneSlider.setZoom (0.5f);
+            check (isNear (zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (0))->getValue(), 0.5, 1.0e-6),
+                   "zooming the tune slider sets the oscillator's zoom");
+            setParameter (zoomed, SynthProcessor::tuneZoomId (0), 1.0f);
+            check (shows (-1.0f, 1.0f) && isNear (tuneSlider.getZoom(), 1.0, 1.0e-6), "setting the oscillator's zoom zooms the slider");
+
+            setParameter (zoomed, SynthProcessor::tuneZoomId (1), 0.0f);
+            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (1)),
+                                      *zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (1)), 1);
+            check (shows (-12.0f, 12.0f), "each oscillator has a zoom of its own");
         }
 
         // Saving and loading.
@@ -3782,7 +3833,8 @@ namespace
             TuneSlider tuneSlider;
             tuneSlider.setLookAndFeel (&lookAndFeel);
             tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (*tuned.parameters.getParameter (SynthProcessor::tuneId (0)), 0);
+            tuneSlider.setOscillator (*tuned.parameters.getParameter (SynthProcessor::tuneId (0)),
+                                     *tuned.parameters.getParameter (SynthProcessor::tuneZoomId (0)), 0);
 
             const auto saveTuneSlider = [&folder, &tuneSlider] (const juce::String& name)
             {

@@ -229,14 +229,14 @@ namespace modulation
         return juce::jlimit (0.0f, 1.0f, position);
     }
 
-    float applyEnvelope (int target, const Assignment& assignment, float position, const EnvelopeState& envelope)
+    float applyEnvelope (int target, const Assignment& assignment, float position, const EnvelopeState& envelope, float scale)
     {
         if (! envelope.releasing)
-            return keepInTravel (target, position + assignment.offset (envelope.level));
+            return keepInTravel (target, position + scale * assignment.offset (envelope.level));
 
         // A control that goes round comes back to rest the shorter way, to its nearest whole turn. An LFO's rate
         // comes back to where it's set, so the LFO carries on at its own rate.
-        const auto atKeyUp = position + assignment.offset (envelope.releaseFrom);
+        const auto atKeyUp = position + scale * assignment.offset (envelope.releaseFrom);
         const auto rest = goesRound (target) ? std::round (atKeyUp)
                         : describe (target).kind == Kind::lfoRate ? position
                                                                   : getRestPosition (target);

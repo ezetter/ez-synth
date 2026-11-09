@@ -37,12 +37,17 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   semitone either side of the note, and from a 5th up a semitone either side of the 5th, for detuning the
   5th slightly. Faint ticks mark tenths, quarters or halves of a semitone, whichever fit. The scale stays
   put while you drag the tune, and follows the tune if it's set from elsewhere, such as by a preset. Zooming
-  never changes the tune.
+  never changes the tune. Each oscillator has its own zoom, saved with the sound, and it also sets how far
+  modulation moves the tune (see below).
 - **Snapping.** Dragging the tune snaps to the nearest whole semitone once you're within a few pixels of
   it, so the intervals are easy to land on exactly. As that's a few pixels however far you've zoomed in, a
   slight detune is easiest zoomed in. Hold Option while dragging to tune without snapping.
-- **Move the tune** like the other controls, with an LFO, for vibrato either side of the note, or an
-  envelope, to sweep the pitch with each note.
+- **Move the tune** like the other controls, with an LFO, for vibrato either side of the note, an
+  envelope, to sweep the pitch with each note, velocity or the mod wheel. The zoom sets how far they can
+  move it: at their full range, they move the tune across as much of the scale as the slider shows. Zoomed
+  right out, a full range spans the whole two octaves; zoomed right in, to a semitone either side, an LFO at
+  100% swings the tune a semitone either side of where it's set, so a range of 10% is a gentle vibrato of a
+  tenth of a semitone. Zooming in or out while a sound plays rescales its modulation to match.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Draw in steps.** **Draw** at the top right of the grid switches between **Smooth**, freehand drawing,

@@ -37,6 +37,11 @@ public:
     static juce::String harmonicsId (int oscillator);
     static juce::String tuneId (int oscillator);
 
+    /** The ID of how far an oscillator's tune slider is zoomed in, which sets how far LFOs, envelopes, velocity and the
+        mod wheel move its tune: at their full range, across the part of the scale it shows.
+    */
+    static juce::String tuneZoomId (int oscillator);
+
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
         low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
@@ -422,6 +427,7 @@ private:
         std::atomic<float>* level = nullptr;
         std::atomic<float>* numHarmonics = nullptr;
         std::atomic<float>* tune = nullptr;
+        std::atomic<float>* tuneZoom = nullptr;
     };
 
     struct FilterParameters

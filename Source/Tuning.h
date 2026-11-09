@@ -57,6 +57,14 @@ namespace tuning
     */
     float zoomToReach (float zoom);
 
+    /** How far either side the scale reaches, such as "±12 st" or "±3.5 st". */
+    juce::String reachToText (float reach);
+
+    /** How much less than across the whole two octaves LFOs, envelopes, velocity and the mod wheel move a tune, when
+        its slider's zoomed in to reach this far either side: at their full range, they move it across the part shown.
+    */
+    inline float getModulationScale (float reach)   { return reach / widestReach; }
+
     /** The part of the scale shown, from its lowest to its highest tuning. */
     struct Window
     {

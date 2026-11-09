@@ -49,14 +49,17 @@
   <PARAM id="osc1Level" value="1.0"/>
   <PARAM id="osc1On" value="1.0"/>
   <PARAM id="osc1Tune" value="0.0"/>
+  <PARAM id="osc1TuneZoom" value="0.0"/>
   <PARAM id="osc2Harmonics" value="9.0"/>
   <PARAM id="osc2Level" value="0.0"/>
   <PARAM id="osc2On" value="1.0"/>
   <PARAM id="osc2Tune" value="0.0299992561340332"/>
+  <PARAM id="osc2TuneZoom" value="0.0"/>
   <PARAM id="osc3Harmonics" value="6.0"/>
   <PARAM id="osc3Level" value="0.25"/>
   <PARAM id="osc3On" value="1.0"/>
   <PARAM id="osc3Tune" value="0.01999998092651367"/>
+  <PARAM id="osc3TuneZoom" value="0.0"/>
   <PARAM id="volume" value="0.3199999928474426"/>
   <WAVE oscillator="0" points="2048......r.pb1ySwwgO1EhZ9v0ka5SIxFrOWcz497uGF7CB+fwOMgeJ+v9O67ypKvzOJHEW+TjBr8iYrr2OnhMg+zUxK9SokI4O.sJl+PFld9ytqP5OeQVp+HdPt9yODK6Ocuts+vXt59iet36OEwTv+fLED+CPJZ7Os7Jx+rkgJ+SwRv7OfdUy+LEVN+yVX77Obs4y+nP4O+yG4+7Ons8y+L5iO+igY77O7xmy+LMuM+SQcy7OgE9x+3EyJ+CPgl7OfKFx+v9DG+y11V7O42Dw+j01B+y1fE7Os.9u+nrV99y+Qy6Omazt+zlt49SVsf6ODAps+r5D09C4GN6Omzer+r4bv9CSq65OxPVq+zi2q9SRYo5O3TMp+HdTm9iFOW5O9xDo+.qxh9SzHE5OSb7m+TWQd9S9Cy4O2Jzl+zbvY9CZAg4OHGrk+TyPU9i.FO4OOpjj+LTzP9CjZ83Oradi+3rcL9yrJr3OTLZh+rFPH9CJia3O8tXg+LnND9y0uK3O8uZf+Xya.9iTy42OaaAe+fQx48i4Id2OIjUc+DgMy8CbfD2Oocwa+HhFs8ykmr1On5SZ+bgWm8CiDV1ObB6X+TL3g8ChS.1OMcjW+fndb8Cpqp0OvjMV+bZ.W8CqiT0O72yT+j1SQ8S7V8zOzNUS+fOQK8iMpjzOYLvQ+f2yD8yVOJzOHLDP+3t587isGtyO3nQN+v2n17yrjPyO+7YL+.JEu7idFxxORZeJ+fqYm7C1XSxOi6jH+Dsxe7ClN0wOivsF+HUcX7S6aXwOkF8D+..lQ7yZv8vOcvUC+TBWK7CUwkvOJw4A+nV2E7i1zPvOEJp.+XgIA7y488uOehM+9fiV56yH.fuOfcb89bIqy6SBrFuOqF769bR5s6y9cvtOmsk593Imn6irbatOEaQ49veQi6ikkEtOJD229n+Xc6CW5rsOuAO19rsfV6SqtOsOnESz9DQRN6SJzrrODG+w93WfD6ygiCrOehQu9LgH45SvATqOPnKr9PdSr5yn.epOeXwn9boTd5in5koOhLIk9DTnO5SVppnOiOag9n1v.5SA8dmOgUga97olj4iQWskOyTkT9DcmI4iu4DjOhCSN9vhhw3CjKohOSn2H9nWFc3ChrbgOwRaD9rjrL3CbjffOMj.A97MW.3y81neOf6G88DGgu2iu3rdODs348XbZj2iz.GdOju228XXgc2itGucOcvh18LCmX2ytAbcOLaT08jhUS2SkaDcOqOny8nVeK2i32ebOhS9v8v9M+1CglmaOvg9r8.5Ms1SbPWZOIFam8n91T1i8RsXOXwQf8z7er0yLOVUOB6WO8XfZjzCruoPOBL127rxonxiSvGFOoTo36X7PeRRJUJ9tNAeX7txonxq.i8Muv9lB8ZfZjzqv90Suy7XU817er0KVbDXu1K0h8p91T1ahw1YuwAco8B5Ms1KbnOauDZdt8x9M+1q3jObuhe+w8pVeK265C5buUtQz8lhUS2KyFUcu6Fv08NCmX2aGrncu5d718ZXgc2K468cuRCb38ZbZj2KQKddu9hy58FGgu2K39Qeu2ai989MW.3aCIPfuvQBB9tjrL3arzFguHxxE9pWFc36D5MhuPtjJ9xhhw3q3vjiu9lSP9FcmI46LUIkuFc0V99olj4aXU3luEz6c9p1v.563yVnuYoph9FTnO5qHSRouhpWl9doTd56GVLpuiB7o9RdSr5KD5BquAGPs9NgH456mXzquGNNv95WfD6KwweruoPyx9FQRN6KZwDsus59z9tsfV66avisuboy19p+Xc6qBw8suVVV39xeQi6awVTtuxxs495Imn66Yaotu62A69dR5s66pA+tuIvZ79dIqy6KXGWuui..99hiV566mXyuum22+9ZgIA7aghJvuZSCA+pV2E7qRbdvuTEWB+VBWK7aGb0vuqA2C+B.lQ7aoQOwusugE+JUcX76HbqwuX5TG+Fsxe763NIxuXiMI+hqYm7qj1mxu5YHK+BJEu76OeFyuyRBM+x2n17KNZjyu1d3N+5t587KBCAzua8nP+h2yD8aFCbzu1nRR+hOQK8KsS0zuwa0S+l1SQ8K+8L0urNRU+dZ.W8KLYi0untpV+hndb8aSG40uHNAX+VL3g8KmvN1uLRXY+dgWm8Kp9j1uWdxZ+JhFs8aZW71uvARb+FgMy8aBYU2ulm3c+hQx4861Vv2uRMme+Zya.9a+qF3uW+tf+NnND9auKV3unLtg+tFPH9KEil3uypvh+5rcL9K6l23uPp0i+NTzP96iJI4uBX7j+VyPU9KxAa4unEDl+1bvY96sBs4u4OLm+VWQd96DG+4uQiTn+Bqxh9quLQ5uZ7bo+JdTm9KNUi5uIkkp+1i2q9qLj05uLstq+t4bv96I8G6uje3r+t5D09KQfZ6uY0Bt+1lt4964Fs6u+GMu+prV99aKf+6uaCVv+l01B+a9MQ7uaaaw+x9DG+K3hg7u.EZx+5EyJ+aXgu7uE0My+NMuM+Ku747uFlwy+N5iO+KZa+7uej+y+pP4O+KWa97uagwy+NEVN+KnW07uEKAy+tkgJ+aKuh7u.onw+hLED+aQLE7u94hu+xXt59a2qa6u+Prr+JdPt96Wjk5u6tBo+RFld9KPqh4ukVlj+1UxK9KpXS3ulwxd+VjBr8qBRw0uqt.S+x9O67aS3mxuH7CF+9uGF76UGctukHav9x0ka5qcgnluOEGG9t.pb1K"
         preset="" stepped="0" steps="8"/>

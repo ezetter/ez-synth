@@ -186,14 +186,15 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
     // either is. An LFO that's switched off moves nothing. A control given a phase follows where its LFO was that much
-    // of a period ago. Once the key is let go, an envelope brings the control steadily down to rest.
-    const auto modulate = [this, &lfoPeriodsGone] (int target, float position)
+    // of a period ago. Once the key is let go, an envelope brings the control steadily down to rest. Each moves it
+    // by its range times the scale given, which is less than 1 for an oscillator's tune with its slider zoomed in.
+    const auto modulate = [this, &lfoPeriodsGone] (int target, float position, float scale = 1.0f)
     {
         if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
-            position += byVelocity.offset (noteVelocity);
+            position += scale * byVelocity.offset (noteVelocity);
 
         if (const auto& byModWheel = patch.modWheelAssignments[(size_t) target]; byModWheel.isActive())
-            position += byModWheel.offset (patch.modWheel);
+            position += scale * byModWheel.offset (patch.modWheel);
 
         const auto& assignment = patch.assignments[(size_t) target];
 
@@ -201,7 +202,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         {
             const auto& run = envelopeRuns[(size_t) (assignment.source - numLfos)];
             return applyEnvelope (target, assignment, position,
-                                  { run.getLevel(), run.hasBeenReleased(), run.getReleaseFrom(), run.getReleaseLeft() });
+                                  { run.getLevel(), run.hasBeenReleased(), run.getReleaseFrom(), run.getReleaseLeft() }, scale);
         }
 
         if (assignment.isActive() && patch.lfos[(size_t) assignment.source].on)
@@ -212,7 +213,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                              : lfo.fromKey  ? randomwave::fromKeyValueAt (randomSeeds[(size_t) assignment.source], periodsGone,
                                                                           lfo.drawing, lfo.times)
                                             : randomwave::valueAt (lfo.seed, periodsGone, lfo.drawing);
-            position += assignment.offset (value);
+            position += scale * assignment.offset (value);
         }
 
         return keepInTravel (target, position);
@@ -230,8 +231,10 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     {
         const auto& oscillator = patch.oscillators[(size_t) i];
 
-        // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on.
-        targets.tunes[(size_t) i] = tuning::fromPosition (modulate (oscillatorTuneTarget (i), tuning::toPosition (oscillator.tune)));
+        // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on. Its zoom
+        // sets how far modulation moves it.
+        targets.tunes[(size_t) i] = tuning::fromPosition (modulate (oscillatorTuneTarget (i), tuning::toPosition (oscillator.tune),
+                                                                    tuning::getModulationScale (oscillator.tuneReach)));
 
         if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
             continue;

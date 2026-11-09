@@ -60,6 +60,12 @@ namespace tuning
         return widestReach * std::pow (narrowestReach / widestReach, juce::jlimit (0.0f, 1.0f, zoom));
     }
 
+    juce::String reachToText (float reach)
+    {
+        return juce::String (juce::CharPointer_UTF8 ("\xc2\xb1"))
+             + (toWholeSemitones (reach).has_value() ? juce::String (juce::roundToInt (reach)) : juce::String (reach, 1)) + " st";
+    }
+
     Window getWindow (float semitones, float reach)
     {
         reach = juce::jlimit (narrowestReach, widestReach, reach);

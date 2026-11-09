@@ -168,7 +168,12 @@ namespace
                             const auto size = text.retainCharacters ("0123456789.").getFloatValue();
                             const auto negative = text.containsChar ('-') || text.contains (juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x92")));
                             return negative ? -size : size;
-                        }))));
+                        })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::tuneZoomId (i), 1 }, name + " Tune Zoom",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float zoom, int) { return tuning::reachToText (tuning::zoomToReach (zoom)); }))));
         }
 
         // Both filters start switched out, a low pass and a high pass, at cutoffs that change the sound clearly once
@@ -268,6 +273,7 @@ juce::String SynthProcessor::onId (int oscillator)          { return modulation:
 juce::String SynthProcessor::levelId (int oscillator)       { return modulation::getKey (modulation::oscillatorLevelTarget (oscillator)); }
 juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation::getKey (modulation::oscillatorHarmonicsTarget (oscillator)); }
 juce::String SynthProcessor::tuneId (int oscillator)        { return modulation::getKey (modulation::oscillatorTuneTarget (oscillator)); }
+juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (oscillator) + "Zoom"; }
 
 SynthProcessor::FilterIds SynthProcessor::filterIds (int filter)
 {
@@ -297,7 +303,8 @@ SynthProcessor::SynthProcessor()
         oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
                                              parameters.getRawParameterValue (levelId (i)),
                                              parameters.getRawParameterValue (harmonicsId (i)),
-                                             parameters.getRawParameterValue (tuneId (i)) };
+                                             parameters.getRawParameterValue (tuneId (i)),
+                                             parameters.getRawParameterValue (tuneZoomId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -578,6 +585,7 @@ void SynthProcessor::updatePatch()
         oscillator.level = source.level->load();
         oscillator.numHarmonics = juce::jlimit (1, waveform::maxHarmonics, juce::roundToInt (source.numHarmonics->load()));
         oscillator.tune = source.tune->load();
+        oscillator.tuneReach = tuning::zoomToReach (source.tuneZoom->load());
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
@@ -1001,22 +1009,27 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
     if (const auto info = modulation::describe (target); info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
         return std::nullopt;
 
-    // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope.
+    // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope,
+    // each across less of an oscillator's tune when its slider's zoomed in.
     auto position = getPosition (target);
     auto moved = false;
+    const auto info = modulation::describe (target);
+    const auto scale = info.kind == modulation::Kind::oscillatorTune
+                           ? tuning::getModulationScale (tuning::zoomToReach (parameters.getRawParameterValue (tuneZoomId (info.oscillator))->load()))
+                           : 1.0f;
 
     if (const auto& byVelocity = velocityAssignments[(size_t) target]; byVelocity.isActive())
     {
         if (const auto velocity = getSourceValue (modulation::velocitySource))
         {
-            position += byVelocity.offset (*velocity);
+            position += scale * byVelocity.offset (*velocity);
             moved = true;
         }
     }
 
     if (const auto& byModWheel = modWheelAssignments[(size_t) target]; byModWheel.isActive())
     {
-        position += byModWheel.offset (modWheelShown.load());
+        position += scale * byModWheel.offset (modWheelShown.load());
         moved = true;
     }
 
@@ -1025,11 +1038,11 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
         if (modulation::isEnvelope (assignment.source))
         {
             if (const auto envelope = getEnvelopeDisplay (assignment.source - numLfos))
-                return modulation::applyEnvelope (target, assignment, position, envelope->getState());
+                return modulation::applyEnvelope (target, assignment, position, envelope->getState(), scale);
         }
         else if (const auto lfo = getSourceValue (assignment.source, assignment.phase))
         {
-            position += assignment.offset (*lfo);
+            position += scale * assignment.offset (*lfo);
             moved = true;
         }
     }
