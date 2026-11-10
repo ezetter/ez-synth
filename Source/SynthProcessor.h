@@ -149,6 +149,32 @@ public:
     /** How many times an oscillator's randomizing has been triggered and carried out. */
     int getRandomizeCount (int oscillator) const noexcept   { return randomizeCounts[(size_t) oscillator]; }
 
+    //==============================================================================
+    // MIDI learn: linking a control to a knob or slider on a MIDI controller, which then sets it, across its whole
+    // travel from 0 to 127. Each MIDI controller number sets one control. The links belong to this copy of the synth,
+    // saved with a host's project but not with presets, so they stay as presets are loaded and changes undone.
+
+    /** The MIDI controller numbers that can be learned: all but the channel mode messages, 120 up. */
+    static constexpr int numLearnableControllers = 120;
+
+    /** Waits for the next MIDI controller moved, and links it to a control, in place of any other it set. */
+    void startMidiLearn (int target);
+    void stopMidiLearn();
+    std::optional<int> getMidiLearnTarget() const noexcept;
+
+    /** The MIDI controller number linked to a control, if any. */
+    std::optional<int> getMidiController (int target) const noexcept;
+    void setMidiController (int target, std::optional<int> controller);
+
+    /** Goes up whenever a link is learned or forgotten, or learning starts or stops, for the window to show it. */
+    int getMidiLearnVersion() const noexcept   { return midiLearnVersion; }
+
+    /** Sets each linked control from where its MIDI controller has been moved to, since this was last called, and
+        links the control being learned to the first controller moved. The message thread does this a few dozen
+        times a second.
+    */
+    void applyMidiControllers();
+
     /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 
@@ -578,6 +604,17 @@ private:
     std::array<std::atomic<int>, numOscillators> randomizeRequests {};
     std::array<int, numOscillators> randomizeRequestsDone {}, randomizeCounts {};
     juce::Random randomizer;
+
+    // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the
+    // first moved while a control's being learned; the message thread links and sets the controls.
+    std::array<std::atomic<int>, numLearnableControllers> controllerValues {}, controllerMoves {};
+    std::atomic<int> learningTarget { -1 }, learnedController { -1 };
+    std::array<int, modulation::numTargets> targetControllers {}, appliedMoves {};
+    std::array<modulation::ThresholdCrossing, numOscillators> controllerRandomizeCrossings {};
+    int midiLearnVersion = 0;
+
+    /** Sets a control to a position along its travel, from 0 to 1, as a MIDI controller does. */
+    void setTargetPosition (int target, float position);
     std::atomic<bool> noteSounding { false };
     std::atomic<float> newestVelocity { 1.0f };
     std::atomic<float> modWheelShown { 0.0f };

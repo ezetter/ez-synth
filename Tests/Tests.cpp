@@ -3279,6 +3279,117 @@ namespace
         }
     }
 
+    /** Moves MIDI controllers, as a block of MIDI, then has the message thread carry out what they set. */
+    void moveControllers (SynthProcessor& synth, const std::vector<std::pair<int, int>>& moves)
+    {
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        juce::MidiBuffer midi;
+        int position = 0;
+
+        for (const auto& [controller, value] : moves)
+            midi.addEvent (juce::MidiMessage::controllerEvent (1, controller, value), position++);
+
+        synth.processBlock (buffer, midi);
+        synth.applyMidiControllers();
+        synth.randomizeAsTriggered();
+    }
+
+    void testMidiLearn()
+    {
+        std::cout << "MIDI learn" << std::endl;
+
+        SynthProcessor synth;
+        const auto cutoff = modulation::filterCutoffTarget (0);
+        const auto cutoffParameter = synth.parameters.getParameter (SynthProcessor::filterIds (0).cutoff);
+
+        check (! synth.getMidiController (cutoff).has_value() && ! synth.getMidiLearnTarget().has_value(),
+               "to start with, no control is linked to a MIDI controller");
+
+        // Moving a controller while nothing's being learned sets nothing.
+        const auto before = cutoffParameter->getValue();
+        moveControllers (synth, { { 74, 10 } });
+        check (juce::exactlyEqual (cutoffParameter->getValue(), before), "a controller that isn't linked sets nothing");
+
+        // Learning: the first controller moved is linked, and sets the control straight away.
+        synth.startMidiLearn (cutoff);
+        check (synth.getMidiLearnTarget() == cutoff, "learning waits for a controller to be moved");
+        moveControllers (synth, { { 74, 100 }, { 75, 3 } });
+        check (synth.getMidiController (cutoff) == 74 && ! synth.getMidiLearnTarget().has_value(),
+               "the first controller moved is linked to the control, and learning stops");
+        check (isNear (cutoffParameter->getValue(), 100.0 / 127.0, 1.0e-4), "...and sets it straight away");
+
+        moveControllers (synth, { { 74, 0 } });
+        check (juce::exactlyEqual (cutoffParameter->getValue(), 0.0f), "the controller then sets the control across its whole travel");
+        moveControllers (synth, { { 75, 127 } });
+        check (juce::exactlyEqual (cutoffParameter->getValue(), 0.0f), "...and no other controller does");
+
+        // The channel mode messages, such as all notes off, can't be learned.
+        synth.startMidiLearn (modulation::volumeTarget);
+        moveControllers (synth, { { 123, 0 } });
+        check (synth.getMidiLearnTarget() == modulation::volumeTarget && ! synth.getMidiController (modulation::volumeTarget).has_value(),
+               "channel mode messages, 120 up, aren't learned");
+        synth.stopMidiLearn();
+
+        // A controller sets one control: linked to another, it's taken from the first.
+        synth.startMidiLearn (modulation::volumeTarget);
+        moveControllers (synth, { { 74, 64 } });
+        check (synth.getMidiController (modulation::volumeTarget) == 74 && ! synth.getMidiController (cutoff).has_value(),
+               "linking a controller to another control unlinks it from the first");
+
+        synth.setMidiController (modulation::volumeTarget, std::nullopt);
+        check (! synth.getMidiController (modulation::volumeTarget).has_value(), "a link can be forgotten");
+
+        // Controls that aren't parameters: a harmonic's amplitude, tune and phase, and randomizing.
+        synth.setMidiController (modulation::harmonicTarget (0, 2), 20);
+        synth.setMidiController (modulation::harmonicTuneTarget (0, 2), 21);
+        synth.setMidiController (modulation::harmonicPhaseTarget (0, 3), 22);
+        moveControllers (synth, { { 20, 127 }, { 21, 0 }, { 22, 32 } });
+        check (isNear (synth.getDecomposition (0).harmonics[1].amplitude, waveform::maxAmplitude, 0.01)
+                 && isNear (synth.getHarmonicTune (0, 2), -waveform::furthestTune, 1.0e-5),
+               "a controller sets a harmonic's amplitude and tune across their travel");
+        check (isNear (synth.getHarmonicPhase (0, 3), 32.0 / 127.0 * juce::MathConstants<double>::twoPi, 0.01),
+               "...and its phase round its turn");
+
+        synth.setMidiController (modulation::randomizeTarget (1), 23);
+        const auto randomized = synth.getShape (1);
+        moveControllers (synth, { { 23, 10 } });
+        moveControllers (synth, { { 23, 100 } });
+        const auto afterFirst = synth.getShape (1);
+        moveControllers (synth, { { 23, 110 } });
+        check (afterFirst != randomized && synth.getShape (1) == afterFirst,
+               "a controller randomizes the harmonics as it's moved past halfway, and not again until it's back");
+
+        // A synced LFO's rate dial sets the cycles a beat.
+        setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
+        synth.setMidiController (modulation::lfoRateTarget (0), 24);
+        moveControllers (synth, { { 24, 127 } });
+        check (juce::exactlyEqual (synth.parameters.getParameter (SynthProcessor::lfoBeatRateId (0))->getValue(), 1.0f),
+               "a controller linked to a synced LFO's rate sets its cycles a beat");
+
+        // The links go with a host's project, and stay as presets are loaded and changes undone.
+        synth.setMidiController (cutoff, 74);
+        juce::MemoryBlock state;
+        synth.getStateInformation (state);
+        SynthProcessor loaded;
+        loaded.setStateInformation (state.getData(), (int) state.getSize());
+        check (loaded.getMidiController (cutoff) == 74 && loaded.getMidiController (modulation::harmonicTarget (0, 2)) == 20,
+               "the links are saved with a host's project");
+
+        loaded.loadFactoryPreset ("Grand Piano");
+        loaded.loadInitPreset();
+        check (loaded.getMidiController (cutoff) == 74, "loading a preset keeps the links");
+
+        // The modulation editor's Learn button starts learning, and closing it stops.
+        {
+            auto editor = std::make_unique<ModulationEditor> (loaded, modulation::volumeTarget);
+            editor->learnButton.onClick();
+            check (loaded.getMidiLearnTarget() == modulation::volumeTarget, "the modulation editor's Learn button starts learning");
+            editor.reset();
+            check (! loaded.getMidiLearnTarget().has_value(), "...and closing the editor stops");
+        }
+    }
+
     void testMidiInputs()
     {
         std::cout << "MIDI devices in the standalone app" << std::endl;
@@ -4145,7 +4256,9 @@ namespace
             modulationEditor.setLookAndFeel (nullptr);
         };
 
+        synth.setMidiController (modulation::filterCutoffTarget (0), 74);
         saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
+        synth.setMidiController (modulation::filterCutoffTarget (0), std::nullopt);
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
         saveModulationEditor (modulation::lfoRateTarget (0), "11b-modulation-editor-lfo-rate");
         synth.setAssignment (modulation::randomizeTarget (0), { 1, 1.0f, false, 0.25f, 0.2f });
@@ -4362,6 +4475,7 @@ int main (int argc, char* argv[])
     testTuning();
     testGlide();
     testMidiInputs();
+    testMidiLearn();
     testPresets();
     testInit();
     testUndo();

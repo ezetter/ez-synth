@@ -7,12 +7,17 @@
 
 /** Sets what moves a control: an LFO or envelope, with how far and which way, the key velocity, with how far, and
     the mod wheel, with how far and which way. It opens next to the control when the control is right-clicked or
-    Control-clicked.
+    Control-clicked. At its foot, Learn links the control to the next knob or slider moved on a MIDI controller.
 */
-class ModulationEditor final : public juce::Component
+class ModulationEditor final : public juce::Component,
+                               private juce::Timer
 {
 public:
     ModulationEditor (SynthProcessor&, int target);
+    ~ModulationEditor() override;
+
+    /** The buttons that learn which MIDI controller sets the control, and forget it. */
+    juce::TextButton learnButton { "Learn" }, forgetButton { "Forget" };
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -46,6 +51,11 @@ private:
     juce::String describeSource() const;
     juce::String describeVelocity() const;
     juce::String describeModWheel() const;
+    juce::String describeMidiLearn() const;
+
+    /** Shows whether the control's linked to a MIDI controller, or waiting to learn one. */
+    void showMidiLearn();
+    void timerCallback() override;
 
     SynthProcessor& synthProcessor;
     const int target;
@@ -58,7 +68,9 @@ private:
     /** The mod wheel moves a control up as it's pushed up, or down if inverted. */
     Section modWheel { { "Off", "On" }, false, true };
 
-    juce::Rectangle<int> titleArea, dividerArea, secondDividerArea;
+    juce::Rectangle<int> titleArea, dividerArea, secondDividerArea, thirdDividerArea, midiCaptionArea, midiStatusArea,
+                         midiDescriptionArea;
+    int shownMidiLearnVersion = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationEditor)
 };

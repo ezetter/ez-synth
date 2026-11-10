@@ -390,7 +390,11 @@ SynthProcessor::SynthProcessor()
     initState = createState();
     undoHistory.push_back (initState);
 
-    // The audio thread asks for oscillators' harmonics to be randomized; the message thread does it.
+    // No control is linked to a MIDI controller until one's learned.
+    targetControllers.fill (-1);
+
+    // The audio thread asks for oscillators' harmonics to be randomized, and passes on MIDI controllers moved; the
+    // message thread carries them out.
     startTimerHz (60);
 }
 
@@ -445,10 +449,26 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     for (const auto metadata : midi)
     {
-        if (const auto message = metadata.getMessage(); message.isNoteOn())
+        const auto message = metadata.getMessage();
+
+        if (message.isNoteOn())
         {
             lastNote = message.getNoteNumber();
             lastNoteOnSample = samplesPlayed + metadata.samplePosition;
+        }
+
+        // Where each controller's been put, for the controls linked to it, and the first moved while learning.
+        if (message.isController() && message.getControllerNumber() < numLearnableControllers)
+        {
+            const auto number = (size_t) message.getControllerNumber();
+            controllerValues[number] = message.getControllerValue();
+            ++controllerMoves[number];
+
+            if (learningTarget >= 0)
+            {
+                auto none = -1;
+                learnedController.compare_exchange_strong (none, (int) number);
+            }
         }
     }
 
@@ -614,6 +634,116 @@ void SynthProcessor::randomizeAsTriggered()
 void SynthProcessor::timerCallback()
 {
     randomizeAsTriggered();
+    applyMidiControllers();
+}
+
+//==============================================================================
+void SynthProcessor::startMidiLearn (int target)
+{
+    learnedController = -1;
+    learningTarget = target;
+    ++midiLearnVersion;
+}
+
+void SynthProcessor::stopMidiLearn()
+{
+    learningTarget = -1;
+    learnedController = -1;
+    ++midiLearnVersion;
+}
+
+std::optional<int> SynthProcessor::getMidiLearnTarget() const noexcept
+{
+    const auto target = learningTarget.load();
+    return target >= 0 ? std::optional (target) : std::nullopt;
+}
+
+std::optional<int> SynthProcessor::getMidiController (int target) const noexcept
+{
+    const auto controller = targetControllers[(size_t) target];
+    return controller >= 0 ? std::optional (controller) : std::nullopt;
+}
+
+void SynthProcessor::setMidiController (int target, std::optional<int> controller)
+{
+    // A controller sets one control, so linking it to this one unlinks it from any other.
+    if (controller.has_value())
+        for (auto& linked : targetControllers)
+            if (linked == *controller)
+                linked = -1;
+
+    targetControllers[(size_t) target] = controller.has_value() && *controller >= 0 && *controller < numLearnableControllers ? *controller : -1;
+
+    // The control waits for its controller to be moved before following it.
+    if (controller.has_value())
+        appliedMoves[(size_t) target] = controllerMoves[(size_t) *controller].load();
+
+    ++midiLearnVersion;
+}
+
+void SynthProcessor::applyMidiControllers()
+{
+    // The controller moved to teach a control sets it straight away.
+    if (const auto target = learningTarget.load(); target >= 0)
+    {
+        if (const auto controller = learnedController.load(); controller >= 0)
+        {
+            setMidiController (target, controller);
+            appliedMoves[(size_t) target] = controllerMoves[(size_t) controller].load() - 1;
+            stopMidiLearn();
+        }
+    }
+
+    for (size_t target = 0; target < targetControllers.size(); ++target)
+    {
+        const auto controller = targetControllers[target];
+
+        if (controller < 0)
+            continue;
+
+        if (const auto moves = controllerMoves[(size_t) controller].load(); moves != appliedMoves[target])
+        {
+            appliedMoves[target] = moves;
+            setTargetPosition ((int) target, (float) controllerValues[(size_t) controller].load() / 127.0f);
+        }
+    }
+}
+
+void SynthProcessor::setTargetPosition (int target, float position)
+{
+    position = juce::jlimit (0.0f, 1.0f, position);
+    const auto info = modulation::describe (target);
+
+    switch (info.kind)
+    {
+        // Randomizing is triggered by the controller crossing halfway, either way.
+        case modulation::Kind::randomize:
+            if (controllerRandomizeCrossings[(size_t) info.oscillator].update (position, 0.5f, 0.5f))
+                randomizeHarmonics (info.oscillator, randomizer);
+            return;
+
+        case modulation::Kind::harmonic:
+            setHarmonicAmplitude (info.oscillator, info.harmonic, modulation::amplitudeRange().convertFrom0to1 (position));
+            return;
+
+        case modulation::Kind::harmonicTune:
+            setHarmonicTune (info.oscillator, info.harmonic, (position - 0.5f) * 2.0f * waveform::furthestTune);
+            return;
+
+        case modulation::Kind::harmonicPhase:
+            setHarmonicPhase (info.oscillator, info.harmonic, position * juce::MathConstants<float>::twoPi);
+            return;
+
+        default:
+            break;
+    }
+
+    // A synced LFO's rate dial sets the cycles a beat.
+    const auto id = info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo) ? lfoBeatRateId (info.lfo)
+                                                                                     : modulation::getKey (target);
+
+    if (auto* parameter = parameters.getParameter (id))
+        parameter->setValueNotifyingHost (position);
 }
 
 void SynthProcessor::shareNewestNote()
@@ -1318,14 +1448,49 @@ void SynthProcessor::share()
 //==============================================================================
 void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (const auto xml = createState().createXml())
+    // The MIDI learn links go with a host's project, but not into presets or the undo history.
+    auto state = createState();
+    juce::ValueTree links ("MIDILEARN");
+
+    for (int target = 0; target < modulation::numTargets; ++target)
+    {
+        if (const auto controller = getMidiController (target))
+        {
+            juce::ValueTree link ("LINK");
+            link.setProperty ("target", modulation::getKey (target), nullptr);
+            link.setProperty ("controller", *controller, nullptr);
+            links.appendChild (link, nullptr);
+        }
+    }
+
+    state.appendChild (links, nullptr);
+
+    if (const auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
 void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    if (const auto xml = getXmlFromBinary (data, sizeInBytes); xml != nullptr && xml->hasTagName (parameters.state.getType()))
-        loadState (juce::ValueTree::fromXml (*xml));
+    const auto xml = getXmlFromBinary (data, sizeInBytes);
+
+    if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+        return;
+
+    auto state = juce::ValueTree::fromXml (*xml);
+
+    // A project saved before MIDI learn has no links, and keeps those learned since.
+    if (const auto links = state.getChildWithName ("MIDILEARN"); links.isValid())
+    {
+        targetControllers.fill (-1);
+
+        for (const auto& link : links)
+            if (const auto target = modulation::findTarget (link["target"].toString()))
+                setMidiController (*target, (int) link["controller"]);
+
+        state.removeChild (links, nullptr);
+    }
+
+    loadState (state);
 }
 
 juce::ValueTree SynthProcessor::createState()

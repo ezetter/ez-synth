@@ -20,7 +20,74 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
     show (modWheel, synthProcessor.getModWheelAssignment (target));
-    setSize (470, 500);
+
+    // Learn waits for a MIDI controller to be moved; clicked again, it stops waiting.
+    for (auto* button : { &learnButton, &forgetButton })
+    {
+        button->setMouseClickGrabsKeyboardFocus (false);
+        button->setWantsKeyboardFocus (false);
+        addAndMakeVisible (button);
+    }
+
+    learnButton.setClickingTogglesState (false);
+    learnButton.onClick = [this]
+    {
+        if (synthProcessor.getMidiLearnTarget() == target)
+            synthProcessor.stopMidiLearn();
+        else
+            synthProcessor.startMidiLearn (target);
+
+        showMidiLearn();
+    };
+
+    forgetButton.onClick = [this]
+    {
+        synthProcessor.setMidiController (target, std::nullopt);
+        showMidiLearn();
+    };
+
+    showMidiLearn();
+    startTimerHz (15);
+    setSize (470, 574);
+}
+
+ModulationEditor::~ModulationEditor()
+{
+    // Closed while waiting to learn, it stops waiting.
+    if (synthProcessor.getMidiLearnTarget() == target)
+        synthProcessor.stopMidiLearn();
+}
+
+void ModulationEditor::timerCallback()
+{
+    if (synthProcessor.getMidiLearnVersion() != shownMidiLearnVersion)
+        showMidiLearn();
+}
+
+void ModulationEditor::showMidiLearn()
+{
+    shownMidiLearnVersion = synthProcessor.getMidiLearnVersion();
+    const auto learning = synthProcessor.getMidiLearnTarget() == target;
+    learnButton.setButtonText (learning ? "Cancel" : "Learn");
+    learnButton.setToggleState (learning, juce::dontSendNotification);
+    forgetButton.setEnabled (synthProcessor.getMidiController (target).has_value());
+    forgetButton.setAlpha (forgetButton.isEnabled() ? 1.0f : 0.4f);
+    repaint();
+}
+
+juce::String ModulationEditor::describeMidiLearn() const
+{
+    const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
+
+    if (synthProcessor.getMidiLearnTarget() == target)
+        return "Move a knob or slider on your MIDI controller to link it to the " + control + ".";
+
+    if (synthProcessor.getMidiController (target).has_value())
+        return modulation::isTrigger (target)
+                   ? juce::String ("Moving it past halfway, either way, randomizes the harmonics.")
+                   : "It sets the " + control + " across its whole travel, from 0 to 127.";
+
+    return "Click Learn, then move a knob or slider on your MIDI controller, to have it set the " + control + ".";
 }
 
 void ModulationEditor::setUp (Section& section)
@@ -317,6 +384,19 @@ void ModulationEditor::resized()
     secondDividerArea = area.removeFromTop (1);
     area.removeFromTop (11);
     layOut (modWheel, area);
+    area.removeFromTop (6);
+    thirdDividerArea = area.removeFromTop (1);
+    area.removeFromTop (11);
+
+    auto row = area.removeFromTop (26);
+    midiCaptionArea = row.removeFromLeft (104);
+    learnButton.setBounds (row.removeFromLeft (90));
+    row.removeFromLeft (8);
+    forgetButton.setBounds (row.removeFromRight (90));
+    row.removeFromRight (8);
+    midiStatusArea = row;
+    area.removeFromTop (8);
+    midiDescriptionArea = area.removeFromTop (20);
 }
 
 void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, const juce::String& choiceCaption,
@@ -373,4 +453,22 @@ void ModulationEditor::paint (juce::Graphics& g)
     g.fillRect (secondDividerArea);
 
     paintSection (g, modWheel, "MOD WHEEL", synthProcessor.getModWheelAssignment (target).isActive(), describeModWheel());
+
+    g.setColour (colours::outline);
+    g.fillRect (thirdDividerArea);
+
+    g.setFont (fonts::caption());
+    g.setColour (colours::dimText);
+    g.drawText ("MIDI CC", midiCaptionArea, juce::Justification::centredLeft);
+
+    const auto controller = synthProcessor.getMidiController (target);
+    const auto learning = synthProcessor.getMidiLearnTarget() == target;
+    g.setFont (fonts::body (13.0f));
+    g.setColour (learning ? colours::modulation : controller.has_value() ? colours::text : colours::dimText);
+    g.drawText (learning ? juce::String ("Waiting...") : controller.has_value() ? "CC " + juce::String (*controller) : juce::String ("Not linked"),
+                midiStatusArea, juce::Justification::centred);
+
+    g.setColour (colours::dimText);
+    g.setFont (fonts::body (12.5f));
+    g.drawFittedText (describeMidiLearn(), midiDescriptionArea, juce::Justification::topLeft, 1);
 }

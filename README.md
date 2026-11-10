@@ -316,6 +316,22 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   moved from it. The oscillator's card above follows along too. The grid stretches to fit a harmonic
   raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
+### MIDI learn
+
+- **Link a control to a knob or slider** on a MIDI controller: right-click, or Control-click, the control,
+  click **Learn** at the foot of the window that opens, and move the knob. The control follows it from then
+  on, across its whole travel, from 0 at one end to 127 at the other. The window shows which controller it
+  is, such as *CC 74*; click **Learn** again before moving anything to cancel, or **Forget** to unlink it.
+- **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
+  each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
+  Linked to **Randomize**, a knob randomizes the harmonics each time it's turned past halfway, either way.
+- **One control for each controller.** Linking a controller to a second control unlinks it from the first.
+  Controllers 120 and up, such as All Notes Off, can't be learned. The mod wheel, controller 1, can, though
+  it also goes on moving whatever it's set to move as a modulator.
+- **The links belong to this copy of EZ Synth**, rather than the sound: a host saves them with its project,
+  and they stay as presets are loaded and changes are undone. A controller sets its control a few dozen
+  times a second, from the window's thread, and its moves aren't steps of their own to undo.
+
 ### Undo
 
 **Command-Z** undoes the last change to the sound, whatever it was: a knob, a slider, a switch, a drawn wave,
