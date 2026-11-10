@@ -1,6 +1,7 @@
 #include "TuneSlider.h"
 
 #include "Modulation.h"
+#include "SynthProcessor.h"
 #include "SynthLookAndFeel.h"
 
 namespace
@@ -68,21 +69,63 @@ TuneSlider::TuneSlider()
     zoomSlider.onValueChange = [this] { moveWindow(); };
     addAndMakeVisible (zoomSlider);
 
+    glideMode.onChoose = [this] (int index)
+    {
+        if (glideModeAttachment != nullptr)
+            glideModeAttachment->setValueAsCompleteGesture ((float) index);
+    };
+    addAndMakeVisible (glideMode);
+
+    glideTimeSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    glideTimeSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    glideTimeSlider.setColour (juce::Slider::trackColourId, colours::dimText);
+    glideTimeSlider.setMouseClickGrabsKeyboardFocus (false);
+    glideTimeSlider.setWantsKeyboardFocus (false);
+    glideTimeSlider.onValueChange = [this] { repaint (glideValueArea); };
+    addAndMakeVisible (glideTimeSlider);
+
     moveWindow();
 }
 
-void TuneSlider::setOscillator (juce::RangedAudioParameter& tuneParameter, juce::RangedAudioParameter& zoomParameter, int oscillator)
+void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, int oscillator)
 {
-    slider.setTitle ("Osc " + juce::String (oscillator + 1) + " tune");
-    zoomSlider.setTitle ("Osc " + juce::String (oscillator + 1) + " tune zoom");
+    const auto name = "Osc " + juce::String (oscillator + 1);
+    slider.setTitle (name + " tune");
+    zoomSlider.setTitle (name + " tune zoom");
+    glideMode.setTitle (name + " glide");
+    glideTimeSlider.setTitle (name + " glide time");
     modulatable::setTarget (slider, modulation::oscillatorTuneTarget (oscillator));
 
     attachment.reset();
     zoomAttachment.reset();
-    attachment = std::make_unique<juce::ParameterAttachment> (tuneParameter, [this] (float semitones) { showTune (semitones); });
+    glideModeAttachment.reset();
+    glideTimeAttachment.reset();
+
+    attachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneId (oscillator)),
+                                                              [this] (float semitones) { showTune (semitones); });
     attachment->sendInitialUpdate();
-    zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (zoomParameter, zoomSlider);
+    zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneZoomId (oscillator)),
+                                                                        zoomSlider);
+
+    // The glide's time is greyed out while it's off.
+    glideModeAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::glideId (oscillator)),
+                                                                       [this] (float value)
+                                                                       {
+                                                                           glideMode.setChosen (juce::roundToInt (value));
+                                                                           glideTimeSlider.setEnabled (juce::roundToInt (value) != 0);
+                                                                           glideTimeSlider.setAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f);
+                                                                           repaint();
+                                                                       });
+    glideModeAttachment->sendInitialUpdate();
+    glideTimeAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::glideTimeId (oscillator)),
+                                                                             glideTimeSlider);
+    glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
     moveWindow();
+}
+
+int TuneSlider::getGlideMode() const noexcept
+{
+    return glideMode.getChosen();
 }
 
 void TuneSlider::setZoom (float zoom)
@@ -136,7 +179,16 @@ void TuneSlider::resized()
     area.removeFromTop (3);
 
     slider.setBounds (area.removeFromTop (22));
-    tickArea = area;
+    tickArea = area.removeFromTop (16);
+    area.removeFromTop (6);
+
+    auto glideRow = area.removeFromTop (22);
+    glideCaptionArea = glideRow.removeFromLeft (48);
+    glideMode.setBounds (glideRow.removeFromLeft (156));
+    glideRow.removeFromLeft (10);
+    glideValueArea = glideRow.removeFromRight (56);
+    glideRow.removeFromRight (8);
+    glideTimeSlider.setBounds (glideRow);
 }
 
 void TuneSlider::paint (juce::Graphics& g)
@@ -147,6 +199,7 @@ void TuneSlider::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
     g.drawText ("TUNE", captionArea, juce::Justification::centredLeft);
     g.drawText ("ZOOM", zoomCaptionArea, juce::Justification::centredLeft);
+    g.drawText ("GLIDE", glideCaptionArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
     g.setColour (colours::text);
@@ -157,6 +210,8 @@ void TuneSlider::paint (juce::Graphics& g)
     g.setFont (fonts::body (12.0f));
     g.setColour (colours::dimText);
     g.drawText (tuning::reachToText ((window.high - window.low) / 2.0f), zoomValueArea, juce::Justification::centredRight);
+    g.setColour (colours::dimText.withAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f));
+    g.drawText (SynthProcessor::glideTimeToText ((float) glideTimeSlider.getValue()), glideValueArea, juce::Justification::centredRight);
 
     const auto ticksTop = (float) tickArea.getY();
     const auto xOf = [this] (float semitones) { return (float) slider.getX() + (float) slider.getPositionOfValue (semitones); };

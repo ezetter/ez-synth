@@ -5,11 +5,18 @@
 #include "Modulation.h"
 #include "Tuning.h"
 
+#include <optional>
+
 /** Everything the voices need to play a block: the oscillators, filters and volume as they're set, the LFOs and
     envelopes, and which controls they move. The processor fills it in on the audio thread before each block.
 */
 struct Patch
 {
+    /** Whether an oscillator slides into each note from the pitch of the note before: never, always, or only when
+        played legato, while another key is still held.
+    */
+    enum class Glide { off, always, legato };
+
     struct Oscillator
     {
         bool on = false;
@@ -21,6 +28,10 @@ struct Patch
             tune: a full range moves it across the part of the scale shown, rather than the whole two octaves.
         */
         float tuneReach = tuning::widestReach;
+
+        /** Whether it slides into each note from the one before, and how long the slide takes. */
+        Glide glide = Glide::off;
+        float glideSeconds = 0.2f;
 
         /** Each harmonic's amplitude, its phase, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phases {}, phaseSines {}, phaseCosines {};
@@ -78,6 +89,17 @@ struct Patch
 
     /** Where the mod wheel is, from 0 to 1, as the MIDI played so far has put it. */
     float modWheel = 0.0f;
+
+    /** Set just before a note starts, for its oscillators that glide: the pitch each oscillator of the note played
+        before had reached, as a MIDI note number, if a note has been played, and whether another key's still held.
+    */
+    struct NoteStart
+    {
+        std::array<std::optional<double>, modulation::numOscillators> glideFrom {};
+        bool legato = false;
+    };
+
+    NoteStart noteStart;
 
     /** Where an LFO's rate is set along its dial's travel, from the slowest at 0 to the fastest at 1. */
     float getLfoRatePosition (size_t lfo) const noexcept

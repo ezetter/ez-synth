@@ -48,6 +48,13 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   right out, a full range spans the whole two octaves; zoomed right in, to a semitone either side, an LFO at
   100% swings the tune a semitone either side of where it's set, so a range of 10% is a gentle vibrato of a
   tenth of a semitone. Zooming in or out while a sound plays rescales its modulation to match.
+- **Glide** into each note with the **Glide** row under the tune slider, separately for each oscillator.
+  **Off** plays each note at its pitch straight away. **Glide** slides the oscillator into every note from
+  the pitch of the note played before, even one already let go. **Legato** slides only into a note played
+  while another key's still held, so playing smoothly glides and playing detached doesn't. A note played
+  mid-glide slides on from wherever the glide had got to. The slider beside the buttons sets how long the
+  slide takes, from 5 ms to 5 seconds; double-click it for 200 ms. Since each oscillator has its own, one
+  can glide while another jumps straight to the note, or two can glide at different speeds.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Draw in steps.** **Draw** at the top right of the grid switches between **Smooth**, freehand drawing,

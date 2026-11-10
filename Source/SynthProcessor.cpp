@@ -173,7 +173,13 @@ namespace
                     juce::ParameterID { SynthProcessor::tuneZoomId (i), 1 }, name + " Tune Zoom",
                     juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f,
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float zoom, int) { return tuning::reachToText (tuning::zoomToReach (zoom)); }))));
+                        .withStringFromValueFunction ([] (float zoom, int) { return tuning::reachToText (tuning::zoomToReach (zoom)); })),
+                std::make_unique<juce::AudioParameterChoice> (
+                    juce::ParameterID { SynthProcessor::glideId (i), 1 }, name + " Glide", SynthProcessor::getGlideNames(), 0),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::glideTimeId (i), 1 }, name + " Glide Time", SynthProcessor::glideTimeRange(), 0.2f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); }))));
         }
 
         // Both filters start switched out, a low pass and a high pass, at cutoffs that change the sound clearly once
@@ -274,6 +280,24 @@ juce::String SynthProcessor::levelId (int oscillator)       { return modulation:
 juce::String SynthProcessor::harmonicsId (int oscillator)   { return modulation::getKey (modulation::oscillatorHarmonicsTarget (oscillator)); }
 juce::String SynthProcessor::tuneId (int oscillator)        { return modulation::getKey (modulation::oscillatorTuneTarget (oscillator)); }
 juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (oscillator) + "Zoom"; }
+juce::String SynthProcessor::glideId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Glide"; }
+juce::String SynthProcessor::glideTimeId (int oscillator)   { return glideId (oscillator) + "Time"; }
+
+juce::StringArray SynthProcessor::getGlideNames()   { return { "Off", "Glide", "Legato" }; }
+
+juce::NormalisableRange<float> SynthProcessor::glideTimeRange()
+{
+    // From 5 ms to 5 seconds, each step along the slider lengthening the glide by the same factor.
+    constexpr auto shortest = 0.005f, longest = 5.0f;
+    return { shortest, longest,
+             [] (float, float, float proportion) { return shortest * std::pow (longest / shortest, proportion); },
+             [] (float, float, float seconds) { return std::log (seconds / shortest) / std::log (longest / shortest); } };
+}
+
+juce::String SynthProcessor::glideTimeToText (float seconds)
+{
+    return seconds < 1.0f ? juce::String (juce::roundToInt (seconds * 1000.0f)) + " ms" : juce::String (seconds, 2) + " s";
+}
 
 SynthProcessor::FilterIds SynthProcessor::filterIds (int filter)
 {
@@ -304,7 +328,9 @@ SynthProcessor::SynthProcessor()
                                              parameters.getRawParameterValue (levelId (i)),
                                              parameters.getRawParameterValue (harmonicsId (i)),
                                              parameters.getRawParameterValue (tuneId (i)),
-                                             parameters.getRawParameterValue (tuneZoomId (i)) };
+                                             parameters.getRawParameterValue (tuneZoomId (i)),
+                                             parameters.getRawParameterValue (glideId (i)),
+                                             parameters.getRawParameterValue (glideTimeId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -586,6 +612,8 @@ void SynthProcessor::updatePatch()
         oscillator.numHarmonics = juce::jlimit (1, waveform::maxHarmonics, juce::roundToInt (source.numHarmonics->load()));
         oscillator.tune = source.tune->load();
         oscillator.tuneReach = tuning::zoomToReach (source.tuneZoom->load());
+        oscillator.glide = (Patch::Glide) juce::jlimit (0, 2, juce::roundToInt (source.glide->load()));
+        oscillator.glideSeconds = source.glideTime->load();
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)

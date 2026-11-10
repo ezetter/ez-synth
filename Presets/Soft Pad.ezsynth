@@ -45,16 +45,22 @@
   <PARAM id="lfo3Period" value="3.999999523162842"/>
   <PARAM id="lfo3Random" value="0.0"/>
   <PARAM id="lfo3Sync" value="0.0"/>
+  <PARAM id="osc1Glide" value="0.0"/>
+  <PARAM id="osc1GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc1Harmonics" value="5.0"/>
   <PARAM id="osc1Level" value="0.800000011920929"/>
   <PARAM id="osc1On" value="1.0"/>
   <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc1TuneZoom" value="0.0"/>
+  <PARAM id="osc2Glide" value="0.0"/>
+  <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc2Harmonics" value="9.0"/>
   <PARAM id="osc2Level" value="0.3499999940395355"/>
   <PARAM id="osc2On" value="1.0"/>
   <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc2TuneZoom" value="0.0"/>
+  <PARAM id="osc3Glide" value="0.0"/>
+  <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc3Harmonics" value="1.0"/>
   <PARAM id="osc3Level" value="0.5"/>
   <PARAM id="osc3On" value="1.0"/>

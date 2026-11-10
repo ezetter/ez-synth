@@ -48,6 +48,7 @@ namespace
 HarmonicVoice::HarmonicVoice (const Patch& patchToPlay)
     : patch (patchToPlay)
 {
+    glideLengths.fill (1.0);
     ownEnvelope.setParameters (normalEnvelope);
 }
 
@@ -76,6 +77,18 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
     noteNumber = midiNoteNumber;
     pitchWheel = currentPitchWheelPosition;
     updateFrequency();
+
+    // Each oscillator that glides slides in from the pitch the note before had reached: always, or, legato, only
+    // while another key's held.
+    for (size_t i = 0; i < glideStarts.size(); ++i)
+    {
+        const auto& oscillator = patch.oscillators[i];
+        const auto& from = patch.noteStart.glideFrom[i];
+        const auto glides = from.has_value() && oscillator.glideSeconds > 0.0f
+                         && (oscillator.glide == Patch::Glide::always || (oscillator.glide == Patch::Glide::legato && patch.noteStart.legato));
+        glideStarts[i] = glides ? *from - midiNoteNumber : 0.0;
+        glideLengths[i] = glides ? std::max (1.0, oscillator.glideSeconds * getSampleRate()) : 1.0;
+    }
 
     phases.fill (0.0);
     harmonicDrifts = {};
@@ -167,6 +180,12 @@ void HarmonicVoice::updateFrequency()
     frequency = 440.0 * std::pow (2.0, (noteNumber - 69 + bend) / 12.0);
 }
 
+double HarmonicVoice::getGlidingPitch (int oscillator) const noexcept
+{
+    const auto i = (size_t) oscillator;
+    return noteNumber + glideStarts[i] * std::max (0.0, 1.0 - (double) samplesSinceNoteOn / glideLengths[i]);
+}
+
 HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 {
     using namespace modulation;
@@ -234,7 +253,8 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on. Its zoom
         // sets how far modulation moves it.
         targets.tunes[(size_t) i] = tuning::fromPosition (modulate (oscillatorTuneTarget (i), tuning::toPosition (oscillator.tune),
-                                                                    tuning::getModulationScale (oscillator.tuneReach)));
+                                                                    tuning::getModulationScale (oscillator.tuneReach)))
+                                  + (float) (getGlidingPitch (i) - noteNumber);
 
         if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
             continue;

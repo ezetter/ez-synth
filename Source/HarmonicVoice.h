@@ -58,6 +58,11 @@ public:
     /** How many periods an LFO has been through, as this note plays it. */
     double getLfoPeriods (int lfo) const noexcept   { return lfoPeriods[(size_t) lfo]; }
 
+    /** The pitch an oscillator is playing, as a MIDI note number, as it glides into the note, or the note's own once
+        it's got there or if it doesn't glide. It leaves out the oscillator's tune and the pitch wheel.
+    */
+    double getGlidingPitch (int oscillator) const noexcept;
+
     /** The seed of the random wave an LFO that starts with each key plays for this note, new with each note. */
     std::uint32_t getRandomSeed (int lfo) const noexcept   { return randomSeeds[(size_t) lfo]; }
 
@@ -125,6 +130,11 @@ private:
     std::array<double, modulation::numLfos> lfoPeriods {};
     std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
     double frequency = 440.0;
+
+    /** How far below or above the note, in semitones, each oscillator started as it glides into it, and how long
+        its glide takes, in samples. One that doesn't glide starts at the note.
+    */
+    std::array<double, modulation::numOscillators> glideStarts {}, glideLengths {};
     int noteNumber = 69;
     int pitchWheel = 8192;
     float noteVelocity = 1.0f;

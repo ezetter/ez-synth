@@ -42,6 +42,17 @@ public:
     */
     static juce::String tuneZoomId (int oscillator);
 
+    /** The IDs of whether an oscillator glides into each note from the one before, always or only legato, and how
+        long its glide takes, in seconds.
+    */
+    static juce::String glideId (int oscillator);
+    static juce::String glideTimeId (int oscillator);
+    static juce::StringArray getGlideNames();
+    static juce::NormalisableRange<float> glideTimeRange();
+
+    /** How long a glide takes, such as "40 ms" or "1.50 s". */
+    static juce::String glideTimeToText (float seconds);
+
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
         low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
@@ -428,6 +439,8 @@ private:
         std::atomic<float>* numHarmonics = nullptr;
         std::atomic<float>* tune = nullptr;
         std::atomic<float>* tuneZoom = nullptr;
+        std::atomic<float>* glide = nullptr;
+        std::atomic<float>* glideTime = nullptr;
     };
 
     struct FilterParameters
@@ -569,7 +582,31 @@ private:
             juce::Synthesiser::handleController (midiChannel, controllerNumber, controllerValue);
         }
 
+        /** Tells the note starting where each oscillator of the note played before had glided to, and whether another
+            key's held, for its oscillators that glide, then notes which voice plays it, for the next note.
+        */
+        void noteOn (int midiChannel, int midiNoteNumber, float velocity) override
+        {
+            patch.noteStart.legato = false;
+
+            for (auto* voice : voices)
+                if (voice->isKeyDown() && voice->getCurrentlyPlayingNote() != midiNoteNumber)
+                    patch.noteStart.legato = true;
+
+            for (size_t i = 0; i < patch.noteStart.glideFrom.size(); ++i)
+                patch.noteStart.glideFrom[i] = lastVoice != nullptr ? std::optional (lastVoice->getGlidingPitch ((int) i)) : std::nullopt;
+
+            juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
+
+            for (auto* voice : voices)
+                if (auto* harmonicVoice = dynamic_cast<HarmonicVoice*> (voice);
+                    harmonicVoice != nullptr && harmonicVoice->isKeyDown() && harmonicVoice->getCurrentlyPlayingNote() == midiNoteNumber
+                    && harmonicVoice->getSamplesSinceNoteOn() == 0)
+                    lastVoice = harmonicVoice;
+        }
+
         Patch& patch;
+        const HarmonicVoice* lastVoice = nullptr;
     };
 
     ModWheelSynthesiser synth { patch };

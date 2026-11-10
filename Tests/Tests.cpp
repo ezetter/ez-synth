@@ -2781,8 +2781,7 @@ namespace
             SynthProcessor zoomed;
             TuneSlider tuneSlider;
             tuneSlider.setBounds (0, 0, 340, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (0)),
-                                     *zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (0)), 0);
+            tuneSlider.setOscillator (zoomed.parameters, 0);
             const auto shows = [&tuneSlider] (float from, float to)
             {
                 return juce::exactlyEqual (tuneSlider.getWindow().low, from) && juce::exactlyEqual (tuneSlider.getWindow().high, to);
@@ -2811,8 +2810,7 @@ namespace
             check (shows (-1.0f, 1.0f) && isNear (tuneSlider.getZoom(), 1.0, 1.0e-6), "setting the oscillator's zoom zooms the slider");
 
             setParameter (zoomed, SynthProcessor::tuneZoomId (1), 0.0f);
-            tuneSlider.setOscillator (*zoomed.parameters.getParameter (SynthProcessor::tuneId (1)),
-                                      *zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (1)), 1);
+            tuneSlider.setOscillator (zoomed.parameters, 1);
             check (shows (-12.0f, 12.0f), "each oscillator has a zoom of its own");
         }
 
@@ -2868,6 +2866,145 @@ namespace
         void setOn (const juce::String&, bool) override             {}
         void showSettings() override                                {}
     };
+
+    /** Plays notes on and off at the times given, in seconds, and returns the left channel. */
+    std::vector<float> playEvents (SynthProcessor& synth, const std::vector<std::tuple<double, int, bool>>& events, double totalSeconds)
+    {
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::vector<float> output;
+
+        for (int start = 0; start < (int) (totalSeconds * sampleRate); start += blockSize)
+        {
+            juce::MidiBuffer midi;
+
+            for (const auto& [seconds, note, on] : events)
+                if (const auto position = (int) (seconds * sampleRate) - start; position >= 0 && position < blockSize)
+                    midi.addEvent (on ? juce::MidiMessage::noteOn (1, note, 1.0f) : juce::MidiMessage::noteOff (1, note), position);
+
+            synth.processBlock (buffer, midi);
+            output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+        }
+
+        return output;
+    }
+
+    /** The frequency of a sine wave, from the time between its first and last upward crossings of 0. */
+    double frequencyOf (const std::vector<float>& signal)
+    {
+        std::optional<double> first;
+        double last = 0.0;
+        int crossings = 0;
+
+        for (size_t i = 1; i < signal.size(); ++i)
+        {
+            if (signal[i - 1] < 0.0f && signal[i] >= 0.0f)
+            {
+                const auto at = (double) (i - 1) + signal[i - 1] / (signal[i - 1] - signal[i]);
+                first = first.value_or (at);
+                last = at;
+                ++crossings;
+            }
+        }
+
+        return crossings > 1 ? (crossings - 1) * sampleRate / (last - *first) : 0.0;
+    }
+
+    void testGlide()
+    {
+        std::cout << "Glide" << std::endl;
+
+        const auto hertz = [] (double note) { return 440.0 * std::pow (2.0, (note - 69.0) / 12.0); };
+
+        // An oscillator set to glide, a sine, over 0.2 seconds. An A3, then, after it's let go, an A4.
+        const auto gliding = [] (int mode, float seconds = 0.2f)
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::glideId (0), (float) mode);
+            setParameter (*synth, SynthProcessor::glideTimeId (0), seconds);
+            return synth;
+        };
+
+        {
+            SynthProcessor fresh;
+            check (juce::exactlyEqual (fresh.parameters.getParameter (SynthProcessor::glideId (0))->getValue(), 0.0f)
+                     && isNear (fresh.parameters.getRawParameterValue (SynthProcessor::glideTimeId (1))->load(), 0.2, 1.0e-6),
+                   "to start with, no oscillator glides, and each glides over 0.2 seconds once it's set to");
+            check (SynthProcessor::glideTimeToText (0.04f) == "40 ms" && SynthProcessor::glideTimeToText (1.5f) == "1.50 s",
+                   "a glide's time is shown in milliseconds, or seconds from a second up");
+            check (isNear (SynthProcessor::glideTimeRange().convertFrom0to1 (0.0f), 0.005, 1.0e-4)
+                     && isNear (SynthProcessor::glideTimeRange().convertFrom0to1 (1.0f), 5.0, 1.0e-4)
+                     && isNear (SynthProcessor::glideTimeRange().convertFrom0to1 (0.5f), std::sqrt (0.005 * 5.0), 1.0e-4),
+                   "a glide takes from 5 ms to 5 seconds, lengthening by the same factor each step along its slider");
+        }
+
+        const std::vector<std::tuple<double, int, bool>> apart { { 0.0, 57, true }, { 0.3, 57, false }, { 0.6, 69, true } };
+        const std::vector<std::tuple<double, int, bool>> overlapping { { 0.0, 57, true }, { 0.6, 69, true }, { 0.61, 57, false } };
+
+        {
+            auto synth = gliding (1);
+            const auto played = playEvents (*synth, apart, 1.2);
+            check (isNear (frequencyOf (slice (played, 0.69, 0.71)), hertz (63.0), 0.02)
+                     && isNear (frequencyOf (slice (played, 0.95, 1.1)), 440.0, 0.005),
+                   "an oscillator set to Glide slides from the note before, half way after half its time, then plays the note");
+        }
+
+        {
+            auto synth = gliding (1, 0.05f);
+            const auto played = playEvents (*synth, apart, 1.2);
+            check (isNear (frequencyOf (slice (played, 0.66, 0.74)), 440.0, 0.005), "a shorter glide gets there sooner");
+        }
+
+        {
+            auto synth = gliding (0);
+            const auto played = playEvents (*synth, apart, 1.2);
+            check (isNear (frequencyOf (slice (played, 0.61, 0.65)), 440.0, 0.005), "an oscillator with its glide off plays the note straight away");
+        }
+
+        {
+            auto synth = gliding (1);
+            const auto played = playEvents (*synth, { { 0.1, 69, true } }, 0.4);
+            check (isNear (frequencyOf (slice (played, 0.11, 0.15)), 440.0, 0.005), "the first note played has nothing to glide from");
+        }
+
+        {
+            auto synth = gliding (2);
+            auto played = playEvents (*synth, apart, 1.2);
+            check (isNear (frequencyOf (slice (played, 0.61, 0.65)), 440.0, 0.005),
+                   "an oscillator set to Legato doesn't glide into a note played after the one before was let go");
+
+            // Over a second, so the A3 has faded by the time it's measured, 0.4 seconds in.
+            synth = gliding (2, 1.0f);
+            played = playEvents (*synth, overlapping, 1.2);
+            check (isNear (frequencyOf (slice (played, 0.99, 1.01)), hertz (57.0 + 12.0 * 0.4), 0.02),
+                   "...but glides into one played while the one before is still held");
+        }
+
+        {
+            // Each oscillator glides or not on its own: the first slides, the second, an octave up, jumps straight there.
+            auto synth = gliding (1);
+            setPreset (*synth, 1, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::onId (1), 1.0f);
+            setParameter (*synth, SynthProcessor::tuneId (1), 12.0f);
+            const auto played = playEvents (*synth, apart, 1.2);
+            const auto early = slice (played, 0.62, 0.66);
+            check (amplitudeAt (early, 880.0) > 0.5 * amplitudeAt (slice (played, 1.0, 1.1), 880.0)
+                     && amplitudeAt (early, 440.0) < 0.2 * amplitudeAt (slice (played, 1.0, 1.1), 440.0),
+                   "one oscillator can glide while another plays the note straight away");
+        }
+
+        {
+            // The tune slider's Glide row sets the oscillator's glide.
+            SynthProcessor shown;
+            TuneSlider tuneSlider;
+            tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
+            tuneSlider.setOscillator (shown.parameters, 2);
+            check (tuneSlider.getGlideMode() == 0, "the tune slider shows the oscillator's glide");
+            setParameter (shown, SynthProcessor::glideId (2), 2.0f);
+            check (tuneSlider.getGlideMode() == 2, "...and follows it as it's set from elsewhere");
+        }
+    }
 
     void testMidiInputs()
     {
@@ -3833,8 +3970,7 @@ namespace
             TuneSlider tuneSlider;
             tuneSlider.setLookAndFeel (&lookAndFeel);
             tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (*tuned.parameters.getParameter (SynthProcessor::tuneId (0)),
-                                     *tuned.parameters.getParameter (SynthProcessor::tuneZoomId (0)), 0);
+            tuneSlider.setOscillator (tuned.parameters, 0);
 
             const auto saveTuneSlider = [&folder, &tuneSlider] (const juce::String& name)
             {
@@ -3860,8 +3996,10 @@ namespace
 
             setParameter (tuned, SynthProcessor::tuneId (0), 7.0f);
             tuneSlider.setZoom (0.5f);
+            setParameter (tuned, SynthProcessor::glideId (0), 2.0f);
+            setParameter (tuned, SynthProcessor::glideTimeId (0), 0.35f);
             modulatable::setLivePosition (*tuneSlider.getChildComponent (0), std::nullopt);
-            saveTuneSlider ("13b-tune-zoomed-partway");
+            saveTuneSlider ("13b-tune-zoomed-partway-legato");
             tuneSlider.setLookAndFeel (nullptr);
         }
 
@@ -3935,6 +4073,7 @@ int main (int argc, char* argv[])
     testLfoSync();
     testShowingMovedHarmonics();
     testTuning();
+    testGlide();
     testMidiInputs();
     testPresets();
     testInit();

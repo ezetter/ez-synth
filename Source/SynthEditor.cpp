@@ -424,8 +424,7 @@ void SynthEditor::refresh()
                 harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)));
                 modulatable::setTarget (harmonicSelector, modulation::oscillatorHarmonicsTarget (edited));
                 harmonicSliders.setOscillator (edited);
-                tuneSlider.setOscillator (*synthProcessor.parameters.getParameter (SynthProcessor::tuneId (edited)),
-                                          *synthProcessor.parameters.getParameter (SynthProcessor::tuneZoomId (edited)), edited);
+                tuneSlider.setOscillator (synthProcessor.parameters, edited);
             }
 
             const auto harmonics = getPlayedHarmonics (edited);
