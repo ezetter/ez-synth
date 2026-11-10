@@ -524,23 +524,36 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
 
-    watchRandomizeTriggers();
+    watchRandomizeTriggers (numSamples);
 
     samplesPlayed += numSamples;
 }
 
-void SynthProcessor::watchRandomizeTriggers()
+void SynthProcessor::watchRandomizeTriggers (int numSamples)
 {
+    // An LFO is looked at every few samples through the block, so a quick one's crossings aren't missed, and one
+    // that only touches a threshold near its end, at its lowest or highest, is caught there.
+    constexpr auto lookInterval = HarmonicVoice::controlInterval;
+
     for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
         const auto target = (size_t) modulation::randomizeTarget ((int) i);
         auto& crossings = randomizeCrossings[i];
         auto triggered = false;
 
-        const auto watch = [this, &triggered] (modulation::MidlineCrossing& crossing, const modulation::Assignment& assignment)
+        const auto watch = [this, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
         {
-            const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase) : std::nullopt;
-            triggered = crossing.update (value, modulation::getMidline (assignment.source)) || triggered;
+            const auto threshold = modulation::getThresholdValue (assignment.source, assignment.threshold);
+            const auto isLfo = assignment.isActive() && assignment.source < numLfos;
+            const auto looks = isLfo ? std::max (1, (numSamples + lookInterval - 1) / lookInterval) : 1;
+
+            for (int look = looks - 1; look >= 0; --look)
+            {
+                const auto periodsEarlier = isLfo ? (double) (look * lookInterval) / patch.getLfoPeriodSamples ((size_t) assignment.source) : 0.0;
+                const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase + periodsEarlier)
+                                                         : std::nullopt;
+                triggered = crossing.update (value, threshold, assignment.threshold) || triggered;
+            }
         };
 
         watch (crossings[0], patch.assignments[target]);
@@ -552,7 +565,7 @@ void SynthProcessor::watchRandomizeTriggers()
     }
 }
 
-std::optional<float> SynthProcessor::getSourceValueNow (int source, float phase) const
+std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase) const
 {
     // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
     if (source == modulation::velocitySource)
@@ -1081,6 +1094,7 @@ void SynthProcessor::setAssignment (int target, const modulation::Assignment& as
 
     assignments[(size_t) target] = assignment;
     assignments[(size_t) target].phase = juce::jlimit (0.0f, modulation::latestPhase, assignment.phase);
+    assignments[(size_t) target].threshold = juce::jlimit (0.0f, 1.0f, assignment.threshold);
 
     // An LFO that's been given something to move is meant to be heard.
     if (assignment.isActive() && ! modulation::isEnvelope (assignment.source) && ! isLfoOn (assignment.source))
@@ -1107,7 +1121,7 @@ void SynthProcessor::setVelocityAssignment (int target, const modulation::Assign
 {
     markEdited();
 
-    velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false };
+    velocityAssignments[(size_t) target] = { assignment.source, assignment.range, false, 0.0f, juce::jlimit (0.0f, 1.0f, assignment.threshold) };
     share();
     ++modulationVersion;
 }
@@ -1121,7 +1135,8 @@ void SynthProcessor::setModWheelAssignment (int target, const modulation::Assign
 {
     markEdited();
 
-    modWheelAssignments[(size_t) target] = { assignment.source, assignment.range, assignment.inverted };
+    modWheelAssignments[(size_t) target] = { assignment.source, assignment.range, assignment.inverted, 0.0f,
+                                             juce::jlimit (0.0f, 1.0f, assignment.threshold) };
     share();
     ++modulationVersion;
 }
@@ -1367,6 +1382,9 @@ juce::ValueTree SynthProcessor::createState()
             if (! modulation::isEnvelope (assignment.source) && assignment.phase > 0.0f)
                 modulationTree.setProperty ("phase", assignment.phase, nullptr);
 
+            if (modulation::isTrigger (target))
+                modulationTree.setProperty ("threshold", assignment.threshold, nullptr);
+
             state.appendChild (modulationTree, nullptr);
         }
     }
@@ -1381,6 +1399,10 @@ juce::ValueTree SynthProcessor::createState()
             juce::ValueTree assignmentTree ("ASSIGNMENT");
             assignmentTree.setProperty ("target", modulation::getKey (target), nullptr);
             assignmentTree.setProperty ("range", assignment.range, nullptr);
+
+            if (modulation::isTrigger (target))
+                assignmentTree.setProperty ("threshold", assignment.threshold, nullptr);
+
             velocityTree.appendChild (assignmentTree, nullptr);
         }
     }
@@ -1397,6 +1419,10 @@ juce::ValueTree SynthProcessor::createState()
             assignmentTree.setProperty ("target", modulation::getKey (target), nullptr);
             assignmentTree.setProperty ("range", assignment.range, nullptr);
             assignmentTree.setProperty ("inverted", assignment.inverted, nullptr);
+
+            if (modulation::isTrigger (target))
+                assignmentTree.setProperty ("threshold", assignment.threshold, nullptr);
+
             modWheelTree.appendChild (assignmentTree, nullptr);
         }
     }
@@ -1511,6 +1537,12 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     assignments = {};
 
+    // A trigger's threshold, saved since it could be set. Saves from before trigger at the midline.
+    const auto readThreshold = [] (const juce::ValueTree& tree)
+    {
+        return juce::jlimit (0.0f, 1.0f, (float) tree.getProperty ("threshold", 0.5f));
+    };
+
     for (const auto& modulationTree : modulations)
     {
         const auto target = modulation::findTarget (modulationTree["target"].toString());
@@ -1528,7 +1560,8 @@ void SynthProcessor::loadState (juce::ValueTree state)
                                                (bool) modulationTree["inverted"],
                                                modulation::isEnvelope (source)
                                                    ? 0.0f
-                                                   : juce::jlimit (0.0f, modulation::latestPhase, (float) modulationTree["phase"]) };
+                                                   : juce::jlimit (0.0f, modulation::latestPhase, (float) modulationTree["phase"]),
+                                               readThreshold (modulationTree) };
     }
 
     // Saves from before velocity could be assigned had it make softer notes quieter, as it does to start with.
@@ -1540,7 +1573,8 @@ void SynthProcessor::loadState (juce::ValueTree state)
     for (const auto& assignmentTree : velocityTree)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
-                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false };
+                                                      juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false, 0.0f,
+                                                      readThreshold (assignmentTree) };
 
     // Saves from before the mod wheel could be assigned have it move nothing.
     modWheelAssignments = {};
@@ -1549,7 +1583,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             modWheelAssignments[(size_t) *target] = { modulation::modWheelSource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]),
-                                                      (bool) assignmentTree["inverted"] };
+                                                      (bool) assignmentTree["inverted"], 0.0f, readThreshold (assignmentTree) };
 
     share();
     ++modulationVersion;

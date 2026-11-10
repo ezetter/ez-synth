@@ -1776,12 +1776,26 @@ namespace
         std::cout << "Randomizing harmonics from a modulator" << std::endl;
 
         {
-            modulation::MidlineCrossing crossing;
-            const auto crossed = std::vector<bool> { crossing.update (-0.5f, 0.0f), crossing.update (-0.1f, 0.0f), crossing.update (0.0f, 0.0f),
-                                                     crossing.update (0.3f, 0.0f), crossing.update (0.0f, 0.0f), crossing.update (-0.2f, 0.0f),
-                                                     crossing.update (std::nullopt, 0.0f), crossing.update (0.4f, 0.0f) };
-            check (crossed == std::vector<bool> { false, false, false, true, false, true, false, false },
-                   "crossing the midline either way counts, landing on it doesn't, and nothing to watch starts afresh");
+            modulation::ThresholdCrossing crossing;
+            const auto crossed = std::vector<bool> { crossing.update (-0.5f, 0.0f, 0.5f), crossing.update (-0.1f, 0.0f, 0.5f),
+                                                     crossing.update (0.3f, 0.0f, 0.5f), crossing.update (0.0f, 0.0f, 0.5f),
+                                                     crossing.update (std::nullopt, 0.0f, 0.5f), crossing.update (0.4f, 0.0f, 0.5f) };
+            check (crossed == std::vector<bool> { false, false, true, true, false, false },
+                   "crossing a threshold either way counts, right on it counts as below, and nothing to watch starts afresh");
+
+            modulation::ThresholdCrossing atBottom;
+            const auto reached = std::vector<bool> { atBottom.update (0.5f, -0.98f, 0.0f), atBottom.update (-0.99f, -0.98f, 0.0f),
+                                                     atBottom.update (0.2f, -0.98f, 0.0f), atBottom.update (-1.0f, -0.98f, 0.0f) };
+            check (reached == std::vector<bool> { false, true, false, true }, "at the very bottom, only getting down to it counts");
+
+            check (juce::exactlyEqual (modulation::getThresholdValue (0, 0.5f), 0.0f) && isNear (modulation::getThresholdValue (0, 0.25f), -0.5, 1.0e-6)
+                     && isNear (modulation::getThresholdValue (0, 0.0f), -0.98, 1.0e-5)
+                     && isNear (modulation::getThresholdValue (modulation::envelopeSource (0), 0.3f), 0.3, 1.0e-6)
+                     && isNear (modulation::getThresholdValue (modulation::modWheelSource, 1.0f), 0.99, 1.0e-6),
+                   "a threshold runs across an LFO's values, -1 to 1, and the others', 0 to 1, the ends from just inside");
+            check (modulation::thresholdToText (0, 0.5f) == "50%, 0 on its wave" && modulation::thresholdToText (1, 0.2f) == "20%, -0.60 on its wave"
+                     && modulation::thresholdToText (modulation::envelopeSource (1), 0.3f) == "30%",
+                   "a threshold is shown as a percentage, and for an LFO, where on its wave");
         }
 
         const auto target = modulation::randomizeTarget (1);
@@ -1835,16 +1849,62 @@ namespace
             check (counts[1] == 1, "velocity randomizes the harmonics when a note's played the other side of halfway from the one before");
         }
 
+        // A threshold sets where crossing triggers it. A sine LFO, a period a second, from 0 rising: at 0%, it
+        // randomizes once at each trough; at 100%, once at each peak; at 25%, -0.5 on its wave, twice a period.
+        {
+            const auto lfoCount = [&target] (float threshold)
+            {
+                SynthProcessor synth;
+                setLfo (synth, 0, 1.0f, false, waveform::Preset::sine);
+                synth.setAssignment (target, { 0, 1.0f, false, 0.0f, threshold });
+                return countRandomizing (synth, {}, 3.05)[1];
+            };
+
+            check (lfoCount (0.0f) == 3 && lfoCount (1.0f) == 3 && lfoCount (0.25f) == 6 && lfoCount (0.5f) == 6,
+                   "an LFO randomizes once at its lowest at 0%, once at its highest at 100%, and twice a period in between");
+        }
+
+        // An envelope at 0% randomizes as it comes back to rest, and at 100% as its attack reaches the top.
+        {
+            const auto envelopeCount = [&target] (float threshold)
+            {
+                SynthProcessor synth;
+                setEnvelope (synth, 0, { 0.05f, 0.0f, 1.0f, 0.05f });
+                synth.setAssignment (target, { modulation::envelopeSource (0), 1.0f, false, 0.0f, threshold });
+                return countRandomizing (synth, { { 0.1, juce::MidiMessage::noteOn (1, 60, 1.0f) },
+                                                  { 0.5, juce::MidiMessage::noteOff (1, 60) } }, 1.0)[1];
+            };
+
+            check (envelopeCount (0.0f) == 1 && envelopeCount (1.0f) == 1,
+                   "an envelope randomizes once as it gets back to nothing at 0%, and once as it reaches the top at 100%");
+        }
+
+        // The mod wheel at 75%: pushed to the top and back to 80 of 127 crosses it twice, where the midline's once.
+        {
+            const auto wheelCount = [&target] (float threshold)
+            {
+                SynthProcessor synth;
+                synth.setModWheelAssignment (target, { modulation::modWheelSource, 1.0f, false, 0.0f, threshold });
+                const auto wheel = [] (int value) { return juce::MidiMessage::controllerEvent (1, modulation::modWheelController, value); };
+                return countRandomizing (synth, { { 0.1, wheel (127) }, { 0.2, wheel (80) } }, 0.4)[1];
+            };
+
+            check (wheelCount (0.75f) == 2 && wheelCount (0.5f) == 1, "the mod wheel randomizes as it crosses its threshold");
+        }
+
         // Saved with the sound, and loaded back.
         {
             SynthProcessor synth;
-            synth.setAssignment (target, { 2, 1.0f, false, 0.25f });
+            synth.setAssignment (target, { 2, 1.0f, false, 0.25f, 0.2f });
+            synth.setModWheelAssignment (target, { modulation::modWheelSource, 0.5f, false, 0.0f, 0.9f });
             juce::MemoryBlock state;
             synth.getStateInformation (state);
             SynthProcessor loaded;
             loaded.setStateInformation (state.getData(), (int) state.getSize());
-            check (loaded.getAssignment (target).source == 2 && isNear (loaded.getAssignment (target).phase, 0.25, 1.0e-5),
-                   "what randomizes an oscillator's harmonics is saved with the sound");
+            check (loaded.getAssignment (target).source == 2 && isNear (loaded.getAssignment (target).phase, 0.25, 1.0e-5)
+                     && isNear (loaded.getAssignment (target).threshold, 0.2, 1.0e-5)
+                     && isNear (loaded.getModWheelAssignment (target).threshold, 0.9, 1.0e-5),
+                   "what randomizes an oscillator's harmonics, and at what threshold, is saved with the sound");
         }
     }
 
@@ -4088,7 +4148,7 @@ namespace
         saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
         saveModulationEditor (modulation::lfoRateTarget (0), "11b-modulation-editor-lfo-rate");
-        synth.setAssignment (modulation::randomizeTarget (0), { 1, 1.0f, false, 0.25f });
+        synth.setAssignment (modulation::randomizeTarget (0), { 1, 1.0f, false, 0.25f, 0.2f });
         saveModulationEditor (modulation::randomizeTarget (0), "11c-modulation-editor-randomize");
         synth.setAssignment (modulation::randomizeTarget (0), {});
 

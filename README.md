@@ -82,15 +82,20 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   wave that would go past full scale is turned down to fit the grid. The harmonics' tunings, the number
   played and the other oscillators are left alone. Click it again for another; Cmd-Z undoes it.
 - **Randomize from a modulator.** Right-click, or Control-click, **Randomize** to have an LFO, envelope,
-  velocity or the mod wheel randomize the oscillator's harmonics for you, each time it crosses its
-  midline, either way. An LFO crosses at 0, so a looping LFO randomizes twice a period, even with no
+  velocity or the mod wheel randomize the oscillator's harmonics for you, each time it crosses a
+  threshold, its midline to start with, either way. An LFO crosses at 0, so a looping LFO randomizes twice a period, even with no
   note playing; its phase shifts when. An envelope crosses halfway, as the newest note's attack rises past
   it and again as its release falls; the mod wheel as it's pushed past halfway and pulled back. Velocity
   randomizes when a note's played on the other side of halfway from the note before: hard after soft, or
-  soft after hard. There's no range or polarity, as crossing either way triggers it. While something's
-  set to trigger it, the button's text is light blue. The audio thread spots each crossing and the window's
+  soft after hard. In place of a range, each has a **Threshold**, from 0% to 100% of the source's values,
+  50% to start with: the midline. For an LFO that's from -1 to 1 on its wave, so 25% is -0.5; for the
+  others it's from 0 to 1. Crossing the threshold either way triggers it, so there's no polarity. At the
+  very ends it's reaching them that counts: at 0% an LFO randomizes once at the bottom of each cycle and an
+  envelope as each note's release ends, and at 100% an LFO once at each peak and an envelope as each
+  attack reaches the top. While something's set to trigger it, the button's text is light blue. The audio thread spots each crossing and the window's
   thread randomizes, a few dozen times a second at most, so an LFO faster than about 30 Hz won't randomize
-  on every crossing.
+  on every crossing. An LFO is looked at every 64 samples, and the very ends count from 1% inside them, so
+  a smooth wave that only comes close to its lowest or highest still reaches them.
 - **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
   amplitude next to it, and once you've played a note, its frequency. A slider changes the wave itself,
   adding or taking away that harmonic's sine wave and leaving the others alone, so the drawing and the

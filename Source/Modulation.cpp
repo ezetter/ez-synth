@@ -153,9 +153,24 @@ namespace modulation
         return describe (target).kind == Kind::randomize;
     }
 
-    float getMidline (int source)
+    float getThresholdValue (int source, float threshold)
     {
-        return source >= 0 && source < numLfos ? 0.0f : 0.5f;
+        // The very ends count from just inside them, so a wave that only comes near its lowest or highest, as a
+        // smooth one does between the moments it's looked at, still reaches them.
+        threshold = juce::jlimit (0.01f, 0.99f, threshold);
+        return source >= 0 && source < numLfos ? 2.0f * threshold - 1.0f : threshold;
+    }
+
+    juce::String thresholdToText (int source, float threshold)
+    {
+        const auto percent = juce::String (juce::roundToInt (juce::jlimit (0.0f, 1.0f, threshold) * 100.0f)) + "%";
+
+        if (source < 0 || source >= numLfos)
+            return percent;
+
+        const auto value = 2.0f * juce::jlimit (0.0f, 1.0f, threshold) - 1.0f;
+        const auto shown = std::abs (value) < 0.005f ? juce::String ("0") : juce::String (value, 2);
+        return percent + ", " + shown + " on its wave";
     }
 
     bool makesLoop (const Assignments& assignments, int target, int source)

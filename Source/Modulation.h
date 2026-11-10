@@ -136,6 +136,11 @@ namespace modulation
         */
         float phase = 0.0f;
 
+        /** For a control that's triggered, such as randomizing, where across the source's values crossing triggers it,
+            from 0, the bottom, to 1, the top: -1 to 1 for an LFO, and 0 to 1 for the rest. Halfway is the midline.
+        */
+        float threshold = 0.5f;
+
         bool isActive() const noexcept   { return source >= 0; }
 
         /** How far the source at a value moves a control along its travel, from where it's set. */
@@ -156,7 +161,7 @@ namespace modulation
         bool operator== (const Assignment& other) const noexcept
         {
             return source == other.source && juce::exactlyEqual (range, other.range) && inverted == other.inverted
-                && juce::exactlyEqual (phase, other.phase);
+                && juce::exactlyEqual (phase, other.phase) && juce::exactlyEqual (threshold, other.threshold);
         }
     };
 
@@ -189,20 +194,29 @@ namespace modulation
     /** Whether a target is triggered when its source crosses its midline, rather than moved along a travel. */
     bool isTrigger (int target);
 
-    /** The value a source crosses to trigger a target: 0 for an LFO, which swings from -1 to 1, and halfway for an
-        envelope, velocity and the mod wheel, which go from 0 to 1.
+    /** The value a source crosses to trigger a target, from a threshold from 0, the bottom of its values, to 1, the
+        top: an LFO swings from -1 to 1, and an envelope, velocity and the mod wheel go from 0 to 1. Halfway is the
+        midline: 0 for an LFO. The very bottom and top count from 1% inside them, so they're reached by a wave that
+        comes close.
     */
-    float getMidline (int source);
+    float getThresholdValue (int source, float threshold);
 
-    /** Follows a source's value, from one look to the next, telling when it's crossed its midline. Landing on the
-        midline itself doesn't cross it: the value has to go on to the other side.
+    /** How a threshold is described: such as "50%", or for an LFO, "50%, 0 on its wave" or "20%, -0.60 on its wave". */
+    juce::String thresholdToText (int source, float threshold);
+
+    /** Follows a source's value, from one look to the next, telling when it's crossed a threshold.
+
+        Between the ends, crossing either way counts. A threshold at the very bottom, 0, counts only when the value
+        gets down to it, and one at the very top, 1, only when it gets up to it, so a wave that dips to its lowest
+        and straight back out counts once there. A value right on the threshold counts as below it, or above it from
+        above the midline.
     */
-    struct MidlineCrossing
+    struct ThresholdCrossing
     {
-        /** Takes the source's value now, or nothing if it has none, such as an envelope with no note sounding, and
-            whether it's crossed its midline since the last value.
+        /** Takes the source's value now, or nothing if it has none, such as an LFO that starts with each key before
+            the first, and whether it's crossed the threshold, from 0 to 1, whose value is given, since the last.
         */
-        bool update (std::optional<float> value, float midline) noexcept
+        bool update (std::optional<float> value, float thresholdValue, float threshold) noexcept
         {
             if (! value.has_value())
             {
@@ -210,13 +224,15 @@ namespace modulation
                 return false;
             }
 
-            const auto now = *value > midline ? 1 : *value < midline ? -1 : side;
-            const auto crossed = side != 0 && now != 0 && now != side;
+            const auto above = threshold > 0.5f ? *value >= thresholdValue : *value > thresholdValue;
+            const auto now = above ? 1 : -1;
+            const auto crossed = side != 0 && now != side
+                              && ! (threshold <= 0.0f && now > 0) && ! (threshold >= 1.0f && now < 0);
             side = now;
             return crossed;
         }
 
-        int side = 0;   // which side of the midline it was last seen, -1 below, 1 above, or 0 if not yet
+        int side = 0;   // which side of the threshold it was last seen, -1 below, 1 above, or 0 if not yet
     };
 
     /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope

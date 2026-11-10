@@ -502,14 +502,14 @@ private:
     void shareNewestNote();
 
     /** On the audio thread, after each block: watches what's given each oscillator's randomizing, and asks for it
-        whenever one crosses its midline.
+        whenever one crosses its threshold.
     */
-    void watchRandomizeTriggers();
+    void watchRandomizeTriggers (int numSamples);
 
     /** A source's value at the end of the block, on the audio thread: an LFO's from where it's got to, shifted
         back by the phase given, the newest note's envelope, if a note's sounding, and the last note's velocity.
     */
-    std::optional<float> getSourceValueNow (int source, float phase) const;
+    std::optional<float> getSourceValueNow (int source, double phase) const;
 
     void timerCallback() override;
 
@@ -574,7 +574,7 @@ private:
     // For each oscillator's randomizing, what's given it, as moving, by velocity and by the mod wheel, each watched
     // for crossing its midline. The audio thread counts up the times it's asked for, the message thread how many
     // it's carried out.
-    std::array<std::array<modulation::MidlineCrossing, 3>, numOscillators> randomizeCrossings {};
+    std::array<std::array<modulation::ThresholdCrossing, 3>, numOscillators> randomizeCrossings {};
     std::array<std::atomic<int>, numOscillators> randomizeRequests {};
     std::array<int, numOscillators> randomizeRequestsDone {}, randomizeCounts {};
     juce::Random randomizer;

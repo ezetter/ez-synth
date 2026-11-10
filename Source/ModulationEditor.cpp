@@ -52,11 +52,15 @@ void ModulationEditor::setUp (Section& section)
         addChildComponent (control);
     }
 
-    // A control that's triggered, rather than moved, has no range or polarity: crossing the midline either way
-    // triggers it.
+    // A control that's triggered, rather than moved, has a threshold in place of a range, and no polarity:
+    // crossing the threshold either way triggers it.
     const auto triggered = modulation::isTrigger (target);
+
+    if (triggered)
+        section.range.setTitle ("Threshold");
+
     section.choice.setVisible (true);
-    section.range.setVisible (! triggered);
+    section.range.setVisible (true);
     section.phase.setVisible (section.hasPhase);
     section.polarity.setVisible (section.hasPolarity && ! triggered);
 }
@@ -72,10 +76,21 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
         for (int lfo = 0; lfo < modulation::numLfos; ++lfo)
             section.choice.setButtonEnabled (lfo + 1, ! synthProcessor.wouldMakeLoop (target, lfo));
 
-    // A range it hasn't been given yet is the usual one to start from.
+    // A range it hasn't been given yet is the usual one to start from. A trigger's slider sets its threshold, from
+    // the midline to start with.
     const auto range = assignment.isActive() || ! isVelocity ? assignment.range : modulation::startingVelocityOnVolume.range;
-    section.range.setValue (range, juce::dontSendNotification);
-    section.range.setDoubleClickReturnValue (true, isVelocity ? modulation::startingVelocityOnVolume.range : modulation::Assignment().range);
+
+    if (modulation::isTrigger (target))
+    {
+        section.range.setValue (assignment.threshold, juce::dontSendNotification);
+        section.range.setDoubleClickReturnValue (true, modulation::Assignment().threshold);
+    }
+    else
+    {
+        section.range.setValue (range, juce::dontSendNotification);
+        section.range.setDoubleClickReturnValue (true, isVelocity ? modulation::startingVelocityOnVolume.range : modulation::Assignment().range);
+    }
+
     section.phase.setValue (assignment.phase * 360.0, juce::dontSendNotification);
     section.polarity.setChosen (assignment.inverted ? 1 : 0);
 
@@ -94,14 +109,30 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
 
 void ModulationEditor::apply()
 {
-    synthProcessor.setAssignment (target, { source.choice.getChosen() - 1, (float) source.range.getValue(),
-                                            source.polarity.getChosen() == 1, (float) (source.phase.getValue() / 360.0) });
+    // A trigger's slider sets its threshold, and leaves its range as it was.
+    const auto triggered = modulation::isTrigger (target);
+    const auto withSlider = [triggered] (modulation::Assignment assignment, const Section& section, const modulation::Assignment& current)
+    {
+        if (triggered)
+        {
+            assignment.range = current.range;
+            assignment.threshold = (float) section.range.getValue();
+        }
 
-    synthProcessor.setVelocityAssignment (target, { velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
-                                                    (float) velocity.range.getValue(), false });
+        return assignment;
+    };
 
-    synthProcessor.setModWheelAssignment (target, { modWheel.choice.getChosen() == 1 ? modulation::modWheelSource : -1,
-                                                    (float) modWheel.range.getValue(), modWheel.polarity.getChosen() == 1 });
+    synthProcessor.setAssignment (target, withSlider ({ source.choice.getChosen() - 1, (float) source.range.getValue(),
+                                                        source.polarity.getChosen() == 1, (float) (source.phase.getValue() / 360.0) },
+                                                      source, synthProcessor.getAssignment (target)));
+
+    synthProcessor.setVelocityAssignment (target, withSlider ({ velocity.choice.getChosen() == 1 ? modulation::velocitySource : -1,
+                                                                (float) velocity.range.getValue(), false },
+                                                              velocity, synthProcessor.getVelocityAssignment (target)));
+
+    synthProcessor.setModWheelAssignment (target, withSlider ({ modWheel.choice.getChosen() == 1 ? modulation::modWheelSource : -1,
+                                                                (float) modWheel.range.getValue(), modWheel.polarity.getChosen() == 1 },
+                                                              modWheel, synthProcessor.getModWheelAssignment (target)));
 
     show (source, synthProcessor.getAssignment (target));
     show (velocity, synthProcessor.getVelocityAssignment (target));
@@ -118,15 +149,29 @@ juce::String ModulationEditor::describeSource() const
         const auto oscillator = "Osc " + juce::String (modulation::describe (target).oscillator + 1);
 
         if (! assignment.isActive())
-            return "Choose an LFO to randomize " + oscillator + "'s harmonics each time its wave crosses 0, going up or down, "
-                   "or an envelope each time it crosses halfway.";
+            return "Choose an LFO or envelope to randomize " + oscillator + "'s harmonics each time it crosses the threshold, "
+                   "going up or down: from 0%, its lowest, to 100%, its highest.";
+
+        // At the very ends, it's reaching them that counts.
+        const auto crossing = [&assignment]
+        {
+            if (assignment.threshold <= 0.0f)
+                return juce::String ("gets down to its lowest");
+
+            if (assignment.threshold >= 1.0f)
+                return juce::String ("gets up to its highest");
+
+            return "crosses " + modulation::thresholdToText (assignment.source, assignment.threshold);
+        };
 
         if (modulation::isEnvelope (assignment.source))
             return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time it "
-                   "crosses halfway, rising after a key's pressed or falling, from the newest note.";
+                 + crossing() + (assignment.threshold <= 0.0f ? juce::String (", as the newest note's release ends.")
+                                 : assignment.threshold >= 1.0f ? juce::String (", as the newest note's attack ends.")
+                                                                : juce::String (", rising after a key's pressed or falling, from the newest note."));
 
-        return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time its "
-               "wave crosses 0, rising or falling"
+        return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time it "
+             + crossing() + (assignment.threshold > 0.0f && assignment.threshold < 1.0f ? ", rising or falling" : "")
              + (assignment.phase > 0.0f ? ", " + modulation::phaseToText (assignment.phase) + " later in its period" : juce::String())
              + ".";
     }
@@ -185,10 +230,10 @@ juce::String ModulationEditor::describeVelocity() const
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
     if (modulation::isTrigger (target))
-        return assignment.isActive() ? juce::String ("A note played harder than halfway after a softer one, or softer after a harder one, "
-                                                     "randomizes the harmonics.")
+        return assignment.isActive() ? "A note played harder than " + modulation::thresholdToText (assignment.source, assignment.threshold)
+                                           + " after a softer one, or softer after a harder one, randomizes the harmonics."
                                      : juce::String ("Switch on to randomize the harmonics when a note's played on the other side of "
-                                                     "halfway from the one before, as hard or as soft.");
+                                                     "the threshold from the one before.");
 
     if (! assignment.isActive())
         return "Switch on to have how hard each key is played move the " + control + ", as well as anything above.";
@@ -203,9 +248,10 @@ juce::String ModulationEditor::describeModWheel() const
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
     if (modulation::isTrigger (target))
-        return assignment.isActive() ? juce::String ("Pushing the mod wheel past halfway, either way, randomizes the harmonics.")
+        return assignment.isActive() ? "Moving the mod wheel past " + modulation::thresholdToText (assignment.source, assignment.threshold)
+                                           + ", either way, randomizes the harmonics."
                                      : juce::String ("Switch on to randomize the harmonics each time a MIDI controller's mod wheel "
-                                                     "passes halfway, either way.");
+                                                     "passes the threshold, either way.");
 
     if (! assignment.isActive())
         return "Switch on to have a MIDI controller's mod wheel move the " + control + ", as well as anything above.";
@@ -282,8 +328,7 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     const auto triggered = modulation::isTrigger (target);
     g.drawText (choiceCaption, section.choiceCaption, juce::Justification::centredLeft);
 
-    if (! triggered)
-        g.drawText ("RANGE", section.rangeCaption, juce::Justification::centredLeft);
+    g.drawText (triggered ? "THRESHOLD" : "RANGE", section.rangeCaption, juce::Justification::centredLeft);
 
     if (section.hasPhase)
         g.drawText ("PHASE", section.phaseCaption, juce::Justification::centredLeft);
@@ -294,9 +339,8 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     g.setFont (fonts::body (13.0f));
     g.setColour (active ? colours::text : colours::dimText);
 
-    if (! triggered)
-        g.drawText (juce::String (juce::roundToInt (section.range.getValue() * 100.0)) + "%", section.rangeValue,
-                    juce::Justification::centredRight);
+    g.drawText (juce::String (juce::roundToInt (section.range.getValue() * 100.0)) + "%", section.rangeValue,
+                juce::Justification::centredRight);
 
     if (section.hasPhase)
     {
