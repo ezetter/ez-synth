@@ -68,10 +68,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   way of drawing and number of steps, which are saved with the sound, so the Step Filter preset's LFO opens
   in its 8 steps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
-- **Pick how many harmonics to play**, 1 to 9, with the numbered buttons under *Harmonics* (3 to start
-  with). The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
+- **Pick how many harmonics to play**, 1 to 16, with the two rows of numbered buttons under *Harmonics* (3
+  to start with). The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
   its own number. Harmonics the wave doesn't have are still played, at nothing: a square played with 3 has
-  its 1st and 3rd, and its 2nd at 0, so the 2nd button is only outlined.
+  its 1st and 3rd, and its 2nd at 0, so the 2nd button is only outlined. Each harmonic's row of controls
+  stays full size while they all fit; pick more than fit in the window, and the rows, sliders and dials
+  shrink just enough for all of them to.
 - **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
   amplitude next to it, and once you've played a note, its frequency. A slider changes the wave itself,
   adding or taking away that harmonic's sine wave and leaving the others alone, so the drawing and the
@@ -438,7 +440,7 @@ save pictures of the window showing several waves.
 ## How it works
 
 - **Breaking the wave down.** A wave is 512 evenly spaced points. A discrete Fourier transform finds the
-  amplitude and phase of its harmonics 1 to 9 (`Source/Waveform.cpp`). Any offset from zero is left out, as
+  amplitude and phase of its harmonics 1 to 16 (`Source/Waveform.cpp`). Any offset from zero is left out, as
   it can't be heard, and anything 100 dB below full scale counts as 0.
 - **Changing a harmonic.** Harmonics on 512 points are independent, so adding a sine wave at harmonic k to
   the wave changes harmonic k and nothing else. A slider adds the difference between the amplitude it's
@@ -516,7 +518,7 @@ save pictures of the window showing several waves.
 | `Source/WaveGrid.*` | The grid you draw on, smoothly or in steps |
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
 | `Source/RandomWave.*` | Random LFO waves, smooth or in steps, worked out from a seed and the time |
-| `Source/HarmonicSelector.*` | The 1 to 9 buttons |
+| `Source/HarmonicSelector.*` | The 1 to 16 buttons |
 | `Source/HarmonicSliders.*` | A slider and tune and phase dials for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
 | `Source/StandaloneApp.cpp` | The standalone app, which only the standalone build includes, playing from every MIDI device plugged in |

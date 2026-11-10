@@ -35,14 +35,17 @@ void HarmonicSelector::setSilentHarmonics (std::array<bool, waveform::maxHarmoni
 juce::Rectangle<float> HarmonicSelector::getButtonArea (int number) const
 {
     constexpr auto gap = 4.0f;
-    const auto width = ((float) getWidth() - gap * (waveform::maxHarmonics - 1)) / waveform::maxHarmonics;
-    return { (float) (number - 1) * (width + gap), 0.0f, width, (float) getHeight() };
+    const auto width = ((float) getWidth() - gap * (perRow - 1)) / perRow;
+    const auto height = ((float) getHeight() - gap * (numRows - 1)) / numRows;
+    const auto row = (number - 1) / perRow, column = (number - 1) % perRow;
+    return { (float) column * (width + gap), (float) row * (height + gap), width, height };
 }
 
 int HarmonicSelector::getNumberAt (juce::Point<float> position) const
 {
-    const auto proportion = position.x / (float) juce::jmax (1, getWidth());
-    return juce::jlimit (1, waveform::maxHarmonics, 1 + (int) (proportion * waveform::maxHarmonics));
+    const auto column = juce::jlimit (0, perRow - 1, (int) (position.x / (float) juce::jmax (1, getWidth()) * perRow));
+    const auto row = juce::jlimit (0, numRows - 1, (int) (position.y / (float) juce::jmax (1, getHeight()) * numRows));
+    return juce::jlimit (1, waveform::maxHarmonics, 1 + row * perRow + column);
 }
 
 void HarmonicSelector::paint (juce::Graphics& g)

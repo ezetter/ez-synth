@@ -11,8 +11,8 @@ namespace waveform
     /** How many evenly spaced points describe the one wavelength drawn on the grid. */
     inline constexpr int numPoints = 512;
 
-    /** The most harmonics a wave can be played with: the 1st up to the 9th. */
-    inline constexpr int maxHarmonics = 9;
+    /** The most harmonics a wave can be played with: the 1st up to the 16th. */
+    inline constexpr int maxHarmonics = 16;
 
     /** How many harmonics a wave is played with until the user picks another number. */
     inline constexpr int defaultHarmonics = 3;

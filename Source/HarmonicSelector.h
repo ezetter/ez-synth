@@ -4,8 +4,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** A row of buttons, 1 to 9, for how many harmonics to play the wave with, from the 1st up. Each lit button is
-    coloured like its harmonic. A right-click or Control-click asks for an LFO to move the number instead.
+/** Two rows of buttons, 1 to 8 and 9 to 16, for how many harmonics to play the wave with, from the 1st up. Each lit
+    button is coloured like its harmonic. A right-click or Control-click asks for an LFO to move the number instead.
 */
 class HarmonicSelector final : public juce::Component
 {
@@ -17,6 +17,11 @@ public:
 
     /** Which harmonics the wave doesn't have. Their buttons are lit only in outline. */
     void setSilentHarmonics (std::array<bool, waveform::maxHarmonics>);
+
+    /** How many buttons there are in each row, and how many rows. */
+    static constexpr int perRow = 8;
+    static constexpr int numRows = (waveform::maxHarmonics + perRow - 1) / perRow;
+    static constexpr int preferredHeight = 60;
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;

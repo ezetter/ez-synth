@@ -31,31 +31,41 @@ namespace modulation
     /** The two filters, numbered from 0, each of which can be a low pass, a mid pass or a high pass. */
     inline constexpr int numFilters = 2;
 
-    // Every control an LFO or envelope can move is a target, with a number.
+    // Every control an LFO or envelope can move is a target, with a number. The numbers are worked out from how many
+    // harmonics there can be. They're never saved: a sound saves each control by its key.
     inline constexpr int volumeTarget = 0;
     constexpr int oscillatorOnTarget (int oscillator)               { return 1 + oscillator; }
     constexpr int oscillatorLevelTarget (int oscillator)            { return 4 + oscillator; }
     constexpr int oscillatorHarmonicsTarget (int oscillator)        { return 7 + oscillator; }
     constexpr int harmonicTarget (int oscillator, int harmonic)     { return 10 + oscillator * waveform::maxHarmonics + harmonic - 1; }
-    constexpr int filterOnTarget (int filter)                       { return 37 + filter; }
-    constexpr int filterCutoffTarget (int filter)                   { return 39 + filter; }
-    constexpr int filterResonanceTarget (int filter)                { return 41 + filter; }
-    constexpr int oscillatorTuneTarget (int oscillator)             { return 43 + oscillator; }
-    constexpr int filterWidthTarget (int filter)                    { return 46 + filter; }
-    constexpr int filterQTarget (int filter)                        { return 48 + filter; }
-    constexpr int filterDepthTarget (int filter)                    { return 50 + filter; }
+
+    namespace detail
+    {
+        inline constexpr int afterHarmonics = 10 + numOscillators * waveform::maxHarmonics;
+        inline constexpr int afterFilters = afterHarmonics + 15;
+        inline constexpr int afterHarmonicTunes = afterFilters + numOscillators * (waveform::maxHarmonics - 1);
+        inline constexpr int afterHarmonicPhases = afterHarmonicTunes + numOscillators * waveform::maxHarmonics;
+    }
+
+    constexpr int filterOnTarget (int filter)                       { return detail::afterHarmonics + filter; }
+    constexpr int filterCutoffTarget (int filter)                   { return detail::afterHarmonics + 2 + filter; }
+    constexpr int filterResonanceTarget (int filter)                { return detail::afterHarmonics + 4 + filter; }
+    constexpr int oscillatorTuneTarget (int oscillator)             { return detail::afterHarmonics + 6 + oscillator; }
+    constexpr int filterWidthTarget (int filter)                    { return detail::afterHarmonics + 9 + filter; }
+    constexpr int filterQTarget (int filter)                        { return detail::afterHarmonics + 11 + filter; }
+    constexpr int filterDepthTarget (int filter)                    { return detail::afterHarmonics + 13 + filter; }
 
     /** The tune of a harmonic above the fundamental, from the 2nd up. */
-    constexpr int harmonicTuneTarget (int oscillator, int harmonic) { return 52 + oscillator * (waveform::maxHarmonics - 1) + harmonic - 2; }
+    constexpr int harmonicTuneTarget (int oscillator, int harmonic) { return detail::afterFilters + oscillator * (waveform::maxHarmonics - 1) + harmonic - 2; }
 
     /** The phase of a harmonic, from the 1st up, from 0 at the bottom of its travel round to a whole turn at the top. */
-    constexpr int harmonicPhaseTarget (int oscillator, int harmonic) { return 76 + oscillator * waveform::maxHarmonics + harmonic - 1; }
+    constexpr int harmonicPhaseTarget (int oscillator, int harmonic) { return detail::afterHarmonicTunes + oscillator * waveform::maxHarmonics + harmonic - 1; }
 
     /** An LFO's rate, which another LFO, an envelope, velocity or the mod wheel can move, but never the LFO itself,
         even through others.
     */
-    constexpr int lfoRateTarget (int lfo)                           { return 103 + lfo; }
-    inline constexpr int numTargets = 106;
+    constexpr int lfoRateTarget (int lfo)                           { return detail::afterHarmonicPhases + lfo; }
+    inline constexpr int numTargets = lfoRateTarget (numLfos);
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
                       oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate };

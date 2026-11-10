@@ -16,6 +16,13 @@ namespace colours
             juce::Colour (0xff9775fa),   // violet
             juce::Colour (0xfff783ac),   // pink
             juce::Colour (0xffd8f5a2),   // pale lime
+            juce::Colour (0xffe8590c),   // deep orange
+            juce::Colour (0xff20c997),   // teal
+            juce::Colour (0xffcc5de8),   // grape
+            juce::Colour (0xffa5d8ff),   // sky
+            juce::Colour (0xffffc9c9),   // rose
+            juce::Colour (0xffc0eb75),   // lime
+            juce::Colour (0xffb197fc),   // lavender
         };
 
         return palette[(size_t) index % palette.size()];

@@ -286,7 +286,7 @@ void SynthEditor::resized()
     lfoPanel.setBounds (side);
     harmonicsCaption = side.removeFromTop (18);
     side.removeFromTop (6);
-    harmonicSelector.setBounds (side.removeFromTop (34));
+    harmonicSelector.setBounds (side.removeFromTop (HarmonicSelector::preferredHeight));
     side.removeFromTop (10);
 
     // The oscillator's tune, at the foot of the panel.

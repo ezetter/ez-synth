@@ -2519,8 +2519,8 @@ namespace
                "an envelope's release brings a phase back round to rest the shorter way");
 
         check (modulation::getName (modulation::harmonicPhaseTarget (0, 1)) == "Osc 1 harmonic 1 phase"
-                 && modulation::findTarget ("osc3Harmonic9Phase") == modulation::harmonicPhaseTarget (2, 9)
-                 && modulation::harmonicPhaseTarget (2, 9) == modulation::lfoRateTarget (0) - 1,
+                 && modulation::findTarget ("osc3Harmonic16Phase") == modulation::harmonicPhaseTarget (2, 16)
+                 && modulation::harmonicPhaseTarget (2, 16) == modulation::lfoRateTarget (0) - 1,
                "every harmonic's phase, the fundamental's too, is a control of its own");
 
         // The dials: one beside every harmonic, the fundamental too.
@@ -3771,6 +3771,11 @@ namespace
         setNumHarmonics (synth, 9);
         save ("2-square-9");
 
+        // A sawtooth with all 16 harmonics: the rows shrink to fit.
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 16);
+        save ("2a-sawtooth-16");
+
         setPreset (synth, 0, waveform::Preset::sine);
         setNumHarmonics (synth, 3);
         save ("3-sine");
@@ -4045,6 +4050,10 @@ namespace
         setFilter (synth, SynthProcessor::filterIds (1), true, 1200.0f);
         editor->setSize (editor->getConstrainer()->getMinimumWidth(), editor->getConstrainer()->getMinimumHeight());
         save ("8-smallest");
+
+        synth.editedSource = 0;
+        setNumHarmonics (synth, 16, 0);
+        save ("8a-smallest-16-harmonics");
     }
 }
 
