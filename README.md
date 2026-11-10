@@ -318,8 +318,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### Modulation overview
 
-- **See everything that moves a control** on one screen: in the standalone app, choose **Modulation
-  Overview...** from the **Options** menu at the top left of its window. It lists every link, grouped by
+- **See everything that moves a control** on one screen: click **Modulation** in the header, beside
+  **Save**, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
+  left of its window. It lists every link, grouped by
   what it comes from: each LFO and envelope, velocity, the mod wheel, and the MIDI controllers learned.
   Each row names the control and says what's done to it, such as *±20% of its travel, inverted, 90°
   behind* or *CC 74, across its whole travel*.

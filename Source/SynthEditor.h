@@ -113,8 +113,11 @@ private:
     /** Tags the controls linked to MIDI controllers, over everything else. */
     MidiLinkMarkers midiLinkMarkers { synthProcessor };
 
-    /** Over everything, while it's shown. */
+    /** Over everything, while it's shown, and the header's button that shows it, which the plugins need, having no
+        Options menu.
+    */
     ModulationOverview modulationOverview { synthProcessor };
+    juce::TextButton modulationButton { "Modulation" };
 
     /** Opens the modulation editor for a control, next to something standing for it, such as its row in the overview. */
     void showModulationEditor (int target, juce::Component& anchor);

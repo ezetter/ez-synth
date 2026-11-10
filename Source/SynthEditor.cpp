@@ -134,6 +134,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     modulationOverview.onClose = [this] { showModulationOverview (false); };
     addChildComponent (modulationOverview);
 
+    modulationButton.setTooltip ("See everything that moves a control, or is linked to a MIDI controller, together");
+    modulationButton.setMouseClickGrabsKeyboardFocus (false);
+    modulationButton.setWantsKeyboardFocus (false);
+    modulationButton.onClick = [this] { showModulationOverview (! isModulationOverviewShown()); };
+    addAndMakeVisible (modulationButton);
+
     setResizable (true, true);
     setResizeLimits (1420, 900, 2200, 1400);
     setSize (1440, 960);
@@ -227,19 +233,22 @@ void SynthEditor::resized()
 
     auto header = area.removeFromTop (50);
     titleArea = header.removeFromLeft (250);
-    noteArea = header.removeFromRight (240);
+    noteArea = header.removeFromRight (220);
 
     auto presets = header.withSizeKeepingCentre (header.getWidth(), 34);
 
     for (auto& button : presetButtons)
     {
-        button.setBounds (presets.removeFromLeft (96));
+        button.setBounds (presets.removeFromLeft (88));
         presets.removeFromLeft (8);
     }
 
-    // The sound's preset sits between the waves and the note being played.
-    presets.removeFromLeft (16);
-    presets.removeFromRight (16);
+    // The sound's preset sits between the waves and the note being played, with the modulation overview's
+    // button after it.
+    presets.removeFromLeft (12);
+    presets.removeFromRight (12);
+    modulationButton.setBounds (presets.removeFromRight (108));
+    presets.removeFromRight (8);
     presetBar.setBounds (presets.withWidth (juce::jmin (presets.getWidth(), 420)).withX (presets.getRight() - juce::jmin (presets.getWidth(), 420)));
 
     area.removeFromTop (12);
@@ -601,6 +610,7 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
 void SynthEditor::showModulationOverview (bool shown)
 {
     modulationOverview.setVisible (shown);
+    modulationButton.setToggleState (shown, juce::dontSendNotification);
 
     if (shown)
     {

@@ -3514,6 +3514,23 @@ namespace
                 synthEditor.showModulationOverview (true);
                 shown->doneButton.onClick();
                 check (! synthEditor.isModulationOverviewShown(), "...as Done does");
+
+                // The header's Modulation button, for the plugins, which have no Options menu, shows and hides it.
+                juce::Button* button = nullptr;
+
+                for (auto* child : editor->getChildren())
+                    if (auto* textButton = dynamic_cast<juce::TextButton*> (child); textButton != nullptr && textButton->getButtonText() == "Modulation")
+                        button = textButton;
+
+                check (button != nullptr && button->isVisible(), "the header has a Modulation button");
+
+                if (button != nullptr)
+                {
+                    button->onClick();
+                    check (synthEditor.isModulationOverviewShown(), "...which shows the overview");
+                    button->onClick();
+                    check (! synthEditor.isModulationOverviewShown(), "...and, clicked again, hides it");
+                }
             }
 
             synth.editorBeingDeleted (editor.get());
