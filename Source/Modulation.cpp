@@ -27,6 +27,8 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= randomizeTarget (0))
+            info = { Kind::randomize, target - randomizeTarget (0) };
         else if (target >= lfoRateTarget (0))
             info = { Kind::lfoRate, 0, 1, 0, target - lfoRateTarget (0) };
         else if (target >= harmonicPhaseTarget (0, 1))
@@ -85,6 +87,7 @@ namespace modulation
             case Kind::harmonicPhase:        return oscillator + " harmonic " + juce::String (info.harmonic) + " phase";
             case Kind::oscillatorTune:       return oscillator + " tune";
             case Kind::lfoRate:              return "LFO " + juce::String (info.lfo + 1) + " rate";
+            case Kind::randomize:            return oscillator + " randomize";
         }
 
         return {};
@@ -113,6 +116,7 @@ namespace modulation
             case Kind::harmonicPhase:        return oscillator + "Harmonic" + juce::String (info.harmonic) + "Phase";
             case Kind::oscillatorTune:       return oscillator + "Tune";
             case Kind::lfoRate:              return "lfo" + juce::String (info.lfo + 1) + "Period";
+            case Kind::randomize:            return oscillator + "Randomize";
         }
 
         return {};
@@ -141,7 +145,17 @@ namespace modulation
     bool isParameter (int target)
     {
         const auto kind = describe (target).kind;
-        return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase;
+        return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase && kind != Kind::randomize;
+    }
+
+    bool isTrigger (int target)
+    {
+        return describe (target).kind == Kind::randomize;
+    }
+
+    float getMidline (int source)
+    {
+        return source >= 0 && source < numLfos ? 0.0f : 0.5f;
     }
 
     bool makesLoop (const Assignments& assignments, int target, int source)

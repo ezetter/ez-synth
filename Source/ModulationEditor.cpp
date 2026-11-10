@@ -52,10 +52,13 @@ void ModulationEditor::setUp (Section& section)
         addChildComponent (control);
     }
 
+    // A control that's triggered, rather than moved, has no range or polarity: crossing the midline either way
+    // triggers it.
+    const auto triggered = modulation::isTrigger (target);
     section.choice.setVisible (true);
-    section.range.setVisible (true);
+    section.range.setVisible (! triggered);
     section.phase.setVisible (section.hasPhase);
-    section.polarity.setVisible (section.hasPolarity);
+    section.polarity.setVisible (section.hasPolarity && ! triggered);
 }
 
 void ModulationEditor::show (Section& section, const modulation::Assignment& assignment)
@@ -110,6 +113,24 @@ juce::String ModulationEditor::describeSource() const
     const auto& assignment = synthProcessor.getAssignment (target);
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
+    if (modulation::isTrigger (target))
+    {
+        const auto oscillator = "Osc " + juce::String (modulation::describe (target).oscillator + 1);
+
+        if (! assignment.isActive())
+            return "Choose an LFO to randomize " + oscillator + "'s harmonics each time its wave crosses 0, going up or down, "
+                   "or an envelope each time it crosses halfway.";
+
+        if (modulation::isEnvelope (assignment.source))
+            return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time it "
+                   "crosses halfway, rising after a key's pressed or falling, from the newest note.";
+
+        return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time its "
+               "wave crosses 0, rising or falling"
+             + (assignment.phase > 0.0f ? ", " + modulation::phaseToText (assignment.phase) + " later in its period" : juce::String())
+             + ".";
+    }
+
     if (! assignment.isActive())
     {
         // An LFO can't move its own rate, nor the rate of an LFO that moves its own, so those are greyed out.
@@ -163,6 +184,12 @@ juce::String ModulationEditor::describeVelocity() const
     const auto& assignment = synthProcessor.getVelocityAssignment (target);
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
 
+    if (modulation::isTrigger (target))
+        return assignment.isActive() ? juce::String ("A note played harder than halfway after a softer one, or softer after a harder one, "
+                                                     "randomizes the harmonics.")
+                                     : juce::String ("Switch on to randomize the harmonics when a note's played on the other side of "
+                                                     "halfway from the one before, as hard or as soft.");
+
     if (! assignment.isActive())
         return "Switch on to have how hard each key is played move the " + control + ", as well as anything above.";
 
@@ -174,6 +201,11 @@ juce::String ModulationEditor::describeModWheel() const
 {
     const auto& assignment = synthProcessor.getModWheelAssignment (target);
     const auto control = modulation::getName (target).toLowerCase().replace ("lfo", "LFO");
+
+    if (modulation::isTrigger (target))
+        return assignment.isActive() ? juce::String ("Pushing the mod wheel past halfway, either way, randomizes the harmonics.")
+                                     : juce::String ("Switch on to randomize the harmonics each time a MIDI controller's mod wheel "
+                                                     "passes halfway, either way.");
 
     if (! assignment.isActive())
         return "Switch on to have a MIDI controller's mod wheel move the " + control + ", as well as anything above.";
@@ -190,7 +222,7 @@ juce::String ModulationEditor::describeModWheel() const
 
 void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
 {
-    constexpr auto captionWidth = 84;
+    constexpr auto captionWidth = 104;
 
     auto row = area.removeFromTop (26);
     section.choiceCaption = row.removeFromLeft (captionWidth);
@@ -247,19 +279,24 @@ void ModulationEditor::paintSection (juce::Graphics& g, const Section& section, 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
 
+    const auto triggered = modulation::isTrigger (target);
     g.drawText (choiceCaption, section.choiceCaption, juce::Justification::centredLeft);
-    g.drawText ("RANGE", section.rangeCaption, juce::Justification::centredLeft);
+
+    if (! triggered)
+        g.drawText ("RANGE", section.rangeCaption, juce::Justification::centredLeft);
 
     if (section.hasPhase)
         g.drawText ("PHASE", section.phaseCaption, juce::Justification::centredLeft);
 
-    if (section.hasPolarity)
+    if (section.hasPolarity && ! triggered)
         g.drawText ("POLARITY", section.polarityCaption, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
     g.setColour (active ? colours::text : colours::dimText);
-    g.drawText (juce::String (juce::roundToInt (section.range.getValue() * 100.0)) + "%", section.rangeValue,
-                juce::Justification::centredRight);
+
+    if (! triggered)
+        g.drawText (juce::String (juce::roundToInt (section.range.getValue() * 100.0)) + "%", section.rangeValue,
+                    juce::Justification::centredRight);
 
     if (section.hasPhase)
     {
@@ -280,7 +317,8 @@ void ModulationEditor::paint (juce::Graphics& g)
     g.setColour (colours::modulation);
     g.drawText ("MODULATE  " + modulation::getName (target).toUpperCase(), titleArea, juce::Justification::centredLeft, true);
 
-    paintSection (g, source, "MOVED BY", synthProcessor.getAssignment (target).isActive(), describeSource());
+    paintSection (g, source, modulation::isTrigger (target) ? "TRIGGERED BY" : "MOVED BY", synthProcessor.getAssignment (target).isActive(),
+                  describeSource());
 
     g.setColour (colours::outline);
     g.fillRect (dividerArea);

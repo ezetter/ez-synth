@@ -13,7 +13,8 @@
     with a drawn wave of its own, and three envelopes, which run with each note, can move any of the controls.
 */
 class SynthProcessor final : public juce::AudioProcessor,
-                             private juce::AudioProcessorValueTreeState::Listener
+                             private juce::AudioProcessorValueTreeState::Listener,
+                             private juce::Timer
 {
 public:
     SynthProcessor();
@@ -138,6 +139,15 @@ public:
         are left as they are.
     */
     void randomizeHarmonics (int oscillator, juce::Random&);
+
+    /** Randomizes the harmonics of each oscillator whose randomizing has been triggered, by its LFO, envelope,
+        velocity or the mod wheel crossing its midline, since this was last called. The audio thread asks, and the
+        message thread does it, a few dozen times a second.
+    */
+    void randomizeAsTriggered();
+
+    /** How many times an oscillator's randomizing has been triggered and carried out. */
+    int getRandomizeCount (int oscillator) const noexcept   { return randomizeCounts[(size_t) oscillator]; }
 
     /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
@@ -491,6 +501,18 @@ private:
     /** Shares where the newest note still sounding is in each envelope, and how hard it was played. */
     void shareNewestNote();
 
+    /** On the audio thread, after each block: watches what's given each oscillator's randomizing, and asks for it
+        whenever one crosses its midline.
+    */
+    void watchRandomizeTriggers();
+
+    /** A source's value at the end of the block, on the audio thread: an LFO's from where it's got to, shifted
+        back by the phase given, the newest note's envelope, if a note's sounding, and the last note's velocity.
+    */
+    std::optional<float> getSourceValueNow (int source, float phase) const;
+
+    void timerCallback() override;
+
     /** Further from zero than drawing and raising harmonics can take a wave. Loading a saved wave keeps it within
         this, in case the save is corrupt.
     */
@@ -548,6 +570,14 @@ private:
     std::atomic<float>* volume = nullptr;
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
+
+    // For each oscillator's randomizing, what's given it, as moving, by velocity and by the mod wheel, each watched
+    // for crossing its midline. The audio thread counts up the times it's asked for, the message thread how many
+    // it's carried out.
+    std::array<std::array<modulation::MidlineCrossing, 3>, numOscillators> randomizeCrossings {};
+    std::array<std::atomic<int>, numOscillators> randomizeRequests {};
+    std::array<int, numOscillators> randomizeRequestsDone {}, randomizeCounts {};
+    juce::Random randomizer;
     std::atomic<bool> noteSounding { false };
     std::atomic<float> newestVelocity { 1.0f };
     std::atomic<float> modWheelShown { 0.0f };

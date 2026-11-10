@@ -78,7 +78,8 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
-    randomizeButton.setTooltip ("Give this oscillator's 16 harmonics random amplitudes and phases");
+    randomizeButton.setTooltip ("Give this oscillator's 16 harmonics random amplitudes and phases. Right-click to have an LFO, "
+                                "envelope, velocity or the mod wheel randomize them each time it crosses its midline.");
     randomizeButton.setMouseClickGrabsKeyboardFocus (false);
     randomizeButton.setWantsKeyboardFocus (false);
     randomizeButton.onClick = [this]
@@ -437,6 +438,7 @@ void SynthEditor::refresh()
                 harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)),
                                                modulation::oscillatorHarmonicsTarget (edited));
                 harmonicSliders.setOscillator (edited);
+                modulatable::setTarget (randomizeButton, modulation::randomizeTarget (edited));
                 tuneSlider.setOscillator (synthProcessor.parameters, edited);
             }
 
@@ -453,6 +455,13 @@ void SynthEditor::refresh()
                 silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
 
             harmonicSelector.setSilentHarmonics (silent);
+
+            // The button's text is in the modulation colour while something triggers it.
+            const auto randomizeTarget = modulation::randomizeTarget (edited);
+            const auto triggered = synthProcessor.getAssignment (randomizeTarget).isActive()
+                                || synthProcessor.getVelocityAssignment (randomizeTarget).isActive()
+                                || synthProcessor.getModWheelAssignment (randomizeTarget).isActive();
+            randomizeButton.setColour (juce::TextButton::textColourOffId, triggered ? colours::modulation : colours::text);
         }
 
         repaint (sidePanel);

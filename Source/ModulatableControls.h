@@ -76,3 +76,19 @@ public:
 private:
     bool alternateClick = false;
 };
+
+/** A button that, on a right-click or Control-click, asks for the modulation editor rather than being clicked, such
+    as one that something can trigger.
+*/
+class ModulatableTextButton final : public juce::TextButton
+{
+public:
+    using juce::TextButton::TextButton;
+
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+
+private:
+    bool alternateClick = false;
+};

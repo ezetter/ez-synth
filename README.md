@@ -81,6 +81,16 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the sliders' travel, so weak harmonics turn up as often as they would dragging a slider at random, and a
   wave that would go past full scale is turned down to fit the grid. The harmonics' tunings, the number
   played and the other oscillators are left alone. Click it again for another; Cmd-Z undoes it.
+- **Randomize from a modulator.** Right-click, or Control-click, **Randomize** to have an LFO, envelope,
+  velocity or the mod wheel randomize the oscillator's harmonics for you, each time it crosses its
+  midline, either way. An LFO crosses at 0, so a looping LFO randomizes twice a period, even with no
+  note playing; its phase shifts when. An envelope crosses halfway, as the newest note's attack rises past
+  it and again as its release falls; the mod wheel as it's pushed past halfway and pulled back. Velocity
+  randomizes when a note's played on the other side of halfway from the note before: hard after soft, or
+  soft after hard. There's no range or polarity, as crossing either way triggers it. While something's
+  set to trigger it, the button's text is light blue. The audio thread spots each crossing and the window's
+  thread randomizes, a few dozen times a second at most, so an LFO faster than about 30 Hz won't randomize
+  on every crossing.
 - **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
   amplitude next to it, and once you've played a note, its frequency. A slider changes the wave itself,
   adding or taking away that harmonic's sine wave and leaving the others alone, so the drawing and the

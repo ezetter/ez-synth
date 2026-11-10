@@ -65,10 +65,15 @@ namespace modulation
         even through others.
     */
     constexpr int lfoRateTarget (int lfo)                           { return detail::afterHarmonicPhases + lfo; }
-    inline constexpr int numTargets = lfoRateTarget (numLfos);
+
+    /** Randomizing an oscillator's harmonics: not a control that's moved, but one that's triggered, each time the
+        LFO, envelope, velocity or mod wheel given it crosses its midline, either way.
+    */
+    constexpr int randomizeTarget (int oscillator)                  { return lfoRateTarget (numLfos) + oscillator; }
+    inline constexpr int numTargets = randomizeTarget (numOscillators);
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate };
+                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate, randomize };
 
     struct TargetInfo
     {
@@ -180,6 +185,39 @@ namespace modulation
         goes round, and otherwise stopped at the end it's gone past.
     */
     float keepInTravel (int target, float position);
+
+    /** Whether a target is triggered when its source crosses its midline, rather than moved along a travel. */
+    bool isTrigger (int target);
+
+    /** The value a source crosses to trigger a target: 0 for an LFO, which swings from -1 to 1, and halfway for an
+        envelope, velocity and the mod wheel, which go from 0 to 1.
+    */
+    float getMidline (int source);
+
+    /** Follows a source's value, from one look to the next, telling when it's crossed its midline. Landing on the
+        midline itself doesn't cross it: the value has to go on to the other side.
+    */
+    struct MidlineCrossing
+    {
+        /** Takes the source's value now, or nothing if it has none, such as an envelope with no note sounding, and
+            whether it's crossed its midline since the last value.
+        */
+        bool update (std::optional<float> value, float midline) noexcept
+        {
+            if (! value.has_value())
+            {
+                side = 0;
+                return false;
+            }
+
+            const auto now = *value > midline ? 1 : *value < midline ? -1 : side;
+            const auto crossed = side != 0 && now != 0 && now != side;
+            side = now;
+            return crossed;
+        }
+
+        int side = 0;   // which side of the midline it was last seen, -1 below, 1 above, or 0 if not yet
+    };
 
     /** Where an envelope moves a control to, from a position along its travel. While the key is held, the envelope
         moves it by its range times its level. Once the key is let go, the control falls steadily from where it was

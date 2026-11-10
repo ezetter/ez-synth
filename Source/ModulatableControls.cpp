@@ -130,3 +130,25 @@ void ModulatableToggle::mouseUp (const juce::MouseEvent& e)
     if (! alternateClick)
         ToggleButton::mouseUp (e);
 }
+
+void ModulatableTextButton::mouseDown (const juce::MouseEvent& e)
+{
+    alternateClick = e.mods.isPopupMenu();
+
+    if (alternateClick)
+        modulatable::requestEditor (*this);
+    else
+        TextButton::mouseDown (e);
+}
+
+void ModulatableTextButton::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! alternateClick)
+        TextButton::mouseDrag (e);
+}
+
+void ModulatableTextButton::mouseUp (const juce::MouseEvent& e)
+{
+    if (! alternateClick)
+        TextButton::mouseUp (e);
+}

@@ -1739,6 +1739,115 @@ namespace
         synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
     }
 
+    /** Plays blocks for as long as given, with MIDI at the times given, randomizing the harmonics as triggered
+        after each block, as the message thread would, and returns how many times each oscillator was randomized.
+    */
+    std::array<int, SynthProcessor::numOscillators> countRandomizing (SynthProcessor& synth,
+                                                                      const std::vector<std::pair<double, juce::MidiMessage>>& events,
+                                                                      double totalSeconds)
+    {
+        synth.prepareToPlay (sampleRate, blockSize);
+        juce::AudioBuffer<float> buffer (2, blockSize);
+        std::array<int, SynthProcessor::numOscillators> before {};
+
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+            before[(size_t) i] = synth.getRandomizeCount (i);
+
+        for (int start = 0; start < (int) (totalSeconds * sampleRate); start += blockSize)
+        {
+            juce::MidiBuffer midi;
+
+            for (const auto& [seconds, message] : events)
+                if (const auto position = (int) (seconds * sampleRate) - start; position >= 0 && position < blockSize)
+                    midi.addEvent (message, position);
+
+            synth.processBlock (buffer, midi);
+            synth.randomizeAsTriggered();
+        }
+
+        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+            before[(size_t) i] = synth.getRandomizeCount (i) - before[(size_t) i];
+
+        return before;
+    }
+
+    void testRandomizeTriggers()
+    {
+        std::cout << "Randomizing harmonics from a modulator" << std::endl;
+
+        {
+            modulation::MidlineCrossing crossing;
+            const auto crossed = std::vector<bool> { crossing.update (-0.5f, 0.0f), crossing.update (-0.1f, 0.0f), crossing.update (0.0f, 0.0f),
+                                                     crossing.update (0.3f, 0.0f), crossing.update (0.0f, 0.0f), crossing.update (-0.2f, 0.0f),
+                                                     crossing.update (std::nullopt, 0.0f), crossing.update (0.4f, 0.0f) };
+            check (crossed == std::vector<bool> { false, false, false, true, false, true, false, false },
+                   "crossing the midline either way counts, landing on it doesn't, and nothing to watch starts afresh");
+        }
+
+        const auto target = modulation::randomizeTarget (1);
+        check (modulation::getName (target) == "Osc 2 randomize" && modulation::findTarget ("osc2Randomize") == target
+                 && modulation::isTrigger (target) && ! modulation::isTrigger (modulation::volumeTarget) && ! modulation::isParameter (target),
+               "each oscillator's randomizing is a control of its own, which is triggered rather than moved");
+
+        // A looping square LFO, a period a second, crosses 0 twice a period, at each step.
+        {
+            SynthProcessor synth;
+            setLfo (synth, 0, 1.0f, false, waveform::Preset::square);
+            synth.setAssignment (target, { 0, 1.0f, false });
+            const auto otherShape = synth.getShape (0);
+            const auto shapeBefore = synth.getShape (1);
+            const auto counts = countRandomizing (synth, {}, 2.1);
+            check (counts == std::array<int, SynthProcessor::numOscillators> { 0, 4, 0 },
+                   "an LFO randomizes the harmonics each time its wave crosses 0, up or down, with no note playing");
+            check (synth.getShape (1) != shapeBefore && synth.getShape (0) == otherShape, "...only the oscillator it's given to");
+            check (! synth.getLivePosition (target).has_value(), "randomizing isn't shown as moved along a travel");
+
+            synth.setAssignment (target, {});
+            check (countRandomizing (synth, {}, 1.1)[1] == 0, "taken off, it doesn't randomize");
+        }
+
+        // An envelope crosses halfway rising as the note starts, and falling as it's let go.
+        {
+            SynthProcessor synth;
+            setEnvelope (synth, 0, { 0.05f, 0.0f, 1.0f, 0.05f });
+            synth.setAssignment (target, { modulation::envelopeSource (0), 1.0f, false });
+            const auto counts = countRandomizing (synth, { { 0.1, juce::MidiMessage::noteOn (1, 60, 1.0f) },
+                                                           { 0.5, juce::MidiMessage::noteOff (1, 60) } }, 1.0);
+            check (counts[1] == 2, "an envelope randomizes the harmonics as it rises past halfway, and as it falls past it");
+        }
+
+        // The mod wheel crosses halfway, up and back down.
+        {
+            SynthProcessor synth;
+            synth.setModWheelAssignment (target, { modulation::modWheelSource, 1.0f, false });
+            const auto wheel = [] (int value) { return juce::MidiMessage::controllerEvent (1, modulation::modWheelController, value); };
+            const auto counts = countRandomizing (synth, { { 0.1, wheel (127) }, { 0.2, wheel (90) }, { 0.3, wheel (20) } }, 0.5);
+            check (counts[1] == 2, "the mod wheel randomizes the harmonics each time it passes halfway");
+        }
+
+        // Velocity crosses halfway from one note to the next, however long between them.
+        {
+            SynthProcessor synth;
+            synth.setVelocityAssignment (target, { modulation::velocitySource, 1.0f, false });
+            const auto counts = countRandomizing (synth, { { 0.0, juce::MidiMessage::noteOn (1, 60, 0.3f) }, { 0.1, juce::MidiMessage::noteOff (1, 60) },
+                                                           { 1.0, juce::MidiMessage::noteOn (1, 62, 0.9f) }, { 1.1, juce::MidiMessage::noteOff (1, 62) },
+                                                           { 1.3, juce::MidiMessage::noteOn (1, 64, 1.0f) } }, 1.5);
+            check (counts[1] == 1, "velocity randomizes the harmonics when a note's played the other side of halfway from the one before");
+        }
+
+        // Saved with the sound, and loaded back.
+        {
+            SynthProcessor synth;
+            synth.setAssignment (target, { 2, 1.0f, false, 0.25f });
+            juce::MemoryBlock state;
+            synth.getStateInformation (state);
+            SynthProcessor loaded;
+            loaded.setStateInformation (state.getData(), (int) state.getSize());
+            check (loaded.getAssignment (target).source == 2 && isNear (loaded.getAssignment (target).phase, 0.25, 1.0e-5),
+                   "what randomizes an oscillator's harmonics is saved with the sound");
+        }
+    }
+
     void testVelocity()
     {
         std::cout << "Velocity" << std::endl;
@@ -1952,7 +2061,7 @@ namespace
         // Each LFO's rate is a control too, which only the mod wheel can move.
         const auto rate = modulation::lfoRateTarget (0);
         check (modulation::getName (modulation::lfoRateTarget (2)) == "LFO 3 rate" && modulation::getKey (rate) == SynthProcessor::lfoPeriodId (0)
-                 && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (2) == modulation::numTargets - 1,
+                 && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (2) == modulation::randomizeTarget (0) - 1,
                "each LFO's rate is a control the mod wheel can move");
 
         // Other LFOs can move an LFO's rate too, but never so that an LFO moves its own, even through others.
@@ -3979,6 +4088,9 @@ namespace
         saveModulationEditor (modulation::filterCutoffTarget (0), "11-modulation-editor");
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
         saveModulationEditor (modulation::lfoRateTarget (0), "11b-modulation-editor-lfo-rate");
+        synth.setAssignment (modulation::randomizeTarget (0), { 1, 1.0f, false, 0.25f });
+        saveModulationEditor (modulation::randomizeTarget (0), "11c-modulation-editor-randomize");
+        synth.setAssignment (modulation::randomizeTarget (0), {});
 
         // Waves drawn in steps: the Step Filter preset's LFO, in its 8 steps, and an oscillator drawn in 12.
         {
@@ -4170,6 +4282,7 @@ int main (int argc, char* argv[])
     testChangingTheWaveMidNote();
     testEditingHarmonics();
     testRandomizingHarmonics();
+    testRandomizeTriggers();
     testTuningHarmonics();
     testHarmonicPhases();
     testDrawingInSteps();

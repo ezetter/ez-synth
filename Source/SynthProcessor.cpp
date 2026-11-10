@@ -389,10 +389,15 @@ SynthProcessor::SynthProcessor()
     presetEdited = false;
     initState = createState();
     undoHistory.push_back (initState);
+
+    // The audio thread asks for oscillators' harmonics to be randomized; the message thread does it.
+    startTimerHz (60);
 }
 
 SynthProcessor::~SynthProcessor()
 {
+    stopTimer();
+
     for (auto* parameter : getParameters())
         if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (parameter))
             parameters.removeParameterListener (withId->paramID, this);
@@ -519,7 +524,83 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
 
+    watchRandomizeTriggers();
+
     samplesPlayed += numSamples;
+}
+
+void SynthProcessor::watchRandomizeTriggers()
+{
+    for (size_t i = 0; i < (size_t) numOscillators; ++i)
+    {
+        const auto target = (size_t) modulation::randomizeTarget ((int) i);
+        auto& crossings = randomizeCrossings[i];
+        auto triggered = false;
+
+        const auto watch = [this, &triggered] (modulation::MidlineCrossing& crossing, const modulation::Assignment& assignment)
+        {
+            const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase) : std::nullopt;
+            triggered = crossing.update (value, modulation::getMidline (assignment.source)) || triggered;
+        };
+
+        watch (crossings[0], patch.assignments[target]);
+        watch (crossings[1], patch.velocityAssignments[target]);
+        watch (crossings[2], patch.modWheelAssignments[target]);
+
+        if (triggered)
+            ++randomizeRequests[i];
+    }
+}
+
+std::optional<float> SynthProcessor::getSourceValueNow (int source, float phase) const
+{
+    // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
+    if (source == modulation::velocitySource)
+        return lastNote >= 0 ? std::optional (newestVelocity.load()) : std::nullopt;
+
+    if (source == modulation::modWheelSource)
+        return patch.modWheel;
+
+    // With no note sounding, an envelope's at rest, at 0, so a note's attack crosses halfway on the way up.
+    if (modulation::isEnvelope (source))
+        return noteSounding ? envelopeDisplays[(size_t) (source - numLfos)].level.load() : 0.0f;
+
+    if (source < 0 || source >= numLfos || ! patch.lfos[(size_t) source].on)
+        return std::nullopt;
+
+    const auto& lfo = patch.lfos[(size_t) source];
+    const auto progress = lfoProgress[(size_t) source].load();
+
+    if (progress < 0.0)
+        return std::nullopt;
+
+    const auto periods = (lfo.fromKey ? progress : (double) lfoCyclesShown[(size_t) source].load() + progress) - phase;
+
+    if (! lfo.random)
+        return modulation::lfoValue (lfo.shape, periods, lfo.fromKey, lfo.times);
+
+    return lfo.fromKey ? randomwave::fromKeyValueAt (newestOnceSeeds[(size_t) source].load(), periods, lfo.drawing, lfo.times)
+                       : randomwave::valueAt (lfo.seed, periods, lfo.drawing);
+}
+
+void SynthProcessor::randomizeAsTriggered()
+{
+    for (size_t i = 0; i < (size_t) numOscillators; ++i)
+    {
+        const auto requests = randomizeRequests[i].load();
+
+        if (requests != randomizeRequestsDone[i])
+        {
+            randomizeRequestsDone[i] = requests;
+            randomizeHarmonics ((int) i, randomizer);
+            ++randomizeCounts[i];
+        }
+    }
+}
+
+void SynthProcessor::timerCallback()
+{
+    randomizeAsTriggered();
 }
 
 void SynthProcessor::shareNewestNote()
@@ -1070,8 +1151,9 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
 
 std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
-    // A synced LFO's rate is the tempo's, which nothing moves.
-    if (const auto info = modulation::describe (target); info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
+    // A synced LFO's rate is the tempo's, which nothing moves, and randomizing is triggered, not moved.
+    if (const auto info = modulation::describe (target); (info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
+                                                           || info.kind == modulation::Kind::randomize)
         return std::nullopt;
 
     // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope,
@@ -1179,6 +1261,10 @@ float SynthProcessor::getPosition (int target) const
         return parameters.getParameter (modulation::getKey (target))->getValue();
 
     const auto info = modulation::describe (target);
+
+    // Randomizing isn't anywhere along a travel.
+    if (info.kind == modulation::Kind::randomize)
+        return 0.0f;
 
     // A harmonic's tune is in tune in the middle of its travel, and its phase goes from 0 round to a whole turn.
     if (info.kind == modulation::Kind::harmonicTune)

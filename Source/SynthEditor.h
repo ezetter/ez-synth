@@ -93,7 +93,7 @@ private:
     HarmonicSelector harmonicSelector;
 
     /** Gives the oscillator shown random harmonics, every one's amplitude and phase. */
-    juce::TextButton randomizeButton { "Randomize" };
+    ModulatableTextButton randomizeButton { "Randomize" };
     juce::Random random;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     PresetBar presetBar;
