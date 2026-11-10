@@ -78,6 +78,17 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
+    randomizeButton.setTooltip ("Give this oscillator's 16 harmonics random amplitudes and phases");
+    randomizeButton.setMouseClickGrabsKeyboardFocus (false);
+    randomizeButton.setWantsKeyboardFocus (false);
+    randomizeButton.onClick = [this]
+    {
+        userTouched = true;
+        synthProcessor.randomizeHarmonics (synthProcessor.editedSource, random);
+        refresh();
+    };
+    addChildComponent (randomizeButton);
+
     for (size_t i = 0; i < presetButtons.size(); ++i)
     {
         const auto preset = waveform::allPresets[i];
@@ -284,7 +295,8 @@ void SynthEditor::resized()
 
     auto side = sidePanel.reduced (16, 14);
     lfoPanel.setBounds (side);
-    harmonicsCaption = side.removeFromTop (18);
+    harmonicsCaption = side.removeFromTop (24);
+    randomizeButton.setBounds (harmonicsCaption.removeFromRight (100));
     side.removeFromTop (6);
     harmonicSelector.setBounds (side.removeFromTop (HarmonicSelector::preferredHeight));
     side.removeFromTop (10);
@@ -406,6 +418,7 @@ void SynthEditor::refresh()
 
         grid.setDrawing (synthProcessor.getDrawing (edited));
         harmonicSelector.setVisible (! editingLfo);
+        randomizeButton.setVisible (! editingLfo);
         harmonicSliders.setVisible (! editingLfo);
         tuneSlider.setVisible (! editingLfo);
         lfoPanel.setVisible (editingLfo);

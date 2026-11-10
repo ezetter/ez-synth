@@ -476,6 +476,76 @@ namespace
         check (peakOf (loud) <= peakOf (plain) * 1.001f, "a wave raised beyond full scale is turned down to fit");
     }
 
+    void testRandomizingHarmonics()
+    {
+        std::cout << "Randomizing harmonics" << std::endl;
+
+        SynthProcessor synth;
+        setPreset (synth, 1, waveform::Preset::square);
+        setNumHarmonics (synth, 5, 1);
+        synth.setHarmonicTune (1, 4, 0.3f);
+        const auto otherShape = synth.getShape (0);
+
+        juce::Random random (20261110);
+        synth.randomizeHarmonics (1, random);
+        const auto first = synth.getDecomposition (1);
+        const auto& shape = synth.getShape (1);
+
+        auto allSounding = true, withinGrid = true;
+
+        for (const auto& harmonic : first.harmonics)
+            allSounding = allSounding && harmonic.amplitude > 0.0f;
+
+        for (const auto value : shape)
+            withinGrid = withinGrid && std::abs (value) <= 1.0f + 1.0e-4f;
+
+        check (allSounding, "randomizing gives every one of the 16 harmonics an amplitude");
+        check (withinGrid, "...and keeps the wave within the grid");
+        check (! synth.getPreset (1).has_value(), "...making a Custom wave");
+        check (synth.getShape (0) == otherShape && synth.getNumHarmonics (1) == 5 && isNear (synth.getHarmonicTune (1, 4), 0.3, 1.0e-6),
+               "...leaving the other oscillators, the number of harmonics played and the harmonics' tunings alone");
+
+        auto phasesSpread = false, amplitudesDiffer = false;
+
+        for (size_t i = 1; i < first.harmonics.size(); ++i)
+        {
+            phasesSpread = phasesSpread || std::abs (synth.getHarmonicPhase (1, (int) i + 1) - synth.getHarmonicPhase (1, 1)) > 0.5f;
+            amplitudesDiffer = amplitudesDiffer || std::abs (first.harmonics[i].amplitude - first.harmonics[0].amplitude) > 0.05f;
+        }
+
+        check (phasesSpread && amplitudesDiffer, "the harmonics get different amplitudes and phases");
+
+        const auto firstShape = synth.getShape (1);
+        synth.randomizeHarmonics (1, random);
+        check (synth.getShape (1) != firstShape, "randomizing again gives a different wave");
+
+        // The window's button randomizes the oscillator shown, as one step to undo.
+        {
+            SynthProcessor shown;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            shown.editedSource = 2;
+            synthEditor.refresh();
+            const auto before = shown.getShape (2);
+
+            juce::Button* button = nullptr;
+
+            for (auto* child : editor->getChildren())
+                if (auto* textButton = dynamic_cast<juce::TextButton*> (child); textButton != nullptr && textButton->getButtonText() == "Randomize")
+                    button = textButton;
+
+            check (button != nullptr && button->isVisible(), "the harmonics panel has a Randomize button");
+
+            if (button != nullptr)
+            {
+                button->onClick();
+                check (shown.getShape (2) != before && shown.getShape (0) != shown.getShape (2), "it randomizes the oscillator shown");
+            }
+
+            shown.editorBeingDeleted (editor.get());
+        }
+    }
+
     void testOscillators()
     {
         std::cout << "Mixing oscillators" << std::endl;
@@ -4099,6 +4169,7 @@ int main (int argc, char* argv[])
     testPlaying();
     testChangingTheWaveMidNote();
     testEditingHarmonics();
+    testRandomizingHarmonics();
     testTuningHarmonics();
     testHarmonicPhases();
     testDrawingInSteps();

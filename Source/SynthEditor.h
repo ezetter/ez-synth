@@ -91,6 +91,10 @@ private:
     FilterPanel filterPanel;
     std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
     HarmonicSelector harmonicSelector;
+
+    /** Gives the oscillator shown random harmonics, every one's amplitude and phase. */
+    juce::TextButton randomizeButton { "Randomize" };
+    juce::Random random;
     std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     PresetBar presetBar;
     ModulatableSlider volumeKnob;

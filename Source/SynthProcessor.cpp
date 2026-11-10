@@ -1,5 +1,7 @@
 #include "SynthProcessor.h"
 
+#include <numeric>
+
 #include "RandomWave.h"
 #include "SynthEditor.h"
 
@@ -781,6 +783,41 @@ void SynthProcessor::setHarmonicPhase (int oscillator, int harmonic, float phase
     waveform::addHarmonic (shape, harmonic, -current.amplitude, current.phase);
     waveform::addHarmonic (shape, harmonic, current.amplitude, phase);
     replaceShape (oscillator, shape, std::nullopt);
+}
+
+void SynthProcessor::randomizeHarmonics (int oscillator, juce::Random& random)
+{
+    markEdited();
+
+    std::array<float, waveform::maxHarmonics> amplitudes {}, phases {};
+
+    for (size_t i = 0; i < amplitudes.size(); ++i)
+    {
+        amplitudes[i] = modulation::amplitudeRange().convertFrom0to1 (random.nextFloat());
+        phases[i] = random.nextFloat() * juce::MathConstants<float>::twoPi;
+    }
+
+    const auto build = [&amplitudes, &phases] (float scale)
+    {
+        waveform::Shape shape {};
+
+        for (size_t i = 0; i < amplitudes.size(); ++i)
+            waveform::addHarmonic (shape, (int) i + 1, amplitudes[i] * scale, phases[i]);
+
+        return shape;
+    };
+
+    auto shape = build (1.0f);
+    const auto peak = std::accumulate (shape.begin(), shape.end(), 0.0f, [] (float a, float b) { return std::max (a, std::abs (b)); });
+
+    if (peak > 1.0f)
+        shape = build (1.0f / peak);
+
+    replaceShape (oscillator, shape, std::nullopt);
+
+    // Harmonics too weak to keep come back in at their new phases when they're raised.
+    std::copy (phases.begin(), phases.end(), oscillators[(size_t) oscillator].phases.begin());
+    share();
 }
 
 //==============================================================================

@@ -132,6 +132,13 @@ public:
     float getHarmonicPhase (int oscillator, int harmonic) const noexcept;
     void setHarmonicPhase (int oscillator, int harmonic, float phase);
 
+    /** Gives every one of an oscillator's 16 harmonics a random amplitude and phase, making a new Custom wave. The
+        amplitudes are spread evenly along their sliders' travel, so weak harmonics are as likely as along the
+        sliders. A wave that would reach beyond full scale is turned down to fit the grid. The harmonics' tunings
+        are left as they are.
+    */
+    void randomizeHarmonics (int oscillator, juce::Random&);
+
     /** Goes up whenever any oscillator's or LFO's wave changes, so the editor can tell when to redraw. */
     int getShapeVersion() const noexcept   { return shapeVersion; }
 

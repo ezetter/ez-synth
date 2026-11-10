@@ -75,6 +75,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   its 1st and 3rd, and its 2nd at 0, so the 2nd number is only outlined. Each harmonic's row of controls
   stays full size while they all fit; pick more than fit in the window, and the rows, sliders and dials
   shrink just enough for all of them to.
+- **Randomize** at the top right of the harmonics panel gives the oscillator shown a new random wave:
+  every one of its 16 harmonics gets a random amplitude and phase, even those it isn't playing yet, so
+  raising the number of harmonics brings in more of the same random wave. Amplitudes are spread evenly along
+  the sliders' travel, so weak harmonics turn up as often as they would dragging a slider at random, and a
+  wave that would go past full scale is turned down to fit the grid. The harmonics' tunings, the number
+  played and the other oscillators are left alone. Click it again for another; Cmd-Z undoes it.
 - **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
   amplitude next to it, and once you've played a note, its frequency. A slider changes the wave itself,
   adding or taking away that harmonic's sine wave and leaving the others alone, so the drawing and the
