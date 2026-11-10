@@ -6,7 +6,6 @@
 #include "HarmonicSliders.h"
 #include "Keyboard.h"
 #include "LfoPanel.h"
-#include "MidiLinkMarkers.h"
 #include "ModulationOverview.h"
 #include "MidiPanel.h"
 #include "ModulatableControls.h"
@@ -109,9 +108,6 @@ private:
 
     /** Only in the standalone app, which plays from MIDI devices itself. */
     std::unique_ptr<MidiPanel> midiPanel;
-
-    /** Tags the controls linked to MIDI controllers, over everything else. */
-    MidiLinkMarkers midiLinkMarkers { synthProcessor };
 
     /** Over everything, while it's shown, and the header's button that shows it, which the plugins need, having no
         Options menu.

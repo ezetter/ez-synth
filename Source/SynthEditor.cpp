@@ -136,7 +136,6 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         addAndMakeVisible (*midiPanel);
     }
 
-    addAndMakeVisible (midiLinkMarkers);
 
     modulationOverview.onEdit = [this] (int target, juce::Component& row) { showModulationEditor (target, row); };
     modulationOverview.onClose = [this] { showModulationOverview (false); };
@@ -235,7 +234,6 @@ void SynthEditor::paintNote (juce::Graphics& g) const
 
 void SynthEditor::resized()
 {
-    midiLinkMarkers.setBounds (getLocalBounds());
     modulationOverview.setBounds (getLocalBounds());
     auto area = getLocalBounds().reduced (18);
 
@@ -698,7 +696,6 @@ void SynthEditor::timerCallback()
 {
     refresh();
     showModulation();
-    midiLinkMarkers.refresh();
     rememberChanges();
 
     // In the standalone app the computer keyboard plays the piano straight away.

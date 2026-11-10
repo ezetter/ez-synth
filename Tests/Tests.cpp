@@ -3,7 +3,6 @@
 
 #include "../Source/HarmonicSelector.h"
 #include "../Source/MidiInputs.h"
-#include "../Source/MidiLinkMarkers.h"
 #include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
 #include "../Source/ModulationOverview.h"
@@ -3382,46 +3381,6 @@ namespace
         loaded.loadInitPreset();
         check (loaded.getMidiController (cutoff) == 74, "loading a preset keeps the links");
 
-        // The window tags each control linked to a controller with its number, and the one being learned.
-        {
-            SynthProcessor shown;
-            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
-            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
-            synthEditor.refresh();
-
-            const auto markers = [&editor]
-            {
-                for (auto* child : editor->getChildren())
-                    if (auto* found = dynamic_cast<MidiLinkMarkers*> (child))
-                        return found->getMarkers();
-
-                return std::vector<MidiLinkMarkers::Marker>();
-            };
-
-            check (markers().empty(), "no control is tagged until one's linked");
-
-            shown.setMidiController (modulation::volumeTarget, 7);
-            shown.setMidiController (modulation::harmonicTarget (0, 2), 20);
-            shown.setMidiController (modulation::harmonicTarget (1, 2), 21);
-            shown.startMidiLearn (modulation::filterCutoffTarget (0));
-            auto tags = markers();
-            juce::StringArray texts;
-
-            for (const auto& tag : tags)
-                texts.add (tag.text + (tag.learning ? "?" : ""));
-
-            texts.sort (false);
-            check (texts == juce::StringArray { "20", "7", "MIDI?" },
-                   "linked controls shown are tagged with their controller's number, and the one being learned with MIDI");
-
-            const auto volumeTag = std::find_if (tags.begin(), tags.end(), [] (const MidiLinkMarkers::Marker& tag) { return tag.text == "7"; });
-            check (volumeTag != tags.end() && editor->getLocalBounds().toFloat().contains (volumeTag->area),
-                   "...each in the window, at its control");
-
-            shown.stopMidiLearn();
-            shown.editorBeingDeleted (editor.get());
-        }
-
         // The modulation editor's Learn button starts learning, and closing it stops.
         {
             auto editor = std::make_unique<ModulationEditor> (loaded, modulation::volumeTarget);
@@ -4581,18 +4540,15 @@ namespace
         synthEditor.showModulation();
         save ("10-modulated-controls");
 
-        // Controls linked to MIDI controllers are tagged, and the one learning shows MIDI.
+        // The modulation overview, with some controls linked to MIDI controllers, which only it shows.
         synth.setMidiController (modulation::volumeTarget, 7);
         synth.setMidiController (modulation::filterCutoffTarget (0), 74);
         synth.setMidiController (modulation::harmonicTarget (0, 2), 20);
         synth.setMidiController (modulation::oscillatorLevelTarget (1), 21);
-        synth.startMidiLearn (modulation::harmonicPhaseTarget (0, 3));
         synthEditor.refresh();
-        save ("10a-midi-links");
         synthEditor.showModulationOverview (true);
         save ("10b-modulation-overview");
         synthEditor.showModulationOverview (false);
-        synth.stopMidiLearn();
 
         for (const auto target : { modulation::volumeTarget, modulation::filterCutoffTarget (0), modulation::harmonicTarget (0, 2),
                                    modulation::oscillatorLevelTarget (1) })

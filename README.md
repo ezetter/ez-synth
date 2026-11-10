@@ -350,8 +350,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   Linked to **Randomize**, or a harmonic's switch, a knob triggers it each time it's turned past its
   **Threshold**, either way: halfway to start with. The threshold's slider is under the MIDI CC row, and at
   0% only turning the knob right down counts, and at 100% only turning it right up. It's kept with the link.
-- **See what's linked.** Each linked control has a small amber tag at its top right with its controller's
-  number, such as *74*, and the control waiting to learn one reads *MIDI* until a knob's moved.
+- **See what's linked** in the **Modulation** overview, which lists every control linked to a MIDI
+  controller, with its number, such as *CC 74*, as well as in each control's own right-click window.
 - **One control for each controller.** Linking a controller to a second control unlinks it from the first.
   Controllers 120 and up, such as All Notes Off, can't be learned. The mod wheel, controller 1, can, though
   it also goes on moving whatever it's set to move as a modulator.
@@ -570,7 +570,6 @@ save pictures of the window showing several waves.
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
-| `Source/MidiLinkMarkers.*` | The amber tags on controls linked to MIDI controllers |
 | `Source/ModulationOverview.*` | The screen listing everything that moves a control, or is linked to one |
 | `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, velocity and the mod wheel, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |

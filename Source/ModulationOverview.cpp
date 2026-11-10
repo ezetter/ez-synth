@@ -4,7 +4,7 @@
 
 namespace
 {
-    /** The amber of MIDI links, as the tags on linked controls have. */
+    /** The amber MIDI links are shown in, apart from the blue of modulation. */
     const juce::Colour midiColour { 0xffffb347 };
 
     juce::String percent (float proportion)
