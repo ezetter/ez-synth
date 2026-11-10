@@ -91,6 +91,35 @@ namespace waveform
     */
     Decomposition decompose (const Shape&);
 
+    /** Whether a harmonic is played as the number of harmonics says, or switched off, or switched on even above it. */
+    enum class HarmonicSwitch : std::uint8_t { follows, off, on };
+    using HarmonicSwitches = std::array<HarmonicSwitch, maxHarmonics>;
+
+    /** The harmonics switched off and on, as bits from the 1st up, for the audio thread. */
+    struct HarmonicSet
+    {
+        std::uint32_t on = 0, off = 0;
+
+        HarmonicSet() = default;
+        explicit HarmonicSet (const HarmonicSwitches&);
+
+        /** Whether a harmonic, numbered from 1, plays when the number of harmonics is as given: if it's switched on,
+            or if it's within the number and not switched off.
+        */
+        bool plays (int harmonic, int count) const noexcept
+        {
+            const auto bit = 1u << (unsigned) (harmonic - 1);
+            return (on & bit) != 0 || (harmonic <= count && (off & bit) == 0);
+        }
+
+        bool operator== (const HarmonicSet&) const = default;
+    };
+
+    /** peaks[n] is the highest the sum of the harmonics played reaches, above or below zero, when the number of
+        harmonics is n: those within it and not switched off, and those switched on.
+    */
+    std::array<float, maxHarmonics + 1> getPeaks (const Decomposition&, const HarmonicSet&);
+
     /** A shape's value at a point in its cycle, from 0 to 1, read along the straight line between its points. A wave
         that repeats heads from its last point back to its first; one played only once holds its last point's value.
     */

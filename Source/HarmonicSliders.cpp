@@ -142,40 +142,53 @@ HarmonicSliders::HarmonicSliders()
 
 void HarmonicSliders::setHarmonics (std::vector<waveform::Partial> newHarmonics)
 {
-    const auto numberChanged = newHarmonics.size() != harmonics.size();
+    // Which row each harmonic's on, if it's played: the harmonics switched off leave no gap.
+    std::array<int, waveform::maxHarmonics> newRows {};
+    newRows.fill (-1);
+
+    for (size_t row = 0; row < newHarmonics.size(); ++row)
+        if (const auto number = newHarmonics[row].harmonic; number >= 1 && number <= waveform::maxHarmonics)
+            newRows[(size_t) number - 1] = (int) row;
+
+    const auto rowsChanged = newRows != rowOf;
+    rowOf = newRows;
     harmonics = std::move (newHarmonics);
 
     for (size_t i = 0; i < sliders.size(); ++i)
     {
+        const auto row = rowOf[i];
+        const auto played = row >= 0;
+        const auto* partial = played ? &harmonics[(size_t) row] : nullptr;
+
         auto& slider = sliders[i];
-        slider.setVisible (i < harmonics.size());
+        slider.setVisible (played);
 
         // The slider being dragged already shows where the user has put it.
-        if (i < harmonics.size() && ! slider.isMouseButtonDown())
-            slider.setValue (harmonics[i].amplitude, juce::dontSendNotification);
+        if (played && ! slider.isMouseButtonDown())
+            slider.setValue (partial->amplitude, juce::dontSendNotification);
 
         auto& phaseDial = phaseDials[i];
-        phaseDial.setVisible (i < harmonics.size());
+        phaseDial.setVisible (played);
 
-        if (i < harmonics.size() && ! phaseDial.isMouseButtonDown())
+        if (played && ! phaseDial.isMouseButtonDown())
         {
-            const auto degrees = juce::radiansToDegrees ((double) harmonics[i].phase);
+            const auto degrees = juce::radiansToDegrees ((double) partial->phase);
             phaseDial.setValue (degrees - 360.0 * std::floor (degrees / 360.0), juce::dontSendNotification);
             phaseDial.setTooltip (describePhase ((int) i + 1, phaseDial.getValue()));
         }
 
         auto& tuner = tuners[i];
-        tuner.setVisible (i > 0 && i < harmonics.size());
+        tuner.setVisible (i > 0 && played);
 
-        if (i > 0 && i < harmonics.size() && ! tuner.isMouseButtonDown())
+        if (i > 0 && played && ! tuner.isMouseButtonDown())
         {
-            tuner.setValue (harmonics[i].tune, juce::dontSendNotification);
-            tuner.setTooltip ("Harmonic " + juce::String ((int) i + 1) + ", at " + juce::String ((double) i + 1.0 + harmonics[i].tune, 2)
+            tuner.setValue (partial->tune, juce::dontSendNotification);
+            tuner.setTooltip ("Harmonic " + juce::String ((int) i + 1) + ", at " + juce::String ((double) i + 1.0 + partial->tune, 2)
                               + " times the fundamental. Double-click to put it in tune.");
         }
     }
 
-    if (numberChanged)
+    if (rowsChanged)
         resized();
 
     repaint();
@@ -229,7 +242,10 @@ void HarmonicSliders::resized()
 
     for (size_t i = 0; i < sliders.size(); ++i)
     {
-        const auto row = splitRow (layout.rows[i]);
+        if (rowOf[i] < 0)
+            continue;
+
+        const auto row = splitRow (layout.rows[(size_t) rowOf[i]]);
         sliders[i].setBounds (row.slider);
         tuners[i].setBounds (row.tune);
         phaseDials[i].setBounds (row.phase);
@@ -272,7 +288,7 @@ void HarmonicSliders::paint (juce::Graphics& g)
         const auto row = splitRow (layout.rows[i]);
         const auto silent = harmonic.amplitude <= 0.0f;
 
-        drawSwatch (g, row.swatch.toFloat(), colours::forPartial ((int) i).withAlpha (silent ? 0.35f : 1.0f), 2.5f);
+        drawSwatch (g, row.swatch.toFloat(), colours::forPartial (harmonic.harmonic - 1).withAlpha (silent ? 0.35f : 1.0f), 2.5f);
 
         g.setFont (fonts::body (13.0f));
         g.setColour (silent ? colours::dimText : colours::text);

@@ -299,11 +299,12 @@ void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
 {
     const auto& shown = movedPartials.has_value() ? *movedPartials : partials;
 
-    // The faintest sine waves are drawn last, so the strong ones can't hide them.
+    // The faintest sine waves are drawn last, so the strong ones can't hide them. Each is in its harmonic's colour,
+    // which a harmonic switched off, leaving a gap, doesn't shift.
     for (auto i = (int) shown.size() - 1; i >= 0; --i)
     {
         const auto& partial = shown[(size_t) i];
-        g.setColour (colours::forPartial (i).withAlpha (0.9f * opacity));
+        g.setColour (colours::forPartial (partial.harmonic - 1).withAlpha (0.9f * opacity));
         g.strokePath (makeCurve ([&partial] (double position) { return partial.valueAt (position); }),
                       juce::PathStrokeType (1.7f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }

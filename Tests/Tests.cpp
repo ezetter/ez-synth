@@ -1854,7 +1854,7 @@ namespace
         // A threshold sets where crossing triggers it. A sine LFO, a period a second, from 0 rising: at 0%, it
         // randomizes once at each trough; at 100%, once at each peak; at 25%, -0.5 on its wave, twice a period.
         {
-            const auto lfoCount = [&target] (float threshold)
+            const auto lfoCount = [] (float threshold)
             {
                 SynthProcessor synth;
                 setLfo (synth, 0, 1.0f, false, waveform::Preset::sine);
@@ -1868,7 +1868,7 @@ namespace
 
         // An envelope at 0% randomizes as it comes back to rest, and at 100% as its attack reaches the top.
         {
-            const auto envelopeCount = [&target] (float threshold)
+            const auto envelopeCount = [] (float threshold)
             {
                 SynthProcessor synth;
                 setEnvelope (synth, 0, { 0.05f, 0.0f, 1.0f, 0.05f });
@@ -1883,7 +1883,7 @@ namespace
 
         // The mod wheel at 75%: pushed to the top and back to 80 of 127 crosses it twice, where the midline's once.
         {
-            const auto wheelCount = [&target] (float threshold)
+            const auto wheelCount = [] (float threshold)
             {
                 SynthProcessor synth;
                 synth.setModWheelAssignment (target, { modulation::modWheelSource, 1.0f, false, 0.0f, threshold });
@@ -3537,6 +3537,168 @@ namespace
         }
     }
 
+    void testHarmonicSwitches()
+    {
+        std::cout << "Switching harmonics on and off" << std::endl;
+
+        using Switch = waveform::HarmonicSwitch;
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sawtooth);
+        setNumHarmonics (synth, 5);
+
+        const auto playedSet = [&synth]
+        {
+            juce::String set;
+
+            for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
+                if (synth.isHarmonicPlayed (0, harmonic))
+                    set << harmonic << " ";
+
+            return set.trim();
+        };
+
+        check (playedSet() == "1 2 3 4 5", "to start with, the number of harmonics says which play");
+
+        synth.toggleHarmonic (0, 2);
+        check (playedSet() == "1 3 4 5" && synth.getHarmonicSwitch (0, 2) == Switch::off, "a harmonic within the number can be switched off");
+
+        setNumHarmonics (synth, 9);
+        check (playedSet() == "1 3 4 5 6 7 8 9", "...and stays off as the number goes past it");
+
+        setNumHarmonics (synth, 5);
+        synth.toggleHarmonic (0, 12);
+        check (playedSet() == "1 3 4 5 12" && synth.getHarmonicSwitch (0, 12) == Switch::on, "a harmonic above the number can be switched on");
+
+        setNumHarmonics (synth, 3);
+        check (playedSet() == "1 3 12", "...and stays on as the number falls below it");
+
+        synth.toggleHarmonic (0, 2);
+        synth.toggleHarmonic (0, 12);
+        check (playedSet() == "1 2 3" && synth.getHarmonicSwitch (0, 2) == Switch::follows && synth.getHarmonicSwitch (0, 12) == Switch::off,
+               "switched back on within the number, a harmonic follows the number again; switched off, one above it stays off");
+        synth.setHarmonicSwitch (0, 12, Switch::follows);
+
+        // The peaks the voices turn the wave down by follow the harmonics played.
+        {
+            const auto& decomposition = synth.getDecomposition (0);
+            const auto plain = waveform::getPeaks (decomposition, {});
+            auto same = true;
+
+            for (size_t n = 1; n < plain.size(); ++n)
+                same = same && isNear (plain[n], decomposition.peaks[n], 1.0e-4);
+
+            waveform::HarmonicSwitches switches {};
+            switches[0] = Switch::off;
+            switches[5] = Switch::on;
+            const auto switched = waveform::getPeaks (decomposition, waveform::HarmonicSet (switches));
+            check (same && isNear (switched[0], decomposition.harmonics[5].amplitude, 0.01)
+                     && isNear (switched[1], decomposition.harmonics[5].amplitude, 0.01),
+                   "the peaks are worked out for the harmonics played: with none switched, as the wave's own");
+        }
+
+        // Played: a sawtooth with 3 harmonics, its 2nd switched off and its 5th on.
+        synth.toggleHarmonic (0, 2);
+        synth.toggleHarmonic (0, 5);
+        const auto played = slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45);
+        check (amplitudeAt (played, 220.0) > 0.05 && amplitudeAt (played, 440.0) < 0.002 * amplitudeAt (played, 220.0)
+                 && amplitudeAt (played, 660.0) > 0.01 && amplitudeAt (played, 1100.0) > 0.005,
+               "a harmonic switched off isn't heard, and one switched on above the number is");
+
+        // Saved with the sound, and undone like any other change.
+        {
+            juce::MemoryBlock state;
+            synth.getStateInformation (state);
+            SynthProcessor loaded;
+            loaded.setStateInformation (state.getData(), (int) state.getSize());
+            check (loaded.getHarmonicSwitch (0, 2) == Switch::off && loaded.getHarmonicSwitch (0, 5) == Switch::on
+                     && loaded.getHarmonicSwitch (1, 2) == Switch::follows,
+                   "the switches are saved with the sound");
+
+            loaded.loadInitPreset();
+            check (loaded.getHarmonicSwitch (0, 2) == Switch::follows, "...and a sound without any has none");
+        }
+
+        // A modulator switches a harmonic each time it crosses its threshold, as randomizing is triggered. A square
+        // LFO, a period a second, crosses 0 twice a period.
+        {
+            SynthProcessor modulated;
+            setLfo (modulated, 0, 1.0f, false, waveform::Preset::square);
+            const auto target = modulation::harmonicSwitchTarget (0, 2);
+            check (modulation::getName (target) == "Osc 1 harmonic 2 switch" && modulation::findTarget ("osc1Harmonic2Switch") == target
+                     && modulation::isTrigger (target),
+                   "each harmonic's switch is a control that's triggered");
+
+            modulated.setAssignment (target, { 0, 1.0f, false });
+            countRandomizing (modulated, {}, 1.6);
+            check (! modulated.isHarmonicPlayed (0, 2), "an LFO switches a harmonic off as it crosses its threshold, three times in 1.6 seconds");
+
+            SynthProcessor evenly;
+            setLfo (evenly, 0, 1.0f, false, waveform::Preset::square);
+            evenly.setAssignment (target, { 0, 1.0f, false });
+            countRandomizing (evenly, {}, 2.1);
+            check (evenly.isHarmonicPlayed (0, 2), "...and back on at each crossing after, four in 2.1 seconds");
+
+            // MIDI learn: a knob turned past halfway switches it.
+            modulated.setAssignment (target, {});
+            modulated.setMidiController (modulation::harmonicSwitchTarget (0, 3), 30);
+            moveControllers (modulated, { { 30, 10 } });
+            moveControllers (modulated, { { 30, 100 } });
+            check (! modulated.isHarmonicPlayed (0, 3), "a MIDI controller turned past halfway switches a harmonic");
+        }
+
+        // In the window: the boxes switch harmonics, show which play, and the harmonics switched off leave no row.
+        {
+            SynthProcessor shown;
+            setNumHarmonics (shown, 3);
+            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            synthEditor.refresh();
+
+            HarmonicSelector* selector = nullptr;
+            std::function<void (juce::Component&)> find = [&] (juce::Component& c)
+            {
+                if (auto* found = dynamic_cast<HarmonicSelector*> (&c))
+                    selector = found;
+
+                for (auto* child : c.getChildren())
+                    find (*child);
+            };
+            find (*editor);
+
+            const auto sliderShown = [&editor] (const juce::String& title)
+            {
+                auto visible = false;
+                std::function<void (juce::Component&)> look = [&] (juce::Component& c)
+                {
+                    if (auto* slider = dynamic_cast<juce::Slider*> (&c); slider != nullptr && slider->getTitle() == title)
+                        visible = slider->isVisible();
+
+                    for (auto* child : c.getChildren())
+                        look (*child);
+                };
+                look (*editor);
+                return visible;
+            };
+
+            check (selector != nullptr && selector->showsPlayed (1) && selector->showsPlayed (3) && ! selector->showsPlayed (4),
+                   "the boxes show which harmonics play");
+
+            if (selector != nullptr)
+            {
+                selector->onToggle (2);
+                synthEditor.refresh();
+                check (! shown.isHarmonicPlayed (0, 2) && ! selector->showsPlayed (2), "clicking a box switches its harmonic off");
+                check (sliderShown ("Harmonic 1") && ! sliderShown ("Harmonic 2") && sliderShown ("Harmonic 3"),
+                       "...and its controls leave the window, the others staying");
+
+                check (modulatable::getTarget (selector->getBox (5)) == modulation::harmonicSwitchTarget (0, 5),
+                       "a box can be right-clicked to give its switch to a modulator");
+            }
+
+            shown.editorBeingDeleted (editor.get());
+        }
+    }
+
     void testMidiInputs()
     {
         std::cout << "MIDI devices in the standalone app" << std::endl;
@@ -4307,6 +4469,16 @@ namespace
         setNumHarmonics (synth, 16);
         save ("2a-sawtooth-16");
 
+        // A sawtooth with 5 harmonics, its 2nd and 4th switched off and its 9th switched on above them.
+        setNumHarmonics (synth, 5);
+        synth.toggleHarmonic (0, 2);
+        synth.toggleHarmonic (0, 4);
+        synth.toggleHarmonic (0, 9);
+        save ("2c-harmonic-switches");
+
+        for (const auto harmonic : { 2, 4, 9 })
+            synth.setHarmonicSwitch (0, harmonic, waveform::HarmonicSwitch::follows);
+
         setPreset (synth, 0, waveform::Preset::sine);
         setNumHarmonics (synth, 3);
         save ("3-sine");
@@ -4640,6 +4812,7 @@ int main (int argc, char* argv[])
     testGlide();
     testMidiInputs();
     testMidiLearn();
+    testHarmonicSwitches();
     testModulationOverview();
     testPresets();
     testInit();

@@ -28,7 +28,9 @@ public:
     /** Called as a phase dial is turned, with the harmonic, numbered from 1, and its new phase, in radians. */
     std::function<void (int harmonic, float phase)> onPhaseChange;
 
-    /** The harmonics the oscillator plays, from the 1st up. */
+    /** The harmonics the oscillator plays, from the 1st up, each on a row of its own, in order. Those switched off
+        aren't given, so they leave no gap: the 1st and 3rd, with the 2nd off, are on the first two rows.
+    */
     void setHarmonics (std::vector<waveform::Partial>);
 
     /** Says which oscillator's harmonics the sliders set, so an LFO can be assigned to each. */
@@ -61,6 +63,9 @@ private:
     std::array<ModulatableSlider, waveform::maxHarmonics> phaseDials;
     std::vector<waveform::Partial> harmonics;
     std::optional<double> fundamental;
+
+    /** Which row each harmonic, from the 1st up, is on, or -1 if it isn't played. */
+    std::array<int, waveform::maxHarmonics> rowOf = [] { std::array<int, waveform::maxHarmonics> rows {}; rows.fill (-1); return rows; }();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicSliders)
 };

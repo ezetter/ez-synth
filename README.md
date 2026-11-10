@@ -69,12 +69,23 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   in its 8 steps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
 - **Pick how many harmonics to play**, 1 to 16, with the slider under *Harmonics* (3 to start with;
-  double-click it to go back to 3). The number's shown beside it, and under it each harmonic's number, lit
-  in its colour up to the number played. The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
-  its own number. Harmonics the wave doesn't have are still played, at nothing: a square played with 3 has
-  its 1st and 3rd, and its 2nd at 0, so the 2nd number is only outlined. Each harmonic's row of controls
-  stays full size while they all fit; pick more than fit in the window, and the rows, sliders and dials
-  shrink just enough for all of them to.
+  double-click it to go back to 3). The number's shown beside it. The oscillator plays its wave's harmonics
+  from the 1st up to that number, and each oscillator has its own number. Harmonics the wave doesn't have
+  are still played, at nothing: a square played with 3 has its 1st and 3rd, and its 2nd at 0. Each
+  harmonic's row of controls stays full size while they all fit; pick more than fit in the window, and the
+  rows, sliders and dials shrink just enough for all of them to.
+- **Switch harmonics on and off** with the numbered boxes under the slider, one for each harmonic. A box is
+  solid in its harmonic's colour while the harmonic plays, fainter if the wave hasn't got it, and grey while
+  it doesn't play. Click a box to switch its harmonic off, or on. A harmonic switched off stays off as the
+  slider passes it, and one switched on above the slider stays on as the slider falls below it; switched
+  back on within the slider, a harmonic follows the slider again. A harmonic that's off leaves the window:
+  its row of controls, and its line on the grid, go, so with the 2nd off the 1st and 3rd are side by side.
+  The oscillator's card counts the harmonics playing.
+- **Switch a harmonic from a modulator.** Right-click, or Control-click, a box to have an LFO, envelope,
+  velocity or the mod wheel switch its harmonic, as **Randomize** can be triggered: each time it crosses
+  its **Threshold**, either way, it switches the harmonic off if it's on, and on if it's off. A square LFO
+  at 50% switches it every half period. A box can be linked to a MIDI controller too, which switches it as
+  it's turned past halfway.
 - **Randomize** at the top right of the harmonics panel gives the oscillator shown a new random wave:
   every one of its 16 harmonics gets a random amplitude and phase, even those it isn't playing yet, so
   raising the number of harmonics brings in more of the same random wave. Amplitudes are spread evenly along

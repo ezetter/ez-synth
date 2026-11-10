@@ -84,7 +84,7 @@ juce::String ModulationEditor::describeMidiLearn() const
 
     if (synthProcessor.getMidiController (target).has_value())
         return modulation::isTrigger (target)
-                   ? juce::String ("Moving it past halfway, either way, randomizes the harmonics.")
+                   ? "Moving it past halfway, either way, " + modulation::describeTrigger (target) + "."
                    : "It sets the " + control + " across its whole travel, from 0 to 127.";
 
     return "Click Learn, then move a knob or slider on your MIDI controller, to have it set the " + control + ".";
@@ -213,10 +213,10 @@ juce::String ModulationEditor::describeSource() const
 
     if (modulation::isTrigger (target))
     {
-        const auto oscillator = "Osc " + juce::String (modulation::describe (target).oscillator + 1);
+        const auto action = modulation::describeTrigger (target);
 
         if (! assignment.isActive())
-            return "Choose an LFO or envelope to randomize " + oscillator + "'s harmonics each time it crosses the threshold, "
+            return "Choose an LFO or envelope that " + action + " each time it crosses the threshold, "
                    "going up or down: from 0%, its lowest, to 100%, its highest.";
 
         // At the very ends, it's reaching them that counts.
@@ -232,12 +232,12 @@ juce::String ModulationEditor::describeSource() const
         };
 
         if (modulation::isEnvelope (assignment.source))
-            return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time it "
+            return modulation::getSourceName (assignment.source) + " " + action + " each time it "
                  + crossing() + (assignment.threshold <= 0.0f ? juce::String (", as the newest note's release ends.")
                                  : assignment.threshold >= 1.0f ? juce::String (", as the newest note's attack ends.")
                                                                 : juce::String (", rising after a key's pressed or falling, from the newest note."));
 
-        return modulation::getSourceName (assignment.source) + " randomizes " + oscillator + "'s harmonics each time it "
+        return modulation::getSourceName (assignment.source) + " " + action + " each time it "
              + crossing() + (assignment.threshold > 0.0f && assignment.threshold < 1.0f ? ", rising or falling" : "")
              + (assignment.phase > 0.0f ? ", " + modulation::phaseToText (assignment.phase) + " later in its period" : juce::String())
              + ".";
@@ -298,9 +298,9 @@ juce::String ModulationEditor::describeVelocity() const
 
     if (modulation::isTrigger (target))
         return assignment.isActive() ? "A note played harder than " + modulation::thresholdToText (assignment.source, assignment.threshold)
-                                           + " after a softer one, or softer after a harder one, randomizes the harmonics."
-                                     : juce::String ("Switch on to randomize the harmonics when a note's played on the other side of "
-                                                     "the threshold from the one before.");
+                                           + " after a softer one, or softer after a harder one, " + modulation::describeTrigger (target) + "."
+                                     : "Switch on to have velocity, when a note's played on the other side of the threshold from the one "
+                                       "before, " + modulation::describeTrigger (target).replace ("switches", "switch").replace ("randomizes", "randomize") + ".";
 
     if (! assignment.isActive())
         return "Switch on to have how hard each key is played move the " + control + ", as well as anything above.";
@@ -316,9 +316,9 @@ juce::String ModulationEditor::describeModWheel() const
 
     if (modulation::isTrigger (target))
         return assignment.isActive() ? "Moving the mod wheel past " + modulation::thresholdToText (assignment.source, assignment.threshold)
-                                           + ", either way, randomizes the harmonics."
-                                     : juce::String ("Switch on to randomize the harmonics each time a MIDI controller's mod wheel "
-                                                     "passes the threshold, either way.");
+                                           + ", either way, " + modulation::describeTrigger (target) + "."
+                                     : "Switch on to have a MIDI controller's mod wheel, each time it passes the threshold, either way, "
+                                       + modulation::describeTrigger (target).replace ("switches", "switch").replace ("randomizes", "randomize") + ".";
 
     if (! assignment.isActive())
         return "Switch on to have a MIDI controller's mod wheel move the " + control + ", as well as anything above.";

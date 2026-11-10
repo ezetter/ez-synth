@@ -11,11 +11,18 @@ HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
     slider.setMouseClickGrabsKeyboardFocus (false);
     slider.setWantsKeyboardFocus (false);
     slider.setTitle ("Number of harmonics");
-    slider.onValueChange = [this] { repaint(); };
-    slider.onLivePositionChange = [this] { repaint (numbersArea); };
+    slider.onValueChange = [this] { repaint (valueArea); };
+    slider.onLivePositionChange = [this] { showMovedNumber(); };
     addAndMakeVisible (slider);
 
+    for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
+    {
+        boxes[(size_t) harmonic - 1] = std::make_unique<Box> (*this, harmonic);
+        addAndMakeVisible (*boxes[(size_t) harmonic - 1]);
+    }
+
     setParameter (parameter, modulation::oscillatorHarmonicsTarget (0));
+    setOscillator (0);
 }
 
 void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter, int target)
@@ -27,12 +34,42 @@ void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter, int 
     repaint();
 }
 
-void HarmonicSelector::setSilentHarmonics (std::array<bool, waveform::maxHarmonics> newSilent)
+void HarmonicSelector::setOscillator (int oscillator)
 {
-    if (newSilent != silent)
+    for (auto& box : boxes)
     {
-        silent = newSilent;
-        repaint();
+        modulatable::setTarget (*box, modulation::harmonicSwitchTarget (oscillator, box->harmonic));
+        box->setTitle ("Osc " + juce::String (oscillator + 1) + " harmonic " + juce::String (box->harmonic) + " switch");
+    }
+}
+
+void HarmonicSelector::setHarmonics (std::array<bool, waveform::maxHarmonics> played, std::array<bool, waveform::maxHarmonics> silent)
+{
+    for (auto& box : boxes)
+    {
+        const auto index = (size_t) box->harmonic - 1;
+
+        if (box->played != played[index] || box->silent != silent[index])
+        {
+            box->played = played[index];
+            box->silent = silent[index];
+            box->repaint();
+        }
+    }
+}
+
+void HarmonicSelector::showMovedNumber()
+{
+    const auto livePosition = modulatable::getLivePosition (slider);
+    const auto movedNumber = livePosition.has_value() ? modulation::positionToHarmonics (*livePosition) : 0;
+
+    for (auto& box : boxes)
+    {
+        if (const auto moved = box->harmonic == movedNumber; moved != box->moved)
+        {
+            box->moved = moved;
+            box->repaint();
+        }
     }
 }
 
@@ -44,57 +81,69 @@ void HarmonicSelector::resized()
     slider.setBounds (area.removeFromTop (22));
     area.removeFromTop (4);
     numbersArea = area.withX (slider.getX()).withWidth (slider.getWidth());
-}
 
-juce::Rectangle<float> HarmonicSelector::getNumberArea (int number) const
-{
-    // A linear slider's thumb runs between half a thumb's width in from either end.
-    const auto x = (float) slider.getX() + (float) slider.getPositionOfValue (number);
+    // Each box sits under the point on the slider that picks its number.
     const auto spacing = (float) slider.getWidth() / (float) waveform::maxHarmonics;
-    return juce::Rectangle<float> (juce::jmin (22.0f, spacing - 2.0f), (float) numbersArea.getHeight())
-        .withCentre ({ x, numbersArea.toFloat().getCentreY() });
+    const auto width = juce::jmin (22.0f, spacing - 2.0f);
+
+    for (auto& box : boxes)
+    {
+        const auto x = (float) slider.getX() + (float) slider.getPositionOfValue (box->harmonic);
+        box->setBounds (juce::Rectangle<float> (width, (float) numbersArea.getHeight())
+                            .withCentre ({ x, numbersArea.toFloat().getCentreY() }).getSmallestIntegerContainer());
+    }
 }
 
 void HarmonicSelector::paint (juce::Graphics& g)
 {
-    const auto selected = getNumber();
-
     g.setColour (colours::text);
     g.setFont (fonts::body (15.0f).boldened());
-    g.drawText (juce::String (selected), valueArea, juce::Justification::centredRight);
+    g.drawText (juce::String (getNumber()), valueArea, juce::Justification::centredRight);
+}
 
-    // The number an LFO, or anything else, has moved the count to, picked out in the modulation colour.
-    const auto livePosition = modulatable::getLivePosition (slider);
-    const auto liveNumber = livePosition.has_value() ? modulation::positionToHarmonics (*livePosition) : 0;
+//==============================================================================
+HarmonicSelector::Box::Box (HarmonicSelector& owner, int number)
+    : harmonic (number),
+      selector (owner)
+{
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    setMouseClickGrabsKeyboardFocus (false);
+    setWantsKeyboardFocus (false);
+    setTooltip ("Click to switch harmonic " + juce::String (number) + " on or off. Right-click to have a modulator switch it.");
+}
+
+void HarmonicSelector::Box::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        modulatable::requestEditor (*this);
+    else if (selector.onToggle != nullptr)
+        selector.onToggle (harmonic);
+}
+
+void HarmonicSelector::Box::paint (juce::Graphics& g)
+{
+    const auto area = getLocalBounds().toFloat().reduced (0.5f);
+    const auto colour = colours::forPartial (harmonic - 1);
+
+    // Solid in the harmonic's colour while it plays, fainter if the wave hasn't got it, as a square has no 2nd, and
+    // grey while it doesn't play.
+    g.setColour (played ? colour.withAlpha (silent ? 0.45f : 1.0f) : colours::outline);
+    g.fillRoundedRectangle (area, 3.0f);
+
+    if (isMouseOver())
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.2f));
+        g.fillRoundedRectangle (area, 3.0f);
+    }
+
+    // The number something has moved the slider to.
+    if (moved)
+    {
+        g.setColour (colours::modulation);
+        g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 2.0f);
+    }
 
     g.setFont (juce::FontOptions (11.5f, juce::Font::bold));
-
-    for (int number = 1; number <= waveform::maxHarmonics; ++number)
-    {
-        const auto area = getNumberArea (number);
-        const auto colour = colours::forPartial (number - 1);
-        const auto played = number <= selected;
-        const auto lit = played && ! silent[(size_t) number - 1];
-
-        if (lit)
-        {
-            g.setColour (colour);
-            g.fillRoundedRectangle (area, 3.0f);
-        }
-        else if (played)
-        {
-            // Played, but the wave doesn't have this harmonic, as a square has no 2nd.
-            g.setColour (colour.withAlpha (0.7f));
-            g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 1.0f);
-        }
-
-        if (number == liveNumber)
-        {
-            g.setColour (colours::modulation);
-            g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 2.0f);
-        }
-
-        g.setColour (lit ? colours::background : (played ? colour : colours::dimText.withAlpha (0.7f)));
-        g.drawText (juce::String (number), area, juce::Justification::centred);
-    }
+    g.setColour (played ? colours::background : colours::dimText);
+    g.drawText (juce::String (harmonic), area, juce::Justification::centred);
 }

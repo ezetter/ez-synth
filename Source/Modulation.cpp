@@ -27,6 +27,9 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= harmonicSwitchTarget (0, 1))
+            info = { Kind::harmonicSwitch, (target - harmonicSwitchTarget (0, 1)) / waveform::maxHarmonics,
+                     (target - harmonicSwitchTarget (0, 1)) % waveform::maxHarmonics + 1 };
         else if (target >= randomizeTarget (0))
             info = { Kind::randomize, target - randomizeTarget (0) };
         else if (target >= lfoRateTarget (0))
@@ -88,6 +91,7 @@ namespace modulation
             case Kind::oscillatorTune:       return oscillator + " tune";
             case Kind::lfoRate:              return "LFO " + juce::String (info.lfo + 1) + " rate";
             case Kind::randomize:            return oscillator + " randomize";
+            case Kind::harmonicSwitch:       return oscillator + " harmonic " + juce::String (info.harmonic) + " switch";
         }
 
         return {};
@@ -117,6 +121,7 @@ namespace modulation
             case Kind::oscillatorTune:       return oscillator + "Tune";
             case Kind::lfoRate:              return "lfo" + juce::String (info.lfo + 1) + "Period";
             case Kind::randomize:            return oscillator + "Randomize";
+            case Kind::harmonicSwitch:       return oscillator + "Harmonic" + juce::String (info.harmonic) + "Switch";
         }
 
         return {};
@@ -145,12 +150,25 @@ namespace modulation
     bool isParameter (int target)
     {
         const auto kind = describe (target).kind;
-        return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase && kind != Kind::randomize;
+        return kind != Kind::harmonic && kind != Kind::harmonicTune && kind != Kind::harmonicPhase && kind != Kind::randomize
+            && kind != Kind::harmonicSwitch;
     }
 
     bool isTrigger (int target)
     {
-        return describe (target).kind == Kind::randomize;
+        const auto kind = describe (target).kind;
+        return kind == Kind::randomize || kind == Kind::harmonicSwitch;
+    }
+
+    juce::String describeTrigger (int target)
+    {
+        const auto info = describe (target);
+        const auto oscillator = "Osc " + juce::String (info.oscillator + 1);
+
+        if (info.kind == Kind::harmonicSwitch)
+            return "switches " + oscillator + " harmonic " + juce::String (info.harmonic) + " on or off";
+
+        return "randomizes " + oscillator + "'s harmonics";
     }
 
     float getThresholdValue (int source, float threshold)

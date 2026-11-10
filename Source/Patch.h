@@ -36,7 +36,10 @@ struct Patch
         /** Each harmonic's amplitude, its phase, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phases {}, phaseSines {}, phaseCosines {};
 
-        /** peaks[n] is the highest the sum of the first n harmonics reaches. */
+        /** Which harmonics are switched off, or on above the number played, and peaks[n], the highest the sum of the
+            harmonics played reaches when n are.
+        */
+        waveform::HarmonicSet switches;
         std::array<float, waveform::maxHarmonics + 1> peaks {};
 
         /** How far each harmonic, from the 1st up, is tuned from its whole number, in harmonics. */

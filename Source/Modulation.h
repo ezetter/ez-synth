@@ -70,10 +70,16 @@ namespace modulation
         LFO, envelope, velocity or mod wheel given it crosses its midline, either way.
     */
     constexpr int randomizeTarget (int oscillator)                  { return lfoRateTarget (numLfos) + oscillator; }
-    inline constexpr int numTargets = randomizeTarget (numOscillators);
+
+    /** Switching a harmonic, from the 1st up, on or off: triggered, as randomizing is, each time what's given it crosses
+        its threshold, either way.
+    */
+    constexpr int harmonicSwitchTarget (int oscillator, int harmonic) { return randomizeTarget (numOscillators) + oscillator * waveform::maxHarmonics + harmonic - 1; }
+    inline constexpr int numTargets = harmonicSwitchTarget (numOscillators, 1);
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
-                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate, randomize };
+                      oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate, randomize,
+                      harmonicSwitch };
 
     struct TargetInfo
     {
@@ -191,8 +197,13 @@ namespace modulation
     */
     float keepInTravel (int target, float position);
 
-    /** Whether a target is triggered when its source crosses its midline, rather than moved along a travel. */
+    /** Whether a target is triggered when its source crosses its threshold, rather than moved along a travel:
+        randomizing an oscillator's harmonics, or switching a harmonic on or off.
+    */
     bool isTrigger (int target);
+
+    /** What triggering a target does, such as "randomizes Osc 1's harmonics" or "switches Osc 2 harmonic 3 on or off". */
+    juce::String describeTrigger (int target);
 
     /** The value a source crosses to trigger a target, from a threshold from 0, the bottom of its values, to 1, the
         top: an LFO swings from -1 to 1, and an envelope, velocity and the mod wheel go from 0 to 1. Halfway is the

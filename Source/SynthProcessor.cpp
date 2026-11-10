@@ -555,10 +555,15 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     // that only touches a threshold near its end, at its lowest or highest, is caught there.
     constexpr auto lookInterval = HarmonicVoice::controlInterval;
 
-    for (size_t i = 0; i < (size_t) numOscillators; ++i)
+    for (size_t i = 0; i < (size_t) numTriggers; ++i)
     {
-        const auto target = (size_t) modulation::randomizeTarget ((int) i);
-        auto& crossings = randomizeCrossings[i];
+        const auto target = (size_t) firstTrigger + i;
+
+        if (! patch.assignments[target].isActive() && ! patch.velocityAssignments[target].isActive()
+             && ! patch.modWheelAssignments[target].isActive())
+            continue;
+
+        auto& crossings = triggerCrossings[i];
         auto triggered = false;
 
         const auto watch = [this, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
@@ -581,7 +586,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         watch (crossings[2], patch.modWheelAssignments[target]);
 
         if (triggered)
-            ++randomizeRequests[i];
+            ++triggerRequests[i];
     }
 }
 
@@ -618,16 +623,38 @@ std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase
 
 void SynthProcessor::randomizeAsTriggered()
 {
-    for (size_t i = 0; i < (size_t) numOscillators; ++i)
+    for (size_t i = 0; i < (size_t) numTriggers; ++i)
     {
-        const auto requests = randomizeRequests[i].load();
+        const auto requests = triggerRequests[i].load();
 
-        if (requests != randomizeRequestsDone[i])
-        {
-            randomizeRequestsDone[i] = requests;
-            randomizeHarmonics ((int) i, randomizer);
-            ++randomizeCounts[i];
-        }
+        if (requests == triggerRequestsDone[i])
+            continue;
+
+        // A switch triggered more than once since last time ends up as each crossing leaves it, on or off.
+        const auto times = requests - triggerRequestsDone[i];
+        triggerRequestsDone[i] = requests;
+        const auto target = firstTrigger + (int) i;
+
+        if (modulation::describe (target).kind == modulation::Kind::harmonicSwitch)
+            for (int time = 0; time < (times % 2 == 0 ? 0 : 1); ++time)
+                carryOutTrigger (target);
+        else
+            carryOutTrigger (target);
+    }
+}
+
+void SynthProcessor::carryOutTrigger (int target)
+{
+    const auto info = modulation::describe (target);
+
+    if (info.kind == modulation::Kind::harmonicSwitch)
+    {
+        toggleHarmonic (info.oscillator, info.harmonic);
+    }
+    else if (info.kind == modulation::Kind::randomize)
+    {
+        randomizeHarmonics (info.oscillator, randomizer);
+        ++randomizeCounts[(size_t) info.oscillator];
     }
 }
 
@@ -714,28 +741,31 @@ void SynthProcessor::setTargetPosition (int target, float position)
     position = juce::jlimit (0.0f, 1.0f, position);
     const auto info = modulation::describe (target);
 
-    switch (info.kind)
+    // Randomizing, and a harmonic's switch, are triggered by the controller crossing halfway, either way.
+    if (modulation::isTrigger (target))
     {
-        // Randomizing is triggered by the controller crossing halfway, either way.
-        case modulation::Kind::randomize:
-            if (controllerRandomizeCrossings[(size_t) info.oscillator].update (position, 0.5f, 0.5f))
-                randomizeHarmonics (info.oscillator, randomizer);
-            return;
+        if (controllerTriggerCrossings[(size_t) (target - firstTrigger)].update (position, 0.5f, 0.5f))
+            carryOutTrigger (target);
 
-        case modulation::Kind::harmonic:
-            setHarmonicAmplitude (info.oscillator, info.harmonic, modulation::amplitudeRange().convertFrom0to1 (position));
-            return;
+        return;
+    }
 
-        case modulation::Kind::harmonicTune:
-            setHarmonicTune (info.oscillator, info.harmonic, (position - 0.5f) * 2.0f * waveform::furthestTune);
-            return;
+    if (info.kind == modulation::Kind::harmonic)
+    {
+        setHarmonicAmplitude (info.oscillator, info.harmonic, modulation::amplitudeRange().convertFrom0to1 (position));
+        return;
+    }
 
-        case modulation::Kind::harmonicPhase:
-            setHarmonicPhase (info.oscillator, info.harmonic, position * juce::MathConstants<float>::twoPi);
-            return;
+    if (info.kind == modulation::Kind::harmonicTune)
+    {
+        setHarmonicTune (info.oscillator, info.harmonic, (position - 0.5f) * 2.0f * waveform::furthestTune);
+        return;
+    }
 
-        default:
-            break;
+    if (info.kind == modulation::Kind::harmonicPhase)
+    {
+        setHarmonicPhase (info.oscillator, info.harmonic, position * juce::MathConstants<float>::twoPi);
+        return;
     }
 
     // A synced LFO's rate dial sets the cycles a beat.
@@ -813,7 +843,8 @@ void SynthProcessor::updatePatch()
                     oscillator.phaseCosines[k] = std::cos (phase);
                 }
 
-                oscillator.peaks = decomposition.peaks;
+                oscillator.peaks = received.peaks[i];
+                oscillator.switches = received.switches[i];
                 oscillator.tunes = received.tunes[i];
             }
 
@@ -1007,6 +1038,40 @@ void SynthProcessor::setHarmonicPhase (int oscillator, int harmonic, float phase
     waveform::addHarmonic (shape, harmonic, -current.amplitude, current.phase);
     waveform::addHarmonic (shape, harmonic, current.amplitude, phase);
     replaceShape (oscillator, shape, std::nullopt);
+}
+
+waveform::HarmonicSwitch SynthProcessor::getHarmonicSwitch (int oscillator, int harmonic) const noexcept
+{
+    if (harmonic < 1 || harmonic > waveform::maxHarmonics)
+        return waveform::HarmonicSwitch::follows;
+
+    return oscillators[(size_t) oscillator].switches[(size_t) harmonic - 1];
+}
+
+void SynthProcessor::setHarmonicSwitch (int oscillator, int harmonic, waveform::HarmonicSwitch state)
+{
+    if (harmonic < 1 || harmonic > waveform::maxHarmonics)
+        return;
+
+    markEdited();
+    oscillators[(size_t) oscillator].switches[(size_t) harmonic - 1] = state;
+    share();
+    ++shapeVersion;
+}
+
+bool SynthProcessor::isHarmonicPlayed (int oscillator, int harmonic) const noexcept
+{
+    return waveform::HarmonicSet (oscillators[(size_t) oscillator].switches).plays (harmonic, getNumHarmonics (oscillator));
+}
+
+void SynthProcessor::toggleHarmonic (int oscillator, int harmonic)
+{
+    using Switch = waveform::HarmonicSwitch;
+
+    if (isHarmonicPlayed (oscillator, harmonic))
+        setHarmonicSwitch (oscillator, harmonic, Switch::off);
+    else
+        setHarmonicSwitch (oscillator, harmonic, harmonic <= getNumHarmonics (oscillator) ? Switch::follows : Switch::on);
 }
 
 void SynthProcessor::randomizeHarmonics (int oscillator, juce::Random& random)
@@ -1298,7 +1363,7 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
     // A synced LFO's rate is the tempo's, which nothing moves, and randomizing is triggered, not moved.
     if (const auto info = modulation::describe (target); (info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
-                                                           || info.kind == modulation::Kind::randomize)
+                                                           || modulation::isTrigger (target))
         return std::nullopt;
 
     // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope,
@@ -1366,9 +1431,13 @@ SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
     }
 
     const auto& harmonics = getDecomposition (oscillator).harmonics;
+    const waveform::HarmonicSet switches (oscillators[(size_t) oscillator].switches);
 
-    for (int harmonic = 1; harmonic <= numHarmonics; ++harmonic)
+    for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
     {
+        if (! switches.plays (harmonic, numHarmonics))
+            continue;
+
         auto partial = harmonics[(size_t) harmonic - 1];
         partial.tune = getHarmonicTune (oscillator, harmonic);
         partial.phase = getHarmonicPhase (oscillator, harmonic);
@@ -1407,8 +1476,8 @@ float SynthProcessor::getPosition (int target) const
 
     const auto info = modulation::describe (target);
 
-    // Randomizing isn't anywhere along a travel.
-    if (info.kind == modulation::Kind::randomize)
+    // Randomizing, or switching a harmonic, isn't anywhere along a travel.
+    if (modulation::isTrigger (target))
         return 0.0f;
 
     // A harmonic's tune is in tune in the middle of its travel, and its phase goes from 0 round to a whole turn.
@@ -1431,6 +1500,8 @@ void SynthProcessor::share()
         shared.decompositions[i] = oscillators[i].decomposition;
         shared.phases[i] = oscillators[i].phases;
         shared.tunes[i] = oscillators[i].tunes;
+        shared.switches[i] = waveform::HarmonicSet (oscillators[i].switches);
+        shared.peaks[i] = waveform::getPeaks (oscillators[i].decomposition, shared.switches[i]);
     }
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
@@ -1528,6 +1599,20 @@ juce::ValueTree SynthProcessor::createState()
                 tuneTexts.add (juce::String (tunes[k]));
 
             wave.setProperty ("tunes", tuneTexts.joinIntoString (" "), nullptr);
+        }
+
+        // Which harmonics are switched off or on, from the 1st up, saved only if any is: 0 follows the number of
+        // harmonics, 1 is off and 2 on.
+        const auto& switches = oscillators[(size_t) i].switches;
+
+        if (std::any_of (switches.begin(), switches.end(), [] (waveform::HarmonicSwitch each) { return each != waveform::HarmonicSwitch::follows; }))
+        {
+            juce::String switchTexts;
+
+            for (const auto each : switches)
+                switchTexts << juce::String ((int) each);
+
+            wave.setProperty ("switches", switchTexts, nullptr);
         }
     }
 
@@ -1655,6 +1740,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
     {
         oscillator.tunes = {};
         oscillator.phases = {};
+        oscillator.switches = {};
     }
 
     for (const auto& wave : waves)
@@ -1697,6 +1783,11 @@ void SynthProcessor::loadState (juce::ValueTree state)
             for (int k = 0; k < std::min (tuneTexts.size(), waveform::maxHarmonics - 1); ++k)
                 oscillators[(size_t) oscillator].tunes[(size_t) k + 1] = juce::jlimit (-waveform::furthestTune, waveform::furthestTune,
                                                                                       tuneTexts[k].getFloatValue());
+
+            const auto switchTexts = wave["switches"].toString();
+
+            for (int k = 0; k < std::min (switchTexts.length(), waveform::maxHarmonics); ++k)
+                oscillators[(size_t) oscillator].switches[(size_t) k] = (waveform::HarmonicSwitch) juce::jlimit (0, 2, (int) (switchTexts[k] - '0'));
         }
     }
 

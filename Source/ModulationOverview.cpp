@@ -13,6 +13,12 @@ namespace
     }
 
     const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+
+    /** What a trigger does, in a word or two: "randomizes", or "switches on or off". */
+    juce::String triggerVerb (int target)
+    {
+        return modulation::describe (target).kind == modulation::Kind::harmonicSwitch ? "switches on or off" : "randomizes";
+    }
     const juce::String plusOrMinus (juce::CharPointer_UTF8 ("\xc2\xb1"));
 }
 
@@ -53,7 +59,7 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
             const auto isLfo = ! modulation::isEnvelope (source);
 
             if (modulation::isTrigger (target))
-                parts.add ("randomizes at " + modulation::thresholdToText (source, assignment.threshold));
+                parts.add (triggerVerb (target) + " at " + modulation::thresholdToText (source, assignment.threshold));
             else if (isLfo)
                 parts.add (plusOrMinus + percent (assignment.range * 0.5f) + " of its travel");
             else
@@ -73,7 +79,7 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
     {
         if (const auto& assignment = synthProcessor.getVelocityAssignment (target); assignment.isActive())
             links.push_back ({ Link::Kind::velocity, modulation::velocitySource, target,
-                               modulation::isTrigger (target) ? "randomizes at " + percent (assignment.threshold)
+                               modulation::isTrigger (target) ? triggerVerb (target) + " at " + percent (assignment.threshold)
                                                               : minus + percent (assignment.range) + " of its travel for the softest notes" });
     }
 
@@ -82,7 +88,7 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
         if (const auto& assignment = synthProcessor.getModWheelAssignment (target); assignment.isActive())
             links.push_back ({ Link::Kind::modWheel, modulation::modWheelSource, target,
                                modulation::isTrigger (target)
-                                   ? "randomizes at " + percent (assignment.threshold)
+                                   ? triggerVerb (target) + " at " + percent (assignment.threshold)
                                    : (assignment.inverted ? minus : juce::String ("+")) + percent (assignment.range) + " of its travel at the top" });
     }
 
@@ -91,7 +97,7 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
         if (const auto controller = synthProcessor.getMidiController (target))
             links.push_back ({ Link::Kind::midi, -1, target,
                                "CC " + juce::String (*controller)
-                                   + (modulation::isTrigger (target) ? juce::String (", randomizes past halfway") : juce::String (", across its whole travel")) });
+                                   + (modulation::isTrigger (target) ? ", " + triggerVerb (target) + " past halfway" : juce::String (", across its whole travel")) });
     }
 
     return links;

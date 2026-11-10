@@ -78,6 +78,14 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
+    // A harmonic's box switches it on or off.
+    harmonicSelector.onToggle = [this] (int harmonic)
+    {
+        userTouched = true;
+        synthProcessor.toggleHarmonic (synthProcessor.editedSource, harmonic);
+        refresh();
+    };
+
     randomizeButton.setTooltip ("Give this oscillator's 16 harmonics random amplitudes and phases. Right-click to have an LFO, "
                                 "envelope, velocity or the mod wheel randomize them each time it crosses its midline.");
     randomizeButton.setMouseClickGrabsKeyboardFocus (false);
@@ -85,7 +93,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     randomizeButton.onClick = [this]
     {
         userTouched = true;
-        synthProcessor.randomizeHarmonics (synthProcessor.editedSource, random);
+        synthProcessor.randomizeHarmonics (synthProcessor.editedSource, buttonRandom);
         refresh();
     };
     addChildComponent (randomizeButton);
@@ -362,8 +370,11 @@ void SynthEditor::setEditedWave (const waveform::Shape& shape, std::optional<wav
 std::vector<waveform::Partial> SynthEditor::getPlayedHarmonics (int oscillator) const
 {
     const auto& harmonics = synthProcessor.getDecomposition (oscillator).harmonics;
-    const auto numHarmonics = juce::jlimit (1, waveform::maxHarmonics, synthProcessor.getNumHarmonics (oscillator));
-    std::vector<waveform::Partial> played { harmonics.begin(), std::next (harmonics.begin(), numHarmonics) };
+    std::vector<waveform::Partial> played;
+
+    for (const auto& harmonic : harmonics)
+        if (synthProcessor.isHarmonicPlayed (oscillator, harmonic.harmonic))
+            played.push_back (harmonic);
 
     for (auto& partial : played)
     {
@@ -454,6 +465,7 @@ void SynthEditor::refresh()
             {
                 harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)),
                                                modulation::oscillatorHarmonicsTarget (edited));
+                harmonicSelector.setOscillator (edited);
                 harmonicSliders.setOscillator (edited);
                 modulatable::setTarget (randomizeButton, modulation::randomizeTarget (edited));
                 tuneSlider.setOscillator (synthProcessor.parameters, edited);
@@ -466,12 +478,15 @@ void SynthEditor::refresh()
             grid.setOscillator (edited + 1, now.on[(size_t) edited]);
             harmonicSliders.setHarmonics (harmonics);
 
-            std::array<bool, waveform::maxHarmonics> silent {};
+            std::array<bool, waveform::maxHarmonics> played {}, silent {};
 
             for (const auto& harmonic : synthProcessor.getDecomposition (edited).harmonics)
+            {
+                played[(size_t) harmonic.harmonic - 1] = synthProcessor.isHarmonicPlayed (edited, harmonic.harmonic);
                 silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
+            }
 
-            harmonicSelector.setSilentHarmonics (silent);
+            harmonicSelector.setHarmonics (played, silent);
 
             // The button's text is in the modulation colour while something triggers it.
             const auto randomizeTarget = modulation::randomizeTarget (edited);
@@ -607,12 +622,12 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
                                             getLocalArea (&anchor, anchor.getLocalBounds()), this);
 }
 
-void SynthEditor::showModulationOverview (bool shown)
+void SynthEditor::showModulationOverview (bool visible)
 {
-    modulationOverview.setVisible (shown);
-    modulationButton.setToggleState (shown, juce::dontSendNotification);
+    modulationOverview.setVisible (visible);
+    modulationButton.setToggleState (visible, juce::dontSendNotification);
 
-    if (shown)
+    if (visible)
     {
         modulationOverview.toFront (true);
         modulationOverview.grabKeyboardFocus();

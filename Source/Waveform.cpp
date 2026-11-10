@@ -157,4 +157,66 @@ namespace waveform
         for (int i = 0; i < numPoints; ++i)
             shape[(size_t) i] += Partial { harmonic, amplitude, phase }.valueAt ((double) i / numPoints);
     }
+
+    HarmonicSet::HarmonicSet (const HarmonicSwitches& switches)
+    {
+        for (size_t i = 0; i < switches.size(); ++i)
+        {
+            if (switches[i] == HarmonicSwitch::on)
+                on |= 1u << (unsigned) i;
+            else if (switches[i] == HarmonicSwitch::off)
+                off |= 1u << (unsigned) i;
+        }
+    }
+
+    std::array<float, maxHarmonics + 1> getPeaks (const Decomposition& decomposition, const HarmonicSet& set)
+    {
+        // Sampled as finely as the decomposition's own peaks, starting from the harmonics switched on, which play
+        // whatever the number, and adding each within the number in turn.
+        constexpr int resolution = 2048;
+        std::vector<float> sum ((size_t) resolution, 0.0f);
+        std::array<float, maxHarmonics + 1> peaks {};
+
+        const auto add = [&sum, &decomposition] (int harmonic)
+        {
+            const auto& partial = decomposition.harmonics[(size_t) harmonic - 1];
+
+            if (partial.amplitude > 0.0f)
+                for (int i = 0; i < resolution; ++i)
+                    sum[(size_t) i] += partial.valueAt ((double) i / resolution);
+        };
+
+        const auto peak = [&sum]
+        {
+            auto highest = 0.0f;
+
+            for (const auto value : sum)
+                highest = std::max (highest, std::abs (value));
+
+            return highest;
+        };
+
+        for (int harmonic = 1; harmonic <= maxHarmonics; ++harmonic)
+            if ((set.on & (1u << (unsigned) (harmonic - 1))) != 0)
+                add (harmonic);
+
+        peaks[0] = peak();
+
+        for (int count = 1; count <= maxHarmonics; ++count)
+        {
+            const auto bit = 1u << (unsigned) (count - 1);
+
+            if ((set.on & bit) == 0 && (set.off & bit) == 0)
+            {
+                add (count);
+                peaks[(size_t) count] = peak();
+            }
+            else
+            {
+                peaks[(size_t) count] = peaks[(size_t) count - 1];
+            }
+        }
+
+        return peaks;
+    }
 }

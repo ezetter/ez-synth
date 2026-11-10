@@ -268,8 +268,12 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         // An LFO moving a harmonic doesn't change how far, so the wave doesn't pump.
         const auto scale = oscillatorLevel / std::max (1.0f, oscillator.peaks[(size_t) numHarmonics]);
 
-        for (int harmonic = 1; harmonic <= numHarmonics; ++harmonic)
+        // The harmonics within the number and not switched off, and those switched on.
+        for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
         {
+            if (! oscillator.switches.plays (harmonic, numHarmonics))
+                continue;
+
             const auto index = (size_t) harmonic - 1;
             const auto target = harmonicTarget (i, harmonic);
             auto amplitude = oscillator.amplitudes[index];

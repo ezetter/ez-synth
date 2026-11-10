@@ -133,6 +133,20 @@ public:
     float getHarmonicPhase (int oscillator, int harmonic) const noexcept;
     void setHarmonicPhase (int oscillator, int harmonic, float phase);
 
+    /** Whether a harmonic, numbered from 1, plays as the number of harmonics says, or is switched off, so it stays
+        off as the number goes past it, or switched on above the number, so it stays on as the number falls below it.
+    */
+    waveform::HarmonicSwitch getHarmonicSwitch (int oscillator, int harmonic) const noexcept;
+    void setHarmonicSwitch (int oscillator, int harmonic, waveform::HarmonicSwitch);
+
+    /** Whether a harmonic plays, with the number of harmonics as it's set. */
+    bool isHarmonicPlayed (int oscillator, int harmonic) const noexcept;
+
+    /** Switches a harmonic off if it plays, and on if it doesn't: back to following the number of harmonics if it's
+        within it, and switched on if it's above it.
+    */
+    void toggleHarmonic (int oscillator, int harmonic);
+
     /** Gives every one of an oscillator's 16 harmonics a random amplitude and phase, making a new Custom wave. The
         amplitudes are spread evenly along their sliders' travel, so weak harmonics are as likely as along the
         sliders. A wave that would reach beyond full scale is turned down to fit the grid. The harmonics' tunings
@@ -141,8 +155,8 @@ public:
     void randomizeHarmonics (int oscillator, juce::Random&);
 
     /** Randomizes the harmonics of each oscillator whose randomizing has been triggered, by its LFO, envelope,
-        velocity or the mod wheel crossing its midline, since this was last called. The audio thread asks, and the
-        message thread does it, a few dozen times a second.
+        velocity or the mod wheel crossing its threshold, since this was last called, and switches each harmonic
+        triggered on or off. The audio thread asks, and the message thread does it, a few dozen times a second.
     */
     void randomizeAsTriggered();
 
@@ -457,6 +471,9 @@ private:
 
         /** How far each harmonic, from the 1st up, is tuned from its whole number. The 1st never is. */
         std::array<float, waveform::maxHarmonics> tunes {};
+
+        /** Whether each harmonic plays as the number of harmonics says, or is switched off, or on. */
+        waveform::HarmonicSwitches switches {};
     };
 
     struct Lfo
@@ -470,6 +487,8 @@ private:
     {
         std::array<waveform::Decomposition, numOscillators> decompositions;
         std::array<std::array<float, waveform::maxHarmonics>, numOscillators> phases {}, tunes {};
+        std::array<waveform::HarmonicSet, numOscillators> switches {};
+        std::array<std::array<float, waveform::maxHarmonics + 1>, numOscillators> peaks {};
         std::array<waveform::Shape, numLfos> lfoShapes {};
         std::array<waveform::Drawing, numLfos> lfoDrawings {};
         modulation::Assignments assignments, velocityAssignments, modWheelAssignments;
@@ -597,20 +616,27 @@ private:
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
 
-    // For each oscillator's randomizing, what's given it, as moving, by velocity and by the mod wheel, each watched
-    // for crossing its midline. The audio thread counts up the times it's asked for, the message thread how many
-    // it's carried out.
-    std::array<std::array<modulation::ThresholdCrossing, 3>, numOscillators> randomizeCrossings {};
-    std::array<std::atomic<int>, numOscillators> randomizeRequests {};
-    std::array<int, numOscillators> randomizeRequestsDone {}, randomizeCounts {};
+    // The controls that are triggered: each oscillator's randomizing, then each of its harmonics' switches.
+    static constexpr int firstTrigger = modulation::randomizeTarget (0);
+    static constexpr int numTriggers = modulation::numTargets - firstTrigger;
+
+    // For each trigger, what's given it, as moving, by velocity and by the mod wheel, each watched for crossing its
+    // threshold. The audio thread counts up the times it's asked for, the message thread how many it's carried out.
+    std::array<std::array<modulation::ThresholdCrossing, 3>, numTriggers> triggerCrossings {};
+    std::array<std::atomic<int>, numTriggers> triggerRequests {};
+    std::array<int, numTriggers> triggerRequestsDone {};
+    std::array<int, numOscillators> randomizeCounts {};
     juce::Random randomizer;
+
+    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches a harmonic on or off. */
+    void carryOutTrigger (int target);
 
     // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the
     // first moved while a control's being learned; the message thread links and sets the controls.
     std::array<std::atomic<int>, numLearnableControllers> controllerValues {}, controllerMoves {};
     std::atomic<int> learningTarget { -1 }, learnedController { -1 };
     std::array<int, modulation::numTargets> targetControllers {}, appliedMoves {};
-    std::array<modulation::ThresholdCrossing, numOscillators> controllerRandomizeCrossings {};
+    std::array<modulation::ThresholdCrossing, numTriggers> controllerTriggerCrossings {};
     int midiLearnVersion = 0;
 
     /** Sets a control to a position along its travel, from 0 to 1, as a MIDI controller does. */
