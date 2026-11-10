@@ -974,6 +974,25 @@ namespace
                "an LFO on the number of harmonics plays all 9, then just the 1st");
         synth.setAssignment (modulation::oscillatorHarmonicsTarget (0), {});
 
+        // Each number of harmonics has an equal share of the slider's travel, so an LFO at its full range, half the
+        // travel either way, reaches all 16 numbers from the middle, 8 or 9.
+        {
+            const auto reaches = [] (int from, int low, int high)
+            {
+                const auto position = modulation::harmonicsToPosition (from);
+                return modulation::positionToHarmonics (position - 0.5f) == low && modulation::positionToHarmonics (position + 0.5f) == high;
+            };
+
+            auto roundTrips = true;
+
+            for (int number = 1; number <= waveform::maxHarmonics; ++number)
+                roundTrips = roundTrips && modulation::positionToHarmonics (modulation::harmonicsToPosition (number)) == number;
+
+            check (roundTrips, "every number of harmonics is where the slider puts it");
+            check (reaches (8, 1, 16) && reaches (9, 1, 16) && reaches (1, 1, 9) && reaches (16, 9, 16),
+                   "an LFO at its full range on the number of harmonics reaches from 1 to 16 from 8 or 9");
+        }
+
         setPreset (synth, 0, waveform::Preset::sine);
         synth.setAssignment (modulation::harmonicTarget (0, 2), { 1, 1.0f, false });
         signal = play (synth, 69, 0.95, 1.3);

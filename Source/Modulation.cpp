@@ -193,7 +193,9 @@ namespace modulation
 
     int positionToHarmonics (float position)
     {
-        return 1 + juce::roundToInt (juce::jlimit (0.0f, 1.0f, position) * (float) (waveform::maxHarmonics - 1));
+        // Each number has an equal share of the travel, so an LFO at its full range, swinging the slider half its
+        // travel either way, reaches from 1 to 16 from 8 or 9, and spends as long on each number.
+        return juce::jlimit (1, waveform::maxHarmonics, 1 + (int) std::floor (position * (float) waveform::maxHarmonics));
     }
 
     float periodToPosition (float seconds)

@@ -210,6 +210,9 @@ namespace modulation
     /** The travel of a harmonic's slider, which gives weak harmonics more of its length. */
     const juce::NormalisableRange<float>& amplitudeRange();
 
+    /** Where a number of harmonics sits along the slider, from 1 at 0 to 16 at 1, and the number at a position
+        along it: each of the 16 numbers has an equal share of its travel, as moved.
+    */
     float harmonicsToPosition (int numHarmonics);
     int positionToHarmonics (float position);
 
