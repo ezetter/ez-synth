@@ -1799,6 +1799,9 @@ namespace
                    "a threshold is shown as a percentage, and for an LFO, where on its wave");
         }
 
+        check (juce::exactlyEqual (modulation::Assignment().threshold, 0.5f),
+               "a modulator's threshold for a trigger starts at 50%, the midline");
+
         const auto target = modulation::randomizeTarget (1);
         check (modulation::getName (target) == "Osc 2 randomize" && modulation::findTarget ("osc2Randomize") == target
                  && modulation::isTrigger (target) && ! modulation::isTrigger (modulation::volumeTarget) && ! modulation::isParameter (target),
@@ -1808,7 +1811,7 @@ namespace
         {
             SynthProcessor synth;
             setLfo (synth, 0, 1.0f, false, waveform::Preset::square);
-            synth.setAssignment (target, { 0, 1.0f, false });
+            synth.setAssignment (target, { 0, 1.0f, false, 0.0f, 0.5f });
             const auto otherShape = synth.getShape (0);
             const auto shapeBefore = synth.getShape (1);
             const auto counts = countRandomizing (synth, {}, 2.1);
@@ -1825,7 +1828,7 @@ namespace
         {
             SynthProcessor synth;
             setEnvelope (synth, 0, { 0.05f, 0.0f, 1.0f, 0.05f });
-            synth.setAssignment (target, { modulation::envelopeSource (0), 1.0f, false });
+            synth.setAssignment (target, { modulation::envelopeSource (0), 1.0f, false, 0.0f, 0.5f });
             const auto counts = countRandomizing (synth, { { 0.1, juce::MidiMessage::noteOn (1, 60, 1.0f) },
                                                            { 0.5, juce::MidiMessage::noteOff (1, 60) } }, 1.0);
             check (counts[1] == 2, "an envelope randomizes the harmonics as it rises past halfway, and as it falls past it");
@@ -1834,7 +1837,7 @@ namespace
         // The mod wheel crosses halfway, up and back down.
         {
             SynthProcessor synth;
-            synth.setModWheelAssignment (target, { modulation::modWheelSource, 1.0f, false });
+            synth.setModWheelAssignment (target, { modulation::modWheelSource, 1.0f, false, 0.0f, 0.5f });
             const auto wheel = [] (int value) { return juce::MidiMessage::controllerEvent (1, modulation::modWheelController, value); };
             const auto counts = countRandomizing (synth, { { 0.1, wheel (127) }, { 0.2, wheel (90) }, { 0.3, wheel (20) } }, 0.5);
             check (counts[1] == 2, "the mod wheel randomizes the harmonics each time it passes halfway");
@@ -1843,7 +1846,7 @@ namespace
         // Velocity crosses halfway from one note to the next, however long between them.
         {
             SynthProcessor synth;
-            synth.setVelocityAssignment (target, { modulation::velocitySource, 1.0f, false });
+            synth.setVelocityAssignment (target, { modulation::velocitySource, 1.0f, false, 0.0f, 0.5f });
             const auto counts = countRandomizing (synth, { { 0.0, juce::MidiMessage::noteOn (1, 60, 0.3f) }, { 0.1, juce::MidiMessage::noteOff (1, 60) },
                                                            { 1.0, juce::MidiMessage::noteOn (1, 62, 0.9f) }, { 1.1, juce::MidiMessage::noteOff (1, 62) },
                                                            { 1.3, juce::MidiMessage::noteOn (1, 64, 1.0f) } }, 1.5);
@@ -1860,6 +1863,15 @@ namespace
                 synth.setAssignment (target, { 0, 1.0f, false, 0.0f, threshold });
                 return countRandomizing (synth, {}, 3.05)[1];
             };
+
+            // At 100%, a square LFO, which starts at 0 and steps straight up, randomizes once a period, as it reaches
+            // the top: as it starts, and a second and two seconds in.
+            {
+                SynthProcessor synth;
+                setLfo (synth, 0, 1.0f, false, waveform::Preset::square);
+                synth.setAssignment (target, { 0, 1.0f, false, 0.0f, 1.0f });
+                check (countRandomizing (synth, {}, 2.1)[1] == 3, "at 100%, a square LFO randomizes once a period, as it reaches the top");
+            }
 
             check (lfoCount (0.0f) == 3 && lfoCount (1.0f) == 3 && lfoCount (0.25f) == 6 && lfoCount (0.5f) == 6,
                    "an LFO randomizes once at its lowest at 0%, once at its highest at 100%, and twice a period in between");
@@ -3353,6 +3365,7 @@ namespace
                "...and its phase round its turn");
 
         synth.setMidiController (modulation::randomizeTarget (1), 23);
+        synth.setMidiThreshold (modulation::randomizeTarget (1), 0.5f);
         const auto randomized = synth.getShape (1);
         moveControllers (synth, { { 23, 10 } });
         moveControllers (synth, { { 23, 100 } });
@@ -3587,19 +3600,20 @@ namespace
                      && modulation::isTrigger (target),
                    "each harmonic's switch is a control that's triggered");
 
-            modulated.setAssignment (target, { 0, 1.0f, false });
+            modulated.setAssignment (target, { 0, 1.0f, false, 0.0f, 0.5f });
             countRandomizing (modulated, {}, 1.6);
             check (! modulated.isHarmonicPlayed (0, 2), "an LFO switches a harmonic off as it crosses its threshold, three times in 1.6 seconds");
 
             SynthProcessor evenly;
             setLfo (evenly, 0, 1.0f, false, waveform::Preset::square);
-            evenly.setAssignment (target, { 0, 1.0f, false });
+            evenly.setAssignment (target, { 0, 1.0f, false, 0.0f, 0.5f });
             countRandomizing (evenly, {}, 2.1);
             check (evenly.isHarmonicPlayed (0, 2), "...and back on at each crossing after, four in 2.1 seconds");
 
             // MIDI learn: a knob turned past halfway switches it.
             modulated.setAssignment (target, {});
             modulated.setMidiController (modulation::harmonicSwitchTarget (0, 3), 30);
+            modulated.setMidiThreshold (modulation::harmonicSwitchTarget (0, 3), 0.5f);
             moveControllers (modulated, { { 30, 10 } });
             moveControllers (modulated, { { 30, 100 } });
             check (! modulated.isHarmonicPlayed (0, 3), "a MIDI controller turned past halfway switches a harmonic");
@@ -3609,8 +3623,8 @@ namespace
             const auto first = modulation::harmonicSwitchTarget (0, 1);
             modulated.setMidiController (first, 31);
             modulated.setMidiThreshold (first, 0.8f);
-            check (isNear (modulated.getMidiThreshold (first), 0.8, 1.0e-6) && isNear (modulated.getMidiThreshold (modulation::randomizeTarget (0)), 0.5, 1.0e-6),
-                   "a MIDI link to a control that's triggered has a threshold, halfway to start with");
+            check (isNear (modulated.getMidiThreshold (first), 0.8, 1.0e-6) && juce::exactlyEqual (modulated.getMidiThreshold (modulation::randomizeTarget (0)), 1.0f),
+                   "a MIDI link to a control that's triggered has a threshold, right up to start with");
             moveControllers (modulated, { { 31, 10 } });
             moveControllers (modulated, { { 31, 90 } });
             const auto beforePast = modulated.isHarmonicPlayed (0, 1);

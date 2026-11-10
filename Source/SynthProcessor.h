@@ -181,7 +181,7 @@ public:
     void setMidiController (int target, std::optional<int> controller);
 
     /** For a control that's triggered, such as randomizing or a harmonic's switch, where across the controller's
-        travel, from 0 to 1, turning it past triggers the control, either way: halfway to start with. As with a
+        travel, from 0 to 1, turning it past triggers the control, either way: right up to start with. As with a
         modulator's threshold, 0 counts only turning it right down, and 1 only turning it right up.
     */
     float getMidiThreshold (int target) const noexcept   { return midiThresholds[(size_t) target]; }
@@ -559,9 +559,10 @@ private:
     void watchRandomizeTriggers (int numSamples);
 
     /** A source's value at the end of the block, on the audio thread: an LFO's from where it's got to, shifted
-        back by the phase given, the newest note's envelope, if a note's sounding, and the last note's velocity.
+        back by the phase given, or as it was the periods given earlier in the block, the newest note's envelope, if
+        a note's sounding, and the last note's velocity.
     */
-    std::optional<float> getSourceValueNow (int source, double phase) const;
+    std::optional<float> getSourceValueNow (int source, double phase, double periodsEarlier = 0.0) const;
 
     void timerCallback() override;
 

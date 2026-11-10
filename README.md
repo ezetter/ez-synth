@@ -94,12 +94,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   played and the other oscillators are left alone. Click it again for another; Cmd-Z undoes it.
 - **Randomize from a modulator.** Right-click, or Control-click, **Randomize** to have an LFO, envelope,
   velocity or the mod wheel randomize the oscillator's harmonics for you, each time it crosses a
-  threshold, its midline to start with, either way. An LFO crosses at 0, so a looping LFO randomizes twice a period, even with no
-  note playing; its phase shifts when. An envelope crosses halfway, as the newest note's attack rises past
-  it and again as its release falls; the mod wheel as it's pushed past halfway and pulled back. Velocity
-  randomizes when a note's played on the other side of halfway from the note before: hard after soft, or
-  soft after hard. In place of a range, each has a **Threshold**, from 0% to 100% of the source's values,
-  50% to start with: the midline. For an LFO that's from -1 to 1 on its wave, so 25% is -0.5; for the
+  threshold, its midline to start with, either way. An LFO crosses at 0, so a looping LFO randomizes twice
+  a period, even with no note playing; its phase shifts when. An envelope crosses halfway, as the newest
+  note's attack rises past it and again as its release falls; the mod wheel as it's pushed past halfway and
+  pulled back. Velocity randomizes when a note's played on the other side of halfway from the note before:
+  hard after soft, or soft after hard. In place of a range, each has a **Threshold**, from 0% to 100% of
+  the source's values, 50% to start with: the midline. For an LFO that's from -1 to 1 on its wave, so 25% is -0.5; for the
   others it's from 0 to 1. Crossing the threshold either way triggers it, so there's no polarity. At the
   very ends it's reaching them that counts: at 0% an LFO randomizes once at the bottom of each cycle and an
   envelope as each note's release ends, and at 100% an LFO once at each peak and an envelope as each
@@ -348,8 +348,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
   each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
   Linked to **Randomize**, or a harmonic's switch, a knob triggers it each time it's turned past its
-  **Threshold**, either way: halfway to start with. The threshold's slider is under the MIDI CC row, and at
-  0% only turning the knob right down counts, and at 100% only turning it right up. It's kept with the link.
+  **Threshold**, either way. The threshold's slider is under the MIDI CC row. It starts at 100%, where only
+  turning the knob right up counts, and at 0% only turning it right down does. It's kept with the link.
 - **See what's linked** in the **Modulation** overview, which lists every control linked to a MIDI
   controller, with its number, such as *CC 74*, as well as in each control's own right-click window.
 - **One control for each controller.** Linking a controller to a second control unlinks it from the first.

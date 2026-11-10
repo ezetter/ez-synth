@@ -143,7 +143,8 @@ namespace modulation
         float phase = 0.0f;
 
         /** For a control that's triggered, such as randomizing, where across the source's values crossing triggers it,
-            from 0, the bottom, to 1, the top: -1 to 1 for an LFO, and 0 to 1 for the rest. Halfway is the midline.
+            from 0, the bottom, to 1, the top: -1 to 1 for an LFO, and 0 to 1 for the rest. Halfway is the midline,
+            where it starts.
         */
         float threshold = 0.5f;
 

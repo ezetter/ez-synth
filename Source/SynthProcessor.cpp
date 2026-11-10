@@ -390,9 +390,10 @@ SynthProcessor::SynthProcessor()
     initState = createState();
     undoHistory.push_back (initState);
 
-    // No control is linked to a MIDI controller until one's learned, and one that's triggered is triggered halfway.
+    // No control is linked to a MIDI controller until one's learned, and one that's triggered is triggered as the
+    // controller's turned right up.
     targetControllers.fill (-1);
-    midiThresholds.fill (0.5f);
+    midiThresholds.fill (1.0f);
 
     // The audio thread asks for oscillators' harmonics to be randomized, and passes on MIDI controllers moved; the
     // message thread carries them out.
@@ -576,7 +577,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
             for (int look = looks - 1; look >= 0; --look)
             {
                 const auto periodsEarlier = isLfo ? (double) (look * lookInterval) / patch.getLfoPeriodSamples ((size_t) assignment.source) : 0.0;
-                const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase + periodsEarlier)
+                const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase, periodsEarlier)
                                                          : std::nullopt;
                 triggered = crossing.update (value, threshold, assignment.threshold) || triggered;
             }
@@ -591,7 +592,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     }
 }
 
-std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase) const
+std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase, double periodsEarlier) const
 {
     // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
     if (source == modulation::velocitySource)
@@ -613,7 +614,13 @@ std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase
     if (progress < 0.0)
         return std::nullopt;
 
-    const auto periods = (lfo.fromKey ? progress : (double) lfoCyclesShown[(size_t) source].load() + progress) - phase;
+    // Before the LFO started, as the synth started playing or the key was pressed, there's nothing to look at.
+    const auto sinceStart = (lfo.fromKey ? progress : (double) lfoCyclesShown[(size_t) source].load() + progress) - periodsEarlier;
+
+    if (sinceStart < 0.0)
+        return std::nullopt;
+
+    const auto periods = sinceStart - phase;
 
     if (! lfo.random)
         return modulation::lfoValue (lfo.shape, periods, lfo.fromKey, lfo.times);
@@ -1566,8 +1573,9 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (const auto links = state.getChildWithName ("MIDILEARN"); links.isValid())
     {
         targetControllers.fill (-1);
-        midiThresholds.fill (0.5f);
+        midiThresholds.fill (1.0f);
 
+        // Links saved before they had thresholds were triggered halfway.
         for (const auto& link : links)
         {
             if (const auto target = modulation::findTarget (link["target"].toString()))
@@ -1812,9 +1820,12 @@ void SynthProcessor::loadState (juce::ValueTree state)
 
     assignments = {};
 
-    // A trigger's threshold, saved since it could be set. Saves from before trigger at the midline.
-    const auto readThreshold = [] (const juce::ValueTree& tree)
+    // A trigger's threshold, saved since it could be set. Saves from before trigger at the midline, as they did.
+    const auto readThreshold = [] (const juce::ValueTree& tree, int target)
     {
+        if (! modulation::isTrigger (target))
+            return modulation::Assignment().threshold;
+
         return juce::jlimit (0.0f, 1.0f, (float) tree.getProperty ("threshold", 0.5f));
     };
 
@@ -1836,7 +1847,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
                                                modulation::isEnvelope (source)
                                                    ? 0.0f
                                                    : juce::jlimit (0.0f, modulation::latestPhase, (float) modulationTree["phase"]),
-                                               readThreshold (modulationTree) };
+                                               readThreshold (modulationTree, *target) };
     }
 
     // Saves from before velocity could be assigned had it make softer notes quieter, as it does to start with.
@@ -1849,7 +1860,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             velocityAssignments[(size_t) *target] = { modulation::velocitySource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]), false, 0.0f,
-                                                      readThreshold (assignmentTree) };
+                                                      readThreshold (assignmentTree, *target) };
 
     // Saves from before the mod wheel could be assigned have it move nothing.
     modWheelAssignments = {};
@@ -1858,7 +1869,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
         if (const auto target = modulation::findTarget (assignmentTree["target"].toString()))
             modWheelAssignments[(size_t) *target] = { modulation::modWheelSource,
                                                       juce::jlimit (0.0f, 1.0f, (float) assignmentTree["range"]),
-                                                      (bool) assignmentTree["inverted"], 0.0f, readThreshold (assignmentTree) };
+                                                      (bool) assignmentTree["inverted"], 0.0f, readThreshold (assignmentTree, *target) };
 
     share();
     ++modulationVersion;

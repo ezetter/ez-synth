@@ -50,7 +50,7 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     midiThreshold.setSliderStyle (juce::Slider::LinearHorizontal);
     midiThreshold.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     midiThreshold.setRange (0.0, 1.0);
-    midiThreshold.setDoubleClickReturnValue (true, 0.5);
+    midiThreshold.setDoubleClickReturnValue (true, 1.0);
     midiThreshold.setColour (juce::Slider::trackColourId, colours::modulation);
     midiThreshold.setTitle ("MIDI threshold");
     midiThreshold.setMouseClickGrabsKeyboardFocus (false);
