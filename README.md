@@ -325,6 +325,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
   each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
   Linked to **Randomize**, a knob randomizes the harmonics each time it's turned past halfway, either way.
+- **See what's linked.** Each linked control has a small amber tag at its top right with its controller's
+  number, such as *74*, and the control waiting to learn one reads *MIDI* until a knob's moved.
 - **One control for each controller.** Linking a controller to a second control unlinks it from the first.
   Controllers 120 and up, such as All Notes Off, can't be learned. The mod wheel, controller 1, can, though
   it also goes on moving whatever it's set to move as a modulator.
@@ -543,6 +545,7 @@ save pictures of the window showing several waves.
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
+| `Source/MidiLinkMarkers.*` | The amber tags on controls linked to MIDI controllers |
 | `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, velocity and the mod wheel, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |

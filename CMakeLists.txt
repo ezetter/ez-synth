@@ -55,6 +55,7 @@ target_sources(EZSynth
         Source/Keyboard.cpp
         Source/LfoPanel.cpp
         Source/MidiInputs.cpp
+        Source/MidiLinkMarkers.cpp
         Source/MidiPanel.cpp
         Source/NumberStepper.cpp
         Source/ModulatableControls.cpp

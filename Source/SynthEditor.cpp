@@ -128,6 +128,8 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         addAndMakeVisible (*midiPanel);
     }
 
+    addAndMakeVisible (midiLinkMarkers);
+
     setResizable (true, true);
     setResizeLimits (1420, 900, 2200, 1400);
     setSize (1440, 960);
@@ -215,6 +217,7 @@ void SynthEditor::paintNote (juce::Graphics& g) const
 
 void SynthEditor::resized()
 {
+    midiLinkMarkers.setBounds (getLocalBounds());
     auto area = getLocalBounds().reduced (18);
 
     auto header = area.removeFromTop (50);
@@ -649,6 +652,7 @@ void SynthEditor::timerCallback()
 {
     refresh();
     showModulation();
+    midiLinkMarkers.refresh();
     rememberChanges();
 
     // In the standalone app the computer keyboard plays the piano straight away.

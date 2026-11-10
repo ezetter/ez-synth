@@ -6,6 +6,7 @@
 #include "HarmonicSliders.h"
 #include "Keyboard.h"
 #include "LfoPanel.h"
+#include "MidiLinkMarkers.h"
 #include "MidiPanel.h"
 #include "ModulatableControls.h"
 #include "PresetBar.h"
@@ -103,6 +104,9 @@ private:
 
     /** Only in the standalone app, which plays from MIDI devices itself. */
     std::unique_ptr<MidiPanel> midiPanel;
+
+    /** Tags the controls linked to MIDI controllers, over everything else. */
+    MidiLinkMarkers midiLinkMarkers { synthProcessor };
 
     /** Names what's under the mouse, for controls that show a picture rather than a word, such as the filter types. */
     juce::TooltipWindow tooltipWindow { this, 500 };
