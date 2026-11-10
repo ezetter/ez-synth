@@ -16,8 +16,11 @@ public:
     ModulationEditor (SynthProcessor&, int target);
     ~ModulationEditor() override;
 
-    /** The buttons that learn which MIDI controller sets the control, and forget it. */
+    /** The buttons that learn which MIDI controller sets the control, and forget it, and for a control that's
+        triggered, where across the controller's travel turning it past triggers it.
+    */
     juce::TextButton learnButton { "Learn" }, forgetButton { "Forget" };
+    juce::Slider midiThreshold;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -53,6 +56,9 @@ private:
     juce::String describeModWheel() const;
     juce::String describeMidiLearn() const;
 
+    /** Where turning a controller triggers a control, such as "past 50%, either way," or "right down". */
+    static juce::String describeMidiThreshold (float threshold);
+
     /** Shows whether the control's linked to a MIDI controller, or waiting to learn one. */
     void showMidiLearn();
     void timerCallback() override;
@@ -69,7 +75,7 @@ private:
     Section modWheel { { "Off", "On" }, false, true };
 
     juce::Rectangle<int> titleArea, dividerArea, secondDividerArea, thirdDividerArea, midiCaptionArea, midiStatusArea,
-                         midiDescriptionArea;
+                         midiDescriptionArea, midiThresholdCaption, midiThresholdValue;
     int shownMidiLearnVersion = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationEditor)

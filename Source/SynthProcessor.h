@@ -180,6 +180,13 @@ public:
     std::optional<int> getMidiController (int target) const noexcept;
     void setMidiController (int target, std::optional<int> controller);
 
+    /** For a control that's triggered, such as randomizing or a harmonic's switch, where across the controller's
+        travel, from 0 to 1, turning it past triggers the control, either way: halfway to start with. As with a
+        modulator's threshold, 0 counts only turning it right down, and 1 only turning it right up.
+    */
+    float getMidiThreshold (int target) const noexcept   { return midiThresholds[(size_t) target]; }
+    void setMidiThreshold (int target, float threshold);
+
     /** Goes up whenever a link is learned or forgotten, or learning starts or stops, for the window to show it. */
     int getMidiLearnVersion() const noexcept   { return midiLearnVersion; }
 
@@ -636,6 +643,7 @@ private:
     std::array<std::atomic<int>, numLearnableControllers> controllerValues {}, controllerMoves {};
     std::atomic<int> learningTarget { -1 }, learnedController { -1 };
     std::array<int, modulation::numTargets> targetControllers {}, appliedMoves {};
+    std::array<float, modulation::numTargets> midiThresholds {};
     std::array<modulation::ThresholdCrossing, numTriggers> controllerTriggerCrossings {};
     int midiLearnVersion = 0;
 

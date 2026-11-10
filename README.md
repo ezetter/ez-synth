@@ -85,7 +85,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   velocity or the mod wheel switch its harmonic, as **Randomize** can be triggered: each time it crosses
   its **Threshold**, either way, it switches the harmonic off if it's on, and on if it's off. A square LFO
   at 50% switches it every half period. A box can be linked to a MIDI controller too, which switches it as
-  it's turned past halfway.
+  it's turned past its threshold.
 - **Randomize** at the top right of the harmonics panel gives the oscillator shown a new random wave:
   every one of its 16 harmonics gets a random amplitude and phase, even those it isn't playing yet, so
   raising the number of harmonics brings in more of the same random wave. Amplitudes are spread evenly along
@@ -347,7 +347,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   is, such as *CC 74*; click **Learn** again before moving anything to cancel, or **Forget** to unlink it.
 - **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
   each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
-  Linked to **Randomize**, a knob randomizes the harmonics each time it's turned past halfway, either way.
+  Linked to **Randomize**, or a harmonic's switch, a knob triggers it each time it's turned past its
+  **Threshold**, either way: halfway to start with. The threshold's slider is under the MIDI CC row, and at
+  0% only turning the knob right down counts, and at 100% only turning it right up. It's kept with the link.
 - **See what's linked.** Each linked control has a small amber tag at its top right with its controller's
   number, such as *74*, and the control waiting to learn one reads *MIDI* until a knob's moved.
 - **One control for each controller.** Linking a controller to a second control unlinks it from the first.

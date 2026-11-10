@@ -390,8 +390,9 @@ SynthProcessor::SynthProcessor()
     initState = createState();
     undoHistory.push_back (initState);
 
-    // No control is linked to a MIDI controller until one's learned.
+    // No control is linked to a MIDI controller until one's learned, and one that's triggered is triggered halfway.
     targetControllers.fill (-1);
+    midiThresholds.fill (0.5f);
 
     // The audio thread asks for oscillators' harmonics to be randomized, and passes on MIDI controllers moved; the
     // message thread carries them out.
@@ -708,6 +709,12 @@ void SynthProcessor::setMidiController (int target, std::optional<int> controlle
     ++midiLearnVersion;
 }
 
+void SynthProcessor::setMidiThreshold (int target, float threshold)
+{
+    midiThresholds[(size_t) target] = juce::jlimit (0.0f, 1.0f, threshold);
+    ++midiLearnVersion;
+}
+
 void SynthProcessor::applyMidiControllers()
 {
     // The controller moved to teach a control sets it straight away.
@@ -741,10 +748,13 @@ void SynthProcessor::setTargetPosition (int target, float position)
     position = juce::jlimit (0.0f, 1.0f, position);
     const auto info = modulation::describe (target);
 
-    // Randomizing, and a harmonic's switch, are triggered by the controller crossing halfway, either way.
+    // Randomizing, and a harmonic's switch, are triggered by the controller crossing its threshold, either way.
     if (modulation::isTrigger (target))
     {
-        if (controllerTriggerCrossings[(size_t) (target - firstTrigger)].update (position, 0.5f, 0.5f))
+        const auto threshold = getMidiThreshold (target);
+
+        if (controllerTriggerCrossings[(size_t) (target - firstTrigger)].update (position, modulation::getThresholdValue (-1, threshold),
+                                                                                threshold))
             carryOutTrigger (target);
 
         return;
@@ -1530,6 +1540,9 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
             juce::ValueTree link ("LINK");
             link.setProperty ("target", modulation::getKey (target), nullptr);
             link.setProperty ("controller", *controller, nullptr);
+
+            if (modulation::isTrigger (target))
+                link.setProperty ("threshold", getMidiThreshold (target), nullptr);
             links.appendChild (link, nullptr);
         }
     }
@@ -1553,10 +1566,16 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (const auto links = state.getChildWithName ("MIDILEARN"); links.isValid())
     {
         targetControllers.fill (-1);
+        midiThresholds.fill (0.5f);
 
         for (const auto& link : links)
+        {
             if (const auto target = modulation::findTarget (link["target"].toString()))
+            {
                 setMidiController (*target, (int) link["controller"]);
+                setMidiThreshold (*target, (float) link.getProperty ("threshold", 0.5f));
+            }
+        }
 
         state.removeChild (links, nullptr);
     }

@@ -3644,6 +3644,33 @@ namespace
             moveControllers (modulated, { { 30, 10 } });
             moveControllers (modulated, { { 30, 100 } });
             check (! modulated.isHarmonicPlayed (0, 3), "a MIDI controller turned past halfway switches a harmonic");
+
+            // A threshold sets where across the controller's travel it switches. At 80%, 90 of 127 isn't past it,
+            // and 110 is.
+            const auto first = modulation::harmonicSwitchTarget (0, 1);
+            modulated.setMidiController (first, 31);
+            modulated.setMidiThreshold (first, 0.8f);
+            check (isNear (modulated.getMidiThreshold (first), 0.8, 1.0e-6) && isNear (modulated.getMidiThreshold (modulation::randomizeTarget (0)), 0.5, 1.0e-6),
+                   "a MIDI link to a control that's triggered has a threshold, halfway to start with");
+            moveControllers (modulated, { { 31, 10 } });
+            moveControllers (modulated, { { 31, 90 } });
+            const auto beforePast = modulated.isHarmonicPlayed (0, 1);
+            moveControllers (modulated, { { 31, 110 } });
+            check (beforePast && ! modulated.isHarmonicPlayed (0, 1), "turning the controller past its threshold switches the harmonic");
+
+            // At 0%, only turning it right down counts.
+            modulated.setMidiThreshold (first, 0.0f);
+            moveControllers (modulated, { { 31, 0 } });
+            const auto atBottom = modulated.isHarmonicPlayed (0, 1);
+            moveControllers (modulated, { { 31, 60 } });
+            check (atBottom && modulated.isHarmonicPlayed (0, 1), "at 0%, turning it right down switches it, and turning it back up doesn't");
+
+            juce::MemoryBlock state;
+            modulated.getStateInformation (state);
+            SynthProcessor loaded;
+            loaded.setStateInformation (state.getData(), (int) state.getSize());
+            check (loaded.getMidiController (first) == 31 && juce::exactlyEqual (loaded.getMidiThreshold (first), 0.0f),
+                   "the threshold is saved with the link, in a host's project");
         }
 
         // In the window: the boxes switch harmonics, show which play, and the harmonics switched off leave no row.
@@ -4598,7 +4625,10 @@ namespace
         saveModulationEditor (modulation::volumeTarget, "11a-modulation-editor-envelope");
         saveModulationEditor (modulation::lfoRateTarget (0), "11b-modulation-editor-lfo-rate");
         synth.setAssignment (modulation::randomizeTarget (0), { 1, 1.0f, false, 0.25f, 0.2f });
+        synth.setMidiController (modulation::randomizeTarget (0), 40);
+        synth.setMidiThreshold (modulation::randomizeTarget (0), 0.7f);
         saveModulationEditor (modulation::randomizeTarget (0), "11c-modulation-editor-randomize");
+        synth.setMidiController (modulation::randomizeTarget (0), std::nullopt);
         synth.setAssignment (modulation::randomizeTarget (0), {});
 
         // Waves drawn in steps: the Step Filter preset's LFO, in its 8 steps, and an oscillator drawn in 12.

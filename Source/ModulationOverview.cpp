@@ -97,7 +97,8 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
         if (const auto controller = synthProcessor.getMidiController (target))
             links.push_back ({ Link::Kind::midi, -1, target,
                                "CC " + juce::String (*controller)
-                                   + (modulation::isTrigger (target) ? ", " + triggerVerb (target) + " past halfway" : juce::String (", across its whole travel")) });
+                                   + (modulation::isTrigger (target) ? ", " + triggerVerb (target) + " at " + percent (synthProcessor.getMidiThreshold (target))
+                                                                  : juce::String (", across its whole travel")) });
     }
 
     return links;

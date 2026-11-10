@@ -46,9 +46,23 @@ ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
         showMidiLearn();
     };
 
+    // A control that's triggered is triggered as the controller's turned past its threshold.
+    midiThreshold.setSliderStyle (juce::Slider::LinearHorizontal);
+    midiThreshold.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    midiThreshold.setRange (0.0, 1.0);
+    midiThreshold.setDoubleClickReturnValue (true, 0.5);
+    midiThreshold.setColour (juce::Slider::trackColourId, colours::modulation);
+    midiThreshold.setTitle ("MIDI threshold");
+    midiThreshold.setMouseClickGrabsKeyboardFocus (false);
+    midiThreshold.setWantsKeyboardFocus (false);
+    midiThreshold.setValue (synthProcessor.getMidiThreshold (target), juce::dontSendNotification);
+    midiThreshold.onValueChange = [this] { synthProcessor.setMidiThreshold (target, (float) midiThreshold.getValue()); };
+    addChildComponent (midiThreshold);
+    midiThreshold.setVisible (modulation::isTrigger (target));
+
     showMidiLearn();
     startTimerHz (15);
-    setSize (470, 574);
+    setSize (470, modulation::isTrigger (target) ? 608 : 574);
 }
 
 ModulationEditor::~ModulationEditor()
@@ -72,7 +86,21 @@ void ModulationEditor::showMidiLearn()
     learnButton.setToggleState (learning, juce::dontSendNotification);
     forgetButton.setEnabled (synthProcessor.getMidiController (target).has_value());
     forgetButton.setAlpha (forgetButton.isEnabled() ? 1.0f : 0.4f);
+
+    if (! midiThreshold.isMouseButtonDown())
+        midiThreshold.setValue (synthProcessor.getMidiThreshold (target), juce::dontSendNotification);
     repaint();
+}
+
+juce::String ModulationEditor::describeMidiThreshold (float threshold)
+{
+    if (threshold <= 0.0f)
+        return "right down";
+
+    if (threshold >= 1.0f)
+        return "right up";
+
+    return "past " + juce::String (juce::roundToInt (threshold * 100.0f)) + "%, either way,";
 }
 
 juce::String ModulationEditor::describeMidiLearn() const
@@ -84,7 +112,7 @@ juce::String ModulationEditor::describeMidiLearn() const
 
     if (synthProcessor.getMidiController (target).has_value())
         return modulation::isTrigger (target)
-                   ? "Moving it past halfway, either way, " + modulation::describeTrigger (target) + "."
+                   ? "Turning it " + describeMidiThreshold (synthProcessor.getMidiThreshold (target)) + " " + modulation::describeTrigger (target) + "."
                    : "It sets the " + control + " across its whole travel, from 0 to 127.";
 
     return "Click Learn, then move a knob or slider on your MIDI controller, to have it set the " + control + ".";
@@ -396,6 +424,16 @@ void ModulationEditor::resized()
     row.removeFromRight (8);
     midiStatusArea = row;
     area.removeFromTop (8);
+
+    if (modulation::isTrigger (target))
+    {
+        row = area.removeFromTop (22);
+        midiThresholdCaption = row.removeFromLeft (104);
+        midiThresholdValue = row.removeFromRight (40);
+        midiThreshold.setBounds (row);
+        area.removeFromTop (12);
+    }
+
     midiDescriptionArea = area.removeFromTop (20);
 }
 
@@ -460,6 +498,17 @@ void ModulationEditor::paint (juce::Graphics& g)
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
     g.drawText ("MIDI CC", midiCaptionArea, juce::Justification::centredLeft);
+
+    if (modulation::isTrigger (target))
+    {
+        g.drawText ("THRESHOLD", midiThresholdCaption, juce::Justification::centredLeft);
+        g.setFont (fonts::body (13.0f));
+        g.setColour (synthProcessor.getMidiController (target).has_value() ? colours::text : colours::dimText);
+        g.drawText (juce::String (juce::roundToInt (midiThreshold.getValue() * 100.0)) + "%", midiThresholdValue,
+                    juce::Justification::centredRight);
+        g.setFont (fonts::caption());
+        g.setColour (colours::dimText);
+    }
 
     const auto controller = synthProcessor.getMidiController (target);
     const auto learning = synthProcessor.getMidiLearnTarget() == target;
