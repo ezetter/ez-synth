@@ -1,46 +1,44 @@
 #pragma once
 
+#include "ModulatableControls.h"
 #include "Waveform.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** Two rows of buttons, 1 to 8 and 9 to 16, for how many harmonics to play the wave with, from the 1st up. Each lit
-    button is coloured like its harmonic. A right-click or Control-click asks for an LFO to move the number instead.
+/** A slider, from 1 to 16, for how many harmonics to play the wave with, from the 1st up, with the number beside it.
+    Under it, each harmonic's number, in its colour: lit up to the number played, and outlined for a harmonic
+    that's played but that the wave doesn't have. A right-click or Control-click on the slider asks for an LFO,
+    envelope, velocity or the mod wheel to move the number instead.
 */
 class HarmonicSelector final : public juce::Component
 {
 public:
     explicit HarmonicSelector (juce::RangedAudioParameter&);
 
-    /** Switches to setting another parameter, such as another oscillator's number of harmonics. */
-    void setParameter (juce::RangedAudioParameter&);
+    /** Switches to setting another parameter, such as another oscillator's number of harmonics, and the control
+        that moves it.
+    */
+    void setParameter (juce::RangedAudioParameter&, int target);
 
-    /** Which harmonics the wave doesn't have. Their buttons are lit only in outline. */
+    /** Which harmonics the wave doesn't have. Their numbers are lit only in outline. */
     void setSilentHarmonics (std::array<bool, waveform::maxHarmonics>);
 
-    /** How many buttons there are in each row, and how many rows. */
-    static constexpr int perRow = 8;
-    static constexpr int numRows = (waveform::maxHarmonics + perRow - 1) / perRow;
-    static constexpr int preferredHeight = 60;
+    /** How many harmonics it's set to play. */
+    int getNumber() const   { return juce::roundToInt (slider.getValue()); }
 
     void paint (juce::Graphics&) override;
-    void mouseDown (const juce::MouseEvent&) override;
-    void mouseDrag (const juce::MouseEvent&) override;
-    void mouseUp (const juce::MouseEvent&) override;
-    void mouseMove (const juce::MouseEvent&) override;
-    void mouseExit (const juce::MouseEvent&) override;
+    void resized() override;
+
+    static constexpr int preferredHeight = 44;
 
 private:
-    juce::Rectangle<float> getButtonArea (int number) const;
-    int getNumberAt (juce::Point<float>) const;
-    void select (int number);
-    void setHovered (int number);
+    /** Where a harmonic's number sits under the slider: under the point on the slider that picks it. */
+    juce::Rectangle<float> getNumberArea (int number) const;
 
-    std::unique_ptr<juce::ParameterAttachment> attachment;
-    int selected = 1;
+    ModulatableSlider slider;
+    std::unique_ptr<juce::SliderParameterAttachment> attachment;
     std::array<bool, waveform::maxHarmonics> silent {};
-    int hovered = 0;
-    bool alternateClick = false;
+    juce::Rectangle<int> valueArea, numbersArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HarmonicSelector)
 };

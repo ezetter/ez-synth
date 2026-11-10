@@ -1,6 +1,7 @@
 // Checks that waves break down into the right harmonics, that the synth plays them, and that the LFOs move what
 // they're given to move. If asked with --snapshots <folder>, it also saves pictures of the window.
 
+#include "../Source/HarmonicSelector.h"
 #include "../Source/MidiInputs.h"
 #include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
@@ -3003,6 +3004,20 @@ namespace
             check (tuneSlider.getGlideMode() == 0, "the tune slider shows the oscillator's glide");
             setParameter (shown, SynthProcessor::glideId (2), 2.0f);
             check (tuneSlider.getGlideMode() == 2, "...and follows it as it's set from elsewhere");
+
+            // The number of harmonics is set with a slider from 1 to 16, which follows the oscillator it's switched to.
+            HarmonicSelector selector (*shown.parameters.getParameter (SynthProcessor::harmonicsId (0)));
+            selector.setBounds (0, 0, 400, HarmonicSelector::preferredHeight);
+            auto& numberSlider = dynamic_cast<juce::Slider&> (*selector.getChildComponent (0));
+            check (juce::exactlyEqual (numberSlider.getMinimum(), 1.0) && juce::exactlyEqual (numberSlider.getMaximum(), 16.0)
+                     && selector.getNumber() == waveform::defaultHarmonics,
+                   "the number of harmonics is a slider from 1 to 16, starting at 3");
+            numberSlider.setValue (12.0, juce::sendNotificationSync);
+            check (shown.getNumHarmonics (0) == 12, "moving the slider sets the number of harmonics");
+            setParameter (shown, SynthProcessor::harmonicsId (1), 7.0f);
+            selector.setParameter (*shown.parameters.getParameter (SynthProcessor::harmonicsId (1)), modulation::oscillatorHarmonicsTarget (1));
+            check (selector.getNumber() == 7 && modulatable::getTarget (numberSlider) == modulation::oscillatorHarmonicsTarget (1),
+                   "switched to another oscillator, it shows and sets that one's number, and its modulation");
         }
     }
 

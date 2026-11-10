@@ -1,26 +1,30 @@
 #include "HarmonicSelector.h"
 
 #include "Modulation.h"
-#include "ModulatableControls.h"
 #include "SynthLookAndFeel.h"
 
 HarmonicSelector::HarmonicSelector (juce::RangedAudioParameter& parameter)
 {
-    setMouseCursor (juce::MouseCursor::PointingHandCursor);
-    setMouseClickGrabsKeyboardFocus (false);
-    setTitle ("Number of harmonics");
-    setParameter (parameter);
+    slider.setSliderStyle (juce::Slider::LinearHorizontal);
+    slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    slider.setColour (juce::Slider::trackColourId, colours::accent);
+    slider.setMouseClickGrabsKeyboardFocus (false);
+    slider.setWantsKeyboardFocus (false);
+    slider.setTitle ("Number of harmonics");
+    slider.onValueChange = [this] { repaint(); };
+    slider.onLivePositionChange = [this] { repaint (numbersArea); };
+    addAndMakeVisible (slider);
+
+    setParameter (parameter, modulation::oscillatorHarmonicsTarget (0));
 }
 
-void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter)
+void HarmonicSelector::setParameter (juce::RangedAudioParameter& parameter, int target)
 {
-    attachment = std::make_unique<juce::ParameterAttachment> (parameter, [this] (float value)
-    {
-        selected = juce::roundToInt (value);
-        repaint();
-    });
-
-    attachment->sendInitialUpdate();
+    attachment.reset();
+    attachment = std::make_unique<juce::SliderParameterAttachment> (parameter, slider);
+    slider.setDoubleClickReturnValue (true, waveform::defaultHarmonics);
+    modulatable::setTarget (slider, target);
+    repaint();
 }
 
 void HarmonicSelector::setSilentHarmonics (std::array<bool, waveform::maxHarmonics> newSilent)
@@ -32,127 +36,65 @@ void HarmonicSelector::setSilentHarmonics (std::array<bool, waveform::maxHarmoni
     }
 }
 
-juce::Rectangle<float> HarmonicSelector::getButtonArea (int number) const
+void HarmonicSelector::resized()
 {
-    constexpr auto gap = 4.0f;
-    const auto width = ((float) getWidth() - gap * (perRow - 1)) / perRow;
-    const auto height = ((float) getHeight() - gap * (numRows - 1)) / numRows;
-    const auto row = (number - 1) / perRow, column = (number - 1) % perRow;
-    return { (float) column * (width + gap), (float) row * (height + gap), width, height };
+    auto area = getLocalBounds();
+    valueArea = area.removeFromRight (40).removeFromTop (22);
+    area.removeFromRight (8);
+    slider.setBounds (area.removeFromTop (22));
+    area.removeFromTop (4);
+    numbersArea = area.withX (slider.getX()).withWidth (slider.getWidth());
 }
 
-int HarmonicSelector::getNumberAt (juce::Point<float> position) const
+juce::Rectangle<float> HarmonicSelector::getNumberArea (int number) const
 {
-    const auto column = juce::jlimit (0, perRow - 1, (int) (position.x / (float) juce::jmax (1, getWidth()) * perRow));
-    const auto row = juce::jlimit (0, numRows - 1, (int) (position.y / (float) juce::jmax (1, getHeight()) * numRows));
-    return juce::jlimit (1, waveform::maxHarmonics, 1 + row * perRow + column);
+    // A linear slider's thumb runs between half a thumb's width in from either end.
+    const auto x = (float) slider.getX() + (float) slider.getPositionOfValue (number);
+    const auto spacing = (float) slider.getWidth() / (float) waveform::maxHarmonics;
+    return juce::Rectangle<float> (juce::jmin (22.0f, spacing - 2.0f), (float) numbersArea.getHeight())
+        .withCentre ({ x, numbersArea.toFloat().getCentreY() });
 }
 
 void HarmonicSelector::paint (juce::Graphics& g)
 {
+    const auto selected = getNumber();
+
+    g.setColour (colours::text);
+    g.setFont (fonts::body (15.0f).boldened());
+    g.drawText (juce::String (selected), valueArea, juce::Justification::centredRight);
+
+    // The number an LFO, or anything else, has moved the count to, picked out in the modulation colour.
+    const auto livePosition = modulatable::getLivePosition (slider);
+    const auto liveNumber = livePosition.has_value() ? modulation::positionToHarmonics (*livePosition) : 0;
+
+    g.setFont (juce::FontOptions (11.5f, juce::Font::bold));
+
     for (int number = 1; number <= waveform::maxHarmonics; ++number)
     {
-        const auto area = getButtonArea (number).reduced (0.5f);
+        const auto area = getNumberArea (number);
         const auto colour = colours::forPartial (number - 1);
-        const auto lit = number <= selected && ! silent[(size_t) number - 1];
+        const auto played = number <= selected;
+        const auto lit = played && ! silent[(size_t) number - 1];
 
         if (lit)
         {
             g.setColour (colour);
-            g.fillRoundedRectangle (area, 5.0f);
+            g.fillRoundedRectangle (area, 3.0f);
         }
-        else if (number <= selected)
+        else if (played)
         {
             // Played, but the wave doesn't have this harmonic, as a square has no 2nd.
-            g.setColour (colour.withAlpha (0.12f));
-            g.fillRoundedRectangle (area, 5.0f);
             g.setColour (colour.withAlpha (0.7f));
-            g.drawRoundedRectangle (area.reduced (0.5f), 5.0f, 1.0f);
-        }
-        else
-        {
-            g.setColour (colours::panel.brighter (0.08f));
-            g.fillRoundedRectangle (area, 5.0f);
-            g.setColour (colours::outline);
-            g.drawRoundedRectangle (area, 5.0f, 1.0f);
+            g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 1.0f);
         }
 
-        if (number == hovered)
-        {
-            g.setColour (juce::Colours::white.withAlpha (0.18f));
-            g.fillRoundedRectangle (area, 5.0f);
-        }
-
-        if (number == selected)
-        {
-            g.setColour (colours::text);
-            g.drawRoundedRectangle (area.reduced (1.0f), 4.0f, 2.0f);
-        }
-
-        // The number an LFO has moved the count to.
-        if (const auto livePosition = modulatable::getLivePosition (*this);
-            livePosition.has_value() && number == modulation::positionToHarmonics (*livePosition))
+        if (number == liveNumber)
         {
             g.setColour (colours::modulation);
-            g.drawRoundedRectangle (area.reduced (1.0f), 4.0f, 2.5f);
+            g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 2.0f);
         }
 
-        g.setColour (lit ? colours::background : (number <= selected ? colour : colours::dimText));
-        g.setFont (juce::FontOptions (14.0f, juce::Font::bold));
+        g.setColour (lit ? colours::background : (played ? colour : colours::dimText.withAlpha (0.7f)));
         g.drawText (juce::String (number), area, juce::Justification::centred);
-    }
-}
-
-void HarmonicSelector::mouseDown (const juce::MouseEvent& e)
-{
-    alternateClick = e.mods.isPopupMenu();
-
-    if (alternateClick)
-    {
-        modulatable::requestEditor (*this);
-        return;
-    }
-
-    attachment->beginGesture();
-    select (getNumberAt (e.position));
-}
-
-void HarmonicSelector::mouseDrag (const juce::MouseEvent& e)
-{
-    if (alternateClick)
-        return;
-
-    select (getNumberAt (e.position));
-    setHovered (getNumberAt (e.position));
-}
-
-void HarmonicSelector::mouseUp (const juce::MouseEvent&)
-{
-    if (! alternateClick)
-        attachment->endGesture();
-}
-
-void HarmonicSelector::mouseMove (const juce::MouseEvent& e)
-{
-    setHovered (getNumberAt (e.position));
-}
-
-void HarmonicSelector::mouseExit (const juce::MouseEvent&)
-{
-    setHovered (0);
-}
-
-void HarmonicSelector::select (int number)
-{
-    if (number != selected)
-        attachment->setValueAsPartOfGesture ((float) number);
-}
-
-void HarmonicSelector::setHovered (int number)
-{
-    if (number != hovered)
-    {
-        hovered = number;
-        repaint();
     }
 }

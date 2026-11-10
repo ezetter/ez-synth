@@ -51,6 +51,9 @@ public:
     */
     bool goesRound = false;
 
+    /** If set, called when where it's been moved to changes, for anything shown beside it that shows that too. */
+    std::function<void()> onLivePositionChange;
+
     double snapValue (double attemptedValue, DragMode) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;

@@ -68,10 +68,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   way of drawing and number of steps, which are saved with the sound, so the Step Filter preset's LFO opens
   in its 8 steps.
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
-- **Pick how many harmonics to play**, 1 to 16, with the two rows of numbered buttons under *Harmonics* (3
-  to start with). The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
+- **Pick how many harmonics to play**, 1 to 16, with the slider under *Harmonics* (3 to start with;
+  double-click it to go back to 3). The number's shown beside it, and under it each harmonic's number, lit
+  in its colour up to the number played. The oscillator plays its wave's harmonics from the 1st up to that number, and each oscillator has
   its own number. Harmonics the wave doesn't have are still played, at nothing: a square played with 3 has
-  its 1st and 3rd, and its 2nd at 0, so the 2nd button is only outlined. Each harmonic's row of controls
+  its 1st and 3rd, and its 2nd at 0, so the 2nd number is only outlined. Each harmonic's row of controls
   stays full size while they all fit; pick more than fit in the window, and the rows, sliders and dials
   shrink just enough for all of them to.
 - **Raise or lower each harmonic** with its slider. There's one for every harmonic being played, with its
@@ -237,7 +238,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Giving an LFO, envelope, velocity or the mod wheel something to move
 
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
-  the harmonic buttons, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth, or an LFO's rate. A small window opens,
+  the number of harmonics, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth, or an LFO's rate. A small window opens,
   in three parts. In the top part you pick an LFO or envelope to move the control; in the middle part you
   switch on **Velocity** to have how hard each key is played move it too; and in the bottom part you switch
   on **Mod wheel** to have a MIDI controller's mod wheel move it. Each part has its own **range**, the top
@@ -518,7 +519,7 @@ save pictures of the window showing several waves.
 | `Source/WaveGrid.*` | The grid you draw on, smoothly or in steps |
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |
 | `Source/RandomWave.*` | Random LFO waves, smooth or in steps, worked out from a seed and the time |
-| `Source/HarmonicSelector.*` | The 1 to 16 buttons |
+| `Source/HarmonicSelector.*` | The slider for how many harmonics to play, with their numbers under it |
 | `Source/HarmonicSliders.*` | A slider and tune and phase dials for each harmonic, and the key to the grid's lines |
 | `Source/Keyboard.*` | The on-screen piano |
 | `Source/StandaloneApp.cpp` | The standalone app, which only the standalone build includes, playing from every MIDI device plugged in |

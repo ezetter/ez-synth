@@ -421,8 +421,8 @@ void SynthEditor::refresh()
         {
             if (edited != shown.editedSource)
             {
-                harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)));
-                modulatable::setTarget (harmonicSelector, modulation::oscillatorHarmonicsTarget (edited));
+                harmonicSelector.setParameter (*synthProcessor.parameters.getParameter (SynthProcessor::harmonicsId (edited)),
+                                               modulation::oscillatorHarmonicsTarget (edited));
                 harmonicSliders.setOscillator (edited);
                 tuneSlider.setOscillator (synthProcessor.parameters, edited);
             }

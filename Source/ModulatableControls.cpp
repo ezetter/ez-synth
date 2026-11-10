@@ -34,6 +34,9 @@ namespace modulatable
             control.getProperties().remove (livePositionProperty);
 
         control.repaint();
+
+        if (auto* slider = dynamic_cast<ModulatableSlider*> (&control); slider != nullptr && slider->onLivePositionChange != nullptr)
+            slider->onLivePositionChange();
     }
 
     std::optional<float> getLivePosition (const juce::Component& control)
