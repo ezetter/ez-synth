@@ -130,6 +130,10 @@ SynthEditor::SynthEditor (SynthProcessor& p)
 
     addAndMakeVisible (midiLinkMarkers);
 
+    modulationOverview.onEdit = [this] (int target, juce::Component& row) { showModulationEditor (target, row); };
+    modulationOverview.onClose = [this] { showModulationOverview (false); };
+    addChildComponent (modulationOverview);
+
     setResizable (true, true);
     setResizeLimits (1420, 900, 2200, 1400);
     setSize (1440, 960);
@@ -218,6 +222,7 @@ void SynthEditor::paintNote (juce::Graphics& g) const
 void SynthEditor::resized()
 {
     midiLinkMarkers.setBounds (getLocalBounds());
+    modulationOverview.setBounds (getLocalBounds());
     auto area = getLocalBounds().reduced (18);
 
     auto header = area.removeFromTop (50);
@@ -583,13 +588,29 @@ void SynthEditor::showModulation()
 
 void SynthEditor::showModulationEditor (juce::Component& control)
 {
-    const auto target = modulatable::getTarget (control);
+    if (const auto target = modulatable::getTarget (control))
+        showModulationEditor (*target, control);
+}
 
-    if (! target.has_value())
-        return;
+void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
+{
+    juce::CallOutBox::launchAsynchronously (std::make_unique<ModulationEditor> (synthProcessor, target),
+                                            getLocalArea (&anchor, anchor.getLocalBounds()), this);
+}
 
-    juce::CallOutBox::launchAsynchronously (std::make_unique<ModulationEditor> (synthProcessor, *target),
-                                            getLocalArea (&control, control.getLocalBounds()), this);
+void SynthEditor::showModulationOverview (bool shown)
+{
+    modulationOverview.setVisible (shown);
+
+    if (shown)
+    {
+        modulationOverview.toFront (true);
+        modulationOverview.grabKeyboardFocus();
+    }
+    else if (isShowing())
+    {
+        grabKeyboardFocus();
+    }
 }
 
 //==============================================================================

@@ -316,6 +316,17 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   moved from it. The oscillator's card above follows along too. The grid stretches to fit a harmonic
   raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
+### Modulation overview
+
+- **See everything that moves a control** on one screen: in the standalone app, choose **Modulation
+  Overview...** from the **Options** menu at the top left of its window. It lists every link, grouped by
+  what it comes from: each LFO and envelope, velocity, the mod wheel, and the MIDI controllers learned.
+  Each row names the control and says what's done to it, such as *±20% of its travel, inverted, 90°
+  behind* or *CC 74, across its whole travel*.
+- **Click a row** to open the control's modulation editor beside it, as right-clicking the control does,
+  or its **×** to take that link off, leaving anything else on the same control. **Done**, or Escape, or
+  choosing the menu item again, goes back to the synth. The list follows changes as they're made.
+
 ### MIDI learn
 
 - **Link a control to a knob or slider** on a MIDI controller: right-click, or Control-click, the control,
@@ -546,6 +557,7 @@ save pictures of the window showing several waves.
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
 | `Source/MidiLinkMarkers.*` | The amber tags on controls linked to MIDI controllers |
+| `Source/ModulationOverview.*` | The screen listing everything that moves a control, or is linked to one |
 | `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, velocity and the mod wheel, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |

@@ -1,8 +1,10 @@
 // EZ Synth's standalone app, which only the standalone build includes. It's JUCE's own standalone app, but it plays
 // from every MIDI device that's plugged in, as soon as it's plugged in, rather than waiting for each to be chosen in
-// the audio and MIDI settings. The plugins take their MIDI from their hosts.
+// the audio and MIDI settings, and its Options menu also opens the modulation overview. The plugins take their MIDI
+// from their hosts.
 
 #include "MidiInputs.h"
+#include "SynthEditor.h"
 
 #include <juce_audio_plugin_client/detail/juce_CheckSettingMacros.h>
 #include <juce_audio_plugin_client/detail/juce_IncludeSystemHeaders.h>
@@ -17,6 +19,49 @@
 
 namespace
 {
+    /** JUCE's standalone window, whose Options menu also opens the screen listing everything that moves a control. */
+    class SynthWindow final : public juce::StandaloneFilterWindow
+    {
+    public:
+        using StandaloneFilterWindow::StandaloneFilterWindow;
+
+    private:
+        enum MenuItem { audioSettings = 1, saveState, loadState, resetState, modulationOverview };
+
+        void buttonClicked (juce::Button* button) override
+        {
+            auto* editor = dynamic_cast<SynthEditor*> (pluginHolder->processor != nullptr ? pluginHolder->processor->getActiveEditor() : nullptr);
+
+            juce::PopupMenu menu;
+            menu.addItem (modulationOverview, "Modulation Overview...", editor != nullptr, editor != nullptr && editor->isModulationOverviewShown());
+            menu.addSeparator();
+            menu.addItem (audioSettings, TRANS ("Audio/MIDI Settings..."));
+            menu.addSeparator();
+            menu.addItem (saveState, TRANS ("Save current state..."));
+            menu.addItem (loadState, TRANS ("Load a saved state..."));
+            menu.addSeparator();
+            menu.addItem (resetState, TRANS ("Reset to default state"));
+
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (button),
+                                [safeThis = SafePointer<SynthWindow> (this)] (int result)
+                                {
+                                    if (safeThis == nullptr || result == 0)
+                                        return;
+
+                                    if (result != modulationOverview)
+                                    {
+                                        safeThis->handleMenuResult (result);
+                                        return;
+                                    }
+
+                                    auto* processor = safeThis->pluginHolder->processor.get();
+
+                                    if (auto* shown = dynamic_cast<SynthEditor*> (processor != nullptr ? processor->getActiveEditor() : nullptr))
+                                        shown->showModulationOverview (! shown->isModulationOverviewShown());
+                                });
+        }
+    };
+
     class StandaloneApp final : public juce::JUCEApplication
     {
     public:
@@ -51,7 +96,7 @@ namespace
             }
 
             const auto background = juce::LookAndFeel::getDefaultLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId);
-            mainWindow = std::make_unique<juce::StandaloneFilterWindow> (getApplicationName(), background, std::move (holder));
+            mainWindow = std::make_unique<SynthWindow> (getApplicationName(), background, std::move (holder));
             mainWindow->setVisible (true);
         }
 
@@ -91,7 +136,7 @@ namespace
         juce::ApplicationProperties appProperties;
         std::unique_ptr<juce::StandalonePluginHolder> pluginHolder;
         std::unique_ptr<AutoMidiInputs> midiInputs;
-        std::unique_ptr<juce::StandaloneFilterWindow> mainWindow;
+        std::unique_ptr<SynthWindow> mainWindow;
     };
 }
 

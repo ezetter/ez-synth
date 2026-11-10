@@ -6,6 +6,7 @@
 #include "../Source/MidiLinkMarkers.h"
 #include "../Source/MidiPanel.h"
 #include "../Source/ModulationEditor.h"
+#include "../Source/ModulationOverview.h"
 #include "../Source/RandomWave.h"
 #include "../Source/SourceCard.h"
 #include "../Source/SynthEditor.h"
@@ -3431,6 +3432,94 @@ namespace
         }
     }
 
+    void testModulationOverview()
+    {
+        std::cout << "Modulation overview" << std::endl;
+
+        SynthProcessor synth;
+        ModulationOverview overview (synth);
+        overview.setBounds (0, 0, 1200, 800);
+
+        const auto describe = [&overview]
+        {
+            juce::StringArray lines;
+
+            for (const auto& link : overview.getLinks())
+                lines.add (ModulationOverview::getGroupName (link) + ": " + modulation::getName (link.target) + ": " + link.description);
+
+            return lines;
+        };
+
+        check (describe() == juce::StringArray { juce::String ("Velocity: Volume: ") + juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x92")) + "35% of its travel for the softest notes" },
+               "to start with, it lists velocity on the volume, and nothing else");
+
+        synth.setAssignment (modulation::filterCutoffTarget (0), { 0, 0.4f, true, 0.25f });
+        synth.setAssignment (modulation::volumeTarget, { modulation::envelopeSource (0), 1.0f, false });
+        synth.setAssignment (modulation::randomizeTarget (1), { 1, 1.0f, false, 0.0f, 0.2f });
+        synth.setModWheelAssignment (modulation::oscillatorLevelTarget (0), { modulation::modWheelSource, 0.5f, false });
+        synth.setMidiController (modulation::filterCutoffTarget (0), 74);
+
+        const auto minus = juce::String (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+        const auto plusOrMinus = juce::String (juce::CharPointer_UTF8 ("\xc2\xb1"));
+        check (describe() == juce::StringArray { "LFO 1: Filter 1 cutoff: " + plusOrMinus + "20% of its travel, inverted, 90" + juce::String (juce::CharPointer_UTF8 ("\xc2\xb0")) + " behind",
+                                                 "LFO 2: Osc 2 randomize: randomizes at 20%, -0.60 on its wave",
+                                                 "Env 1: Volume: +100% of its travel",
+                                                 "Velocity: Volume: " + minus + "35% of its travel for the softest notes",
+                                                 "Mod wheel: Osc 1 level: +50% of its travel at the top",
+                                                 "MIDI controllers: Filter 1 cutoff: CC 74, across its whole travel" },
+               "it lists every link, grouped by what it comes from, with what each moves and by how much");
+
+        // Taking links off.
+        for (const auto& link : overview.getLinks())
+            if (link.kind == ModulationOverview::Link::Kind::source && link.target == modulation::volumeTarget)
+                overview.remove (link);
+
+        for (const auto& link : overview.getLinks())
+            if (link.kind == ModulationOverview::Link::Kind::midi)
+                overview.remove (link);
+
+        check (! synth.getAssignment (modulation::volumeTarget).isActive() && synth.getVelocityAssignment (modulation::volumeTarget).isActive()
+                 && ! synth.getMidiController (modulation::filterCutoffTarget (0)).has_value() && overview.getLinks().size() == 4,
+               "a link can be taken off, leaving the others on the same control");
+
+        // In the window, it's shown over the synth, and Done or Escape goes back.
+        {
+            std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            check (! synthEditor.isModulationOverviewShown(), "the window starts on the synth");
+            synthEditor.showModulationOverview (true);
+            check (synthEditor.isModulationOverviewShown(), "the overview can be shown over it");
+
+            ModulationOverview* shown = nullptr;
+
+            for (auto* child : editor->getChildren())
+                if (auto* found = dynamic_cast<ModulationOverview*> (child))
+                    shown = found;
+
+            // Only the window's resizing corner and its tooltips, always on top, stay over it.
+            const auto& children = editor->getChildren();
+            auto overAll = shown != nullptr;
+
+            for (auto i = children.indexOf (shown) + 1; overAll && i < children.size(); ++i)
+                overAll = dynamic_cast<juce::ResizableCornerComponent*> (children[i]) != nullptr
+                       || dynamic_cast<juce::TooltipWindow*> (children[i]) != nullptr;
+
+            check (shown != nullptr && shown->getBounds() == editor->getLocalBounds() && overAll,
+                   "...covering the whole window, over everything but its resizing corner and tooltips");
+
+            if (shown != nullptr)
+            {
+                shown->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey));
+                check (! synthEditor.isModulationOverviewShown(), "Escape goes back to the synth");
+                synthEditor.showModulationOverview (true);
+                shown->doneButton.onClick();
+                check (! synthEditor.isModulationOverviewShown(), "...as Done does");
+            }
+
+            synth.editorBeingDeleted (editor.get());
+        }
+    }
+
     void testMidiInputs()
     {
         std::cout << "MIDI devices in the standalone app" << std::endl;
@@ -4284,6 +4373,9 @@ namespace
         synth.startMidiLearn (modulation::harmonicPhaseTarget (0, 3));
         synthEditor.refresh();
         save ("10a-midi-links");
+        synthEditor.showModulationOverview (true);
+        save ("10b-modulation-overview");
+        synthEditor.showModulationOverview (false);
         synth.stopMidiLearn();
 
         for (const auto target : { modulation::volumeTarget, modulation::filterCutoffTarget (0), modulation::harmonicTarget (0, 2),
@@ -4531,6 +4623,7 @@ int main (int argc, char* argv[])
     testGlide();
     testMidiInputs();
     testMidiLearn();
+    testModulationOverview();
     testPresets();
     testInit();
     testUndo();

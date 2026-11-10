@@ -61,6 +61,7 @@ target_sources(EZSynth
         Source/ModulatableControls.cpp
         Source/Modulation.cpp
         Source/ModulationEditor.cpp
+        Source/ModulationOverview.cpp
         Source/PresetBar.cpp
         Source/RandomWave.cpp
         Source/SourceCard.cpp

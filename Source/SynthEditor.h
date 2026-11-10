@@ -7,6 +7,7 @@
 #include "Keyboard.h"
 #include "LfoPanel.h"
 #include "MidiLinkMarkers.h"
+#include "ModulationOverview.h"
 #include "MidiPanel.h"
 #include "ModulatableControls.h"
 #include "PresetBar.h"
@@ -41,6 +42,10 @@ public:
     void showModulation();
 
     void showModulationEditor (juce::Component& control) override;
+
+    /** Shows the screen listing everything that moves a control, or is linked to one, over the synth, or hides it. */
+    void showModulationOverview (bool);
+    bool isModulationOverviewShown() const   { return modulationOverview.isVisible(); }
 
     /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
     bool keyPressed (const juce::KeyPress&) override;
@@ -107,6 +112,12 @@ private:
 
     /** Tags the controls linked to MIDI controllers, over everything else. */
     MidiLinkMarkers midiLinkMarkers { synthProcessor };
+
+    /** Over everything, while it's shown. */
+    ModulationOverview modulationOverview { synthProcessor };
+
+    /** Opens the modulation editor for a control, next to something standing for it, such as its row in the overview. */
+    void showModulationEditor (int target, juce::Component& anchor);
 
     /** Names what's under the mouse, for controls that show a picture rather than a word, such as the filter types. */
     juce::TooltipWindow tooltipWindow { this, 500 };
