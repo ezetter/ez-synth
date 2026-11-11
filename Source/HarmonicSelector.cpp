@@ -43,16 +43,18 @@ void HarmonicSelector::setOscillator (int oscillator)
     }
 }
 
-void HarmonicSelector::setHarmonics (std::array<bool, waveform::maxHarmonics> played, std::array<bool, waveform::maxHarmonics> silent)
+void HarmonicSelector::setHarmonics (std::array<bool, waveform::maxHarmonics> played, std::array<bool, waveform::maxHarmonics> silent,
+                                     waveform::HarmonicSwitches switches)
 {
     for (auto& box : boxes)
     {
         const auto index = (size_t) box->harmonic - 1;
 
-        if (box->played != played[index] || box->silent != silent[index])
+        if (box->played != played[index] || box->silent != silent[index] || box->switched != switches[index])
         {
             box->played = played[index];
             box->silent = silent[index];
+            box->switched = switches[index];
             box->repaint();
         }
     }
@@ -125,10 +127,40 @@ void HarmonicSelector::Box::paint (juce::Graphics& g)
     const auto area = getLocalBounds().toFloat().reduced (0.5f);
     const auto colour = colours::forPartial (harmonic - 1);
 
-    // Solid in the harmonic's colour while it plays, fainter if the wave hasn't got it, as a square has no 2nd, and
-    // grey while it doesn't play.
-    g.setColour (played ? colour.withAlpha (silent ? 0.45f : 1.0f) : colours::outline);
-    g.fillRoundedRectangle (area, 3.0f);
+    // Fainter if the wave hasn't got the harmonic, as a square has no 2nd.
+    const auto shade = colour.withAlpha (silent ? 0.45f : 1.0f);
+    const auto clickedOn = switched == waveform::HarmonicSwitch::on;
+    const auto clickedOff = switched == waveform::HarmonicSwitch::off;
+    juce::Colour numberColour;
+
+    if (clickedOn)
+    {
+        // Switched on by a click: solid in its colour.
+        g.setColour (shade);
+        g.fillRoundedRectangle (area, 3.0f);
+        numberColour = colours::background;
+    }
+    else if (clickedOff)
+    {
+        // Switched off by a click: grey.
+        g.setColour (colours::outline);
+        g.fillRoundedRectangle (area, 3.0f);
+        numberColour = colours::dimText;
+    }
+    else if (played)
+    {
+        // Played as the slider has it: a border in its colour, on dark.
+        g.setColour (colours::background);
+        g.fillRoundedRectangle (area, 3.0f);
+        g.setColour (shade);
+        g.drawRoundedRectangle (area.reduced (0.5f), 3.0f, 1.0f);
+        numberColour = shade;
+    }
+    else
+    {
+        // Above the slider: just its number, faint.
+        numberColour = colours::dimText.withAlpha (0.7f);
+    }
 
     if (isMouseOver())
     {
@@ -144,6 +176,6 @@ void HarmonicSelector::Box::paint (juce::Graphics& g)
     }
 
     g.setFont (juce::FontOptions (11.5f, juce::Font::bold));
-    g.setColour (played ? colours::background : colours::dimText);
+    g.setColour (numberColour);
     g.drawText (juce::String (harmonic), area, juce::Justification::centred);
 }

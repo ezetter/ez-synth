@@ -484,7 +484,12 @@ void SynthEditor::refresh()
                 silent[(size_t) harmonic.harmonic - 1] = harmonic.amplitude <= 0.0f;
             }
 
-            harmonicSelector.setHarmonics (played, silent);
+            waveform::HarmonicSwitches switches {};
+
+            for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
+                switches[(size_t) harmonic - 1] = synthProcessor.getHarmonicSwitch (edited, harmonic);
+
+            harmonicSelector.setHarmonics (played, silent, switches);
 
             // The button's text is in the modulation colour while something triggers it.
             const auto randomizeTarget = modulation::randomizeTarget (edited);

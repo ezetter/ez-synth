@@ -3702,6 +3702,13 @@ namespace
                 check (sliderShown ("Harmonic 1") && ! sliderShown ("Harmonic 2") && sliderShown ("Harmonic 3"),
                        "...and its controls leave the window, the others staying");
 
+                selector->onToggle (6);
+                synthEditor.refresh();
+                check (selector->showsSwitch (1) == Switch::follows && selector->showsSwitch (3) == Switch::follows
+                         && selector->showsSwitch (2) == Switch::off && selector->showsSwitch (6) == Switch::on
+                         && selector->showsSwitch (7) == Switch::follows,
+                       "the boxes show which harmonics follow the slider and which were switched on or off by a click");
+
                 check (modulatable::getTarget (selector->getBox (5)) == modulation::harmonicSwitchTarget (0, 5),
                        "a box can be right-clicked to give its switch to a modulator");
             }

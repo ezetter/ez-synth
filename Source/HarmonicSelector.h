@@ -24,8 +24,12 @@ public:
     /** Says which oscillator's harmonics the boxes switch, so a modulator can be given each. */
     void setOscillator (int oscillator);
 
-    /** Which harmonics play, and which of those the wave doesn't have, which are shown fainter. */
-    void setHarmonics (std::array<bool, waveform::maxHarmonics> played, std::array<bool, waveform::maxHarmonics> silent);
+    /** Which harmonics play, which of those the wave doesn't have, which are shown fainter, and how each is switched.
+        One that follows the slider and plays has a border in its colour; one switched on by a click is solid in its
+        colour; and one switched off by a click is grey.
+    */
+    void setHarmonics (std::array<bool, waveform::maxHarmonics> played, std::array<bool, waveform::maxHarmonics> silent,
+                       waveform::HarmonicSwitches switches);
 
     /** Called when a box is clicked, with its harmonic, numbered from 1. */
     std::function<void (int harmonic)> onToggle;
@@ -35,6 +39,9 @@ public:
 
     /** Whether a harmonic's box shows it playing. */
     bool showsPlayed (int harmonic) const   { return boxes[(size_t) harmonic - 1]->played; }
+
+    /** How a harmonic's box shows it switched: following the slider, or switched on or off by a click. */
+    waveform::HarmonicSwitch showsSwitch (int harmonic) const   { return boxes[(size_t) harmonic - 1]->switched; }
 
     /** A harmonic's box, numbered from 1. */
     juce::Component& getBox (int harmonic)   { return *boxes[(size_t) harmonic - 1]; }
@@ -59,6 +66,7 @@ private:
 
         const int harmonic;
         bool played = false, silent = false, moved = false;
+        waveform::HarmonicSwitch switched = waveform::HarmonicSwitch::follows;
 
     private:
         HarmonicSelector& selector;

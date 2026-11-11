@@ -74,9 +74,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   are still played, at nothing: a square played with 3 has its 1st and 3rd, and its 2nd at 0. Each
   harmonic's row of controls stays full size while they all fit; pick more than fit in the window, and the
   rows, sliders and dials shrink just enough for all of them to.
-- **Switch harmonics on and off** with the numbered boxes under the slider, one for each harmonic. A box is
-  solid in its harmonic's colour while the harmonic plays, fainter if the wave hasn't got it, and grey while
-  it doesn't play. Click a box to switch its harmonic off, or on. A harmonic switched off stays off as the
+- **Switch harmonics on and off** with the numbered boxes under the slider, one for each harmonic. A box
+  following the slider, the fundamental's included, has a border in its harmonic's colour on dark while the
+  harmonic plays, and just a faint number above the slider. Switched on by a click, it's solid in its colour;
+  switched off by a click, it's grey. Either way it's fainter if the wave hasn't got the harmonic. Click a box to switch its harmonic off, or on. A harmonic switched off stays off as the
   slider passes it, and one switched on above the slider stays on as the slider falls below it; switched
   back on within the slider, a harmonic follows the slider again. A harmonic that's off leaves the window:
   its row of controls, and its line on the grid, go, so with the 2nd off the 1st and 3rd are side by side.
