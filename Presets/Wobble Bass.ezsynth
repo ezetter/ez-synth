@@ -32,18 +32,21 @@
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="0.2499998807907104"/>
   <PARAM id="lfo1Random" value="0.0"/>
+  <PARAM id="lfo1StartOnPlay" value="1.0"/>
   <PARAM id="lfo1Sync" value="0.0"/>
   <PARAM id="lfo2BeatRate" value="5.0"/>
   <PARAM id="lfo2Mode" value="0.0"/>
   <PARAM id="lfo2On" value="0.0"/>
   <PARAM id="lfo2Period" value="1.999999642372131"/>
   <PARAM id="lfo2Random" value="0.0"/>
+  <PARAM id="lfo2StartOnPlay" value="1.0"/>
   <PARAM id="lfo2Sync" value="0.0"/>
   <PARAM id="lfo3BeatRate" value="5.0"/>
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="0.0"/>
   <PARAM id="lfo3Period" value="3.999999523162842"/>
   <PARAM id="lfo3Random" value="0.0"/>
+  <PARAM id="lfo3StartOnPlay" value="1.0"/>
   <PARAM id="lfo3Sync" value="0.0"/>
   <PARAM id="osc1Glide" value="0.0"/>
   <PARAM id="osc1GlideTime" value="0.2000000178813934"/>

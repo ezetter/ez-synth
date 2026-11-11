@@ -75,6 +75,7 @@ public:
     static juce::String lfoRandomId (int lfo);
     static juce::String lfoSyncId (int lfo);
     static juce::String lfoBeatRateId (int lfo);
+    static juce::String lfoStartOnPlayId (int lfo);
 
     /** The IDs of each envelope's parameters: its attack, decay and release in seconds, and its sustain level. */
     static juce::String attackId (int envelope);
@@ -227,10 +228,15 @@ public:
     bool isLfoOn (int lfo) const noexcept;
     float getLfoPeriod (int lfo) const noexcept;
     /** Whether an LFO's rate is synced to the host's tempo, running a number of cycles a beat rather than as its rate
-        dial says in hertz. A looping LFO synced to the tempo follows the host's beat while it plays, so its periods
-        start on the beat. Nothing moves a synced LFO's rate.
+        dial says in hertz. Nothing moves a synced LFO's rate.
     */
     bool isLfoSynced (int lfo) const noexcept;
+
+    /** Whether a looping LFO starts when the host starts playing: synced, lined up with the bar, so a cycle of 1/4 a
+        beat starts on each bar, and otherwise from the start of its cycle. Only starting counts: while the host plays
+        on, its loops and jumps leave the LFO running smoothly. On to start with.
+    */
+    bool isLfoStartedOnPlay (int lfo) const noexcept;
 
     /** How many cycles a beat a synced LFO runs, and so how many beats each of its periods lasts. */
     double getLfoCyclesPerBeat (int lfo) const noexcept;
@@ -541,6 +547,7 @@ private:
         std::atomic<float>* random = nullptr;
         std::atomic<float>* sync = nullptr;
         std::atomic<float>* beatRate = nullptr;
+        std::atomic<float>* startOnPlay = nullptr;
     };
 
     struct EnvelopeParameters
@@ -664,8 +671,12 @@ private:
     std::atomic<float> newestVelocity { 1.0f };
     std::atomic<float> modWheelShown { 0.0f };
 
-    // The tempo synced LFOs follow.
+    // The tempo synced LFOs follow, and whether the host was playing last block, to catch it starting.
     double playingTempo = modulation::defaultTempo;
+    bool hostWasPlaying = false;
+
+    /** Starts the LFOs that start when the host does, from the beat it starts at, if it says. */
+    void startLfosOnPlay (std::optional<double> beat);
     std::atomic<double> hostTempo { modulation::defaultTempo };
     std::atomic<bool> hostGivesTempo { false };
     std::vector<HarmonicVoice*> voices;

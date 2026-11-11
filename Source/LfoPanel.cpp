@@ -61,6 +61,11 @@ LfoPanel::LfoPanel (SynthProcessor& processor)
     syncSwitch.setWantsKeyboardFocus (false);
     syncSwitch.onStateChange = [this] { repaint(); };
     addAndMakeVisible (syncSwitch);
+
+    startOnPlaySwitch.setMouseClickGrabsKeyboardFocus (false);
+    startOnPlaySwitch.setWantsKeyboardFocus (false);
+    startOnPlaySwitch.onStateChange = [this] { repaint(); };
+    addAndMakeVisible (startOnPlaySwitch);
     setLfo (0);
 }
 
@@ -73,6 +78,11 @@ void LfoPanel::setLfo (int newLfo)
     syncAttachment = std::make_unique<juce::ButtonParameterAttachment> (
         *synthProcessor.parameters.getParameter (SynthProcessor::lfoSyncId (lfo)), syncSwitch);
     syncSwitch.setTitle ("LFO " + juce::String (lfo + 1) + " synced to the tempo");
+
+    startOnPlayAttachment.reset();
+    startOnPlayAttachment = std::make_unique<juce::ButtonParameterAttachment> (
+        *synthProcessor.parameters.getParameter (SynthProcessor::lfoStartOnPlayId (lfo)), startOnPlaySwitch);
+    startOnPlaySwitch.setTitle ("LFO " + juce::String (lfo + 1) + " starts when the host plays");
     refresh();
 }
 
@@ -119,6 +129,15 @@ void LfoPanel::resized()
     syncLabelArea = row;
     area.removeFromTop (6);
     syncHintArea = area.removeFromTop (34);
+    area.removeFromTop (6);
+
+    // Starting with the host: the switch, then what it does.
+    row = area.removeFromTop (24);
+    startOnPlaySwitch.setBounds (row.removeFromLeft (36));
+    row.removeFromLeft (10);
+    startLabelArea = row;
+    area.removeFromTop (6);
+    startHintArea = area.removeFromTop (34);
     area.removeFromTop (16);
 
     captionArea = area.removeFromTop (18);
@@ -162,6 +181,16 @@ void LfoPanel::paint (juce::Graphics& g)
                             "lasts a quarter note in 4/4."
                           : "Synced, the Rate dial sets how many cycles it runs a beat, rather than how many a second.",
                       syncHintArea, juce::Justification::topLeft, 2);
+
+    g.setFont (fonts::body (13.0f));
+    g.setColour (startOnPlaySwitch.getToggleState() ? colours::text : colours::dimText);
+    g.drawText ("Start on Play", startLabelArea, juce::Justification::centredLeft, true);
+    g.setColour (colours::dimText);
+    g.setFont (fonts::body (12.5f));
+    g.drawFittedText (syncSwitch.getToggleState()
+                          ? "When the host starts playing, it lines up with the bar. Looping back doesn't restart it."
+                          : "When the host starts playing, it starts its cycle. Looping back doesn't restart it.",
+                      startHintArea, juce::Justification::topLeft, 2);
 
     g.setFont (fonts::body (13.0f));
 

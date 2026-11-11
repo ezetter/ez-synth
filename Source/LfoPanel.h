@@ -6,7 +6,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /** Shown beside the grid in place of the harmonics when an LFO is chosen: a switch to sync its rate to the host's
-    tempo, then the controls the LFO moves, and how to give it more.
+    tempo, another to start it when the host starts playing, then the controls the LFO moves, and how to give it more.
 */
 class LfoPanel final : public juce::Component
 {
@@ -23,6 +23,9 @@ public:
 
     /** The switch that syncs the LFO's rate to the tempo. */
     ModulatableToggle syncSwitch;
+
+    /** The switch that starts the LFO when the host starts playing. */
+    juce::ToggleButton startOnPlaySwitch;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -52,10 +55,10 @@ private:
     std::vector<std::unique_ptr<Row>> rows;
     int numHidden = 0;
 
-    std::unique_ptr<juce::ButtonParameterAttachment> syncAttachment;
+    std::unique_ptr<juce::ButtonParameterAttachment> syncAttachment, startOnPlayAttachment;
     juce::String shownTempo;
 
-    juce::Rectangle<int> syncCaptionArea, syncLabelArea, tempoArea, syncHintArea, captionArea, listArea, footerArea;
+    juce::Rectangle<int> syncCaptionArea, syncLabelArea, tempoArea, syncHintArea, startLabelArea, startHintArea, captionArea, listArea, footerArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LfoPanel)
 };

@@ -207,11 +207,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   second, snapping to **1/8**, **1/6**, **1/4**, **1/3**, **1/2**, **1**, **2**, **3**, **4**, **6** and
   **8 per beat**, as it shows under the dial. At 1 per beat, a cycle lasts a quarter note in 4/4; at 1/4 per
   beat, a whole bar; at 1/3 and 1/6 per beat, 3 and 6 beats, for bars of 3/4 and 6/8.
-  Only the DAW's tempo is followed, not where it is in the song, so when it loops back, jumps, or starts and
-  stops, a looping LFO runs on smoothly from wherever it is rather than starting its cycle again. The panel
-  shows the tempo it's following; the standalone app has no DAW to give one, so it follows 120 BPM. The rate in hertz is kept for
+  The panel shows the tempo it's following; the standalone app has no DAW to give one, so it follows 120 BPM. The rate in hertz is kept for
   when it's unsynced. Nothing moves a synced LFO's rate: an LFO, envelope, velocity or mod wheel given its rate
   leaves it alone until it's unsynced.
+- **Start on Play.** Under the sync switch, a second switch, on to start with, starts a looping LFO when your
+  DAW starts playing: synced, lined up with the bar, so at 1/4 per beat each cycle starts on a bar, wherever
+  you start from; unsynced, from the start of its cycle. Only starting counts: while the DAW plays on, its
+  loops and jumps leave the LFO running smoothly, so a loop back to the start doesn't restart it mid-cycle.
+  Switched off, the LFO runs on regardless of the DAW.
 - **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each
   time a key is pressed, separately for each note, then holds its last value: an envelope. Draw a wave that
   rises from −1 to +1 and holds there, for instance, to swell each note in.

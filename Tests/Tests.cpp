@@ -2295,16 +2295,20 @@ namespace
         check (! synth.getLivePosition (modulation::lfoRateTarget (0)).has_value(), "nothing moves a synced LFO's rate");
         synth.setModWheelAssignment (modulation::lfoRateTarget (0), {});
 
-        // While the host plays, a looping LFO runs on from where it is, whatever the host's position: when it loops
-        // back to the start of the song, or jumps, or prepares to play again, the LFO carries on smoothly.
+        // When the host starts playing, a looping LFO lines up with the bar: at 1/4 a beat it lasts a bar, so at beat
+        // 10.25 it's 2.25 beats, or 0.5625 of a bar, into its period, and moves on by the block from there.
+        check (synth.isLfoStartedOnPlay (0), "an LFO starts when the host starts playing, to start with");
         setParameter (synth, SynthProcessor::lfoBeatRateId (0), 2.0f);
         host.info.setBpm (120.0);
         host.info.setIsPlaying (true);
         host.info.setPpqPosition (10.25);
         synth.processBlock (buffer, noMidi);
-        const auto before = *synth.getLfoProgress (0);
         const auto step = blockSize / (2.0 * sampleRate);   // at 1/4 a beat and 120 BPM, a period is 2 seconds
+        const auto before = *synth.getLfoProgress (0);
+        check (isNear (before, 0.5625 + step, 1.0e-6), "when the host starts playing, a synced LFO lines up with the bar");
 
+        // While it plays on, it runs on from where it is, whatever the host's position: when it loops back to the
+        // start, or jumps, or prepares to play again, the LFO carries on smoothly.
         host.info.setPpqPosition (0.0);
         synth.processBlock (buffer, noMidi);
         const auto afterLoop = *synth.getLfoProgress (0);
@@ -2314,9 +2318,40 @@ namespace
         synth.prepareToPlay (sampleRate, blockSize);
         host.info.setPpqPosition (37.5);
         synth.processBlock (buffer, noMidi);
-        check (isNear (*synth.getLfoProgress (0), std::fmod (afterLoop + step, 1.0), 1.0e-6),
+        const auto afterJump = *synth.getLfoProgress (0);
+        check (isNear (afterJump, std::fmod (afterLoop + step, 1.0), 1.0e-6),
                "...as it does when the host prepares to play again, or jumps elsewhere");
 
+        // Stopped and started again, it lines up again; with the switch off, it runs on.
+        host.info.setIsPlaying (false);
+        synth.processBlock (buffer, noMidi);
+        host.info.setIsPlaying (true);
+        host.info.setPpqPosition (4.0);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (*synth.getLfoProgress (0), step, 1.0e-6), "started again on a bar, it starts its cycle there");
+
+        setParameter (synth, SynthProcessor::lfoStartOnPlayId (0), 0.0f);
+        host.info.setIsPlaying (false);
+        synth.processBlock (buffer, noMidi);
+        const auto stopped = *synth.getLfoProgress (0);
+        host.info.setIsPlaying (true);
+        host.info.setPpqPosition (10.25);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (*synth.getLfoProgress (0), std::fmod (stopped + step, 1.0), 1.0e-6),
+               "with Start on Play off, the host starting leaves it running on");
+
+        // Unsynced, it starts its cycle when the host starts.
+        setParameter (synth, SynthProcessor::lfoStartOnPlayId (0), 1.0f);
+        setParameter (synth, SynthProcessor::lfoSyncId (0), 0.0f);
+        setLfo (synth, 0, 0.5f, false, waveform::Preset::sine);
+        host.info.setIsPlaying (false);
+        synth.processBlock (buffer, noMidi);
+        host.info.setIsPlaying (true);
+        host.info.setPpqPosition (10.25);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (*synth.getLfoProgress (0), blockSize / (0.5 * sampleRate), 1.0e-6),
+               "unsynced, it starts its cycle when the host starts playing");
+        setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
         host.info.setIsPlaying (false);
 
         // Without a host, it follows 120 BPM.
