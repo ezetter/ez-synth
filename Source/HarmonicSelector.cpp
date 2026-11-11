@@ -142,10 +142,10 @@ void HarmonicSelector::Box::paint (juce::Graphics& g)
     }
     else if (clickedOff)
     {
-        // Switched off by a click: grey.
-        g.setColour (colours::outline);
+        // Switched off by a click: light grey, with a black number.
+        g.setColour (colours::dimText);
         g.fillRoundedRectangle (area, 3.0f);
-        numberColour = colours::dimText;
+        numberColour = juce::Colours::black;
     }
     else if (played)
     {
