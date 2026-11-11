@@ -207,9 +207,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   second, snapping to **1/8**, **1/6**, **1/4**, **1/3**, **1/2**, **1**, **2**, **3**, **4**, **6** and
   **8 per beat**, as it shows under the dial. At 1 per beat, a cycle lasts a quarter note in 4/4; at 1/4 per
   beat, a whole bar; at 1/3 and 1/6 per beat, 3 and 6 beats, for bars of 3/4 and 6/8.
-  While the DAW plays, a looping LFO follows its beat, so its cycles line up with the beats: at 1/4 per beat
-  each cycle starts on a bar. When it's stopped, the LFO runs on at the tempo. The panel shows the tempo it's
-  following; the standalone app has no DAW to give one, so it follows 120 BPM. The rate in hertz is kept for
+  Only the DAW's tempo is followed, not where it is in the song, so when it loops back, jumps, or starts and
+  stops, a looping LFO runs on smoothly from wherever it is rather than starting its cycle again. The panel
+  shows the tempo it's following; the standalone app has no DAW to give one, so it follows 120 BPM. The rate in hertz is kept for
   when it's unsynced. Nothing moves a synced LFO's rate: an LFO, envelope, velocity or mod wheel given its rate
   leaves it alone until it's unsynced.
 - **Loop** runs the LFO all the time, the same for every note. **Once** runs it through one period each

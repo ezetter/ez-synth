@@ -425,7 +425,12 @@ void SynthProcessor::prepareToPlay (double sampleRate, int)
     playingSampleRate = sampleRate;
     synth.setCurrentPlaybackSampleRate (sampleRate);
 
-    // The looping LFOs start their periods afresh whenever playing starts.
+    // The looping LFOs carry on where they were: a host may prepare again whenever its transport starts or loops,
+    // and they're never sent back to the start of their cycles.
+}
+
+void SynthProcessor::restartLfos()
+{
     lfoPhases.fill (0.0);
     lfoCycles.fill (0);
 }
@@ -474,9 +479,9 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
     }
 
-    // The host's tempo, for LFOs synced to it, and while it plays, where it is in beats, from the start of its song.
+    // The host's tempo, for LFOs synced to it. Only its tempo: where it is in the song isn't followed, so when it
+    // loops back or jumps, the LFOs run on smoothly.
     playingTempo = modulation::defaultTempo;
-    playingBeat.reset();
     auto tempoFromHost = false;
 
     if (auto* playHead = getPlayHead())
@@ -488,9 +493,6 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
                 playingTempo = *bpm;
                 tempoFromHost = true;
             }
-
-            if (const auto beat = position->getPpqPosition(); position->getIsPlaying() && beat.hasValue())
-                playingBeat = *beat;
         }
     }
 
@@ -911,19 +913,10 @@ void SynthProcessor::updatePatch()
         lfo.times = modulation::getLfoTimes (mode);
         lfo.synced = isLfoSynced ((int) i);
 
-        // Synced to the tempo, it runs a number of cycles a beat, and while the host plays, a looping LFO follows its
-        // beat, so its periods line up with the beats, as a bar's do.
+        // Synced to the tempo, it runs a number of cycles a beat, carrying on from where it is as the tempo changes.
         if (lfo.synced)
         {
-            const auto beats = getLfoSyncedBeats ((int) i);
-            lfo.periodSeconds = (float) (beats * 60.0 / playingTempo);
-
-            if (playingBeat.has_value())
-            {
-                const auto periods = *playingBeat / beats;
-                lfoCycles[i] = (std::int64_t) std::floor (periods);
-                lfoPhases[i] = periods - std::floor (periods);
-            }
+            lfo.periodSeconds = (float) (getLfoSyncedBeats ((int) i) * 60.0 / playingTempo);
         }
         else
         {

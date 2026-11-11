@@ -84,6 +84,11 @@ public:
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+
+    /** Sends the looping LFOs back to the start of their cycles. Nothing the host does calls this, so they run on
+        smoothly through its loops and restarts; it's for starting from a known point, as the tests do.
+    */
+    void restartLfos();
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout&) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
@@ -659,9 +664,8 @@ private:
     std::atomic<float> newestVelocity { 1.0f };
     std::atomic<float> modWheelShown { 0.0f };
 
-    // The tempo synced LFOs follow, and where the host is, in beats, while it plays.
+    // The tempo synced LFOs follow.
     double playingTempo = modulation::defaultTempo;
-    std::optional<double> playingBeat;
     std::atomic<double> hostTempo { modulation::defaultTempo };
     std::atomic<bool> hostGivesTempo { false };
     std::vector<HarmonicVoice*> voices;

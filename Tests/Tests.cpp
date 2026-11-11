@@ -119,6 +119,7 @@ namespace
     std::vector<float> play (SynthProcessor& synth, int note, double holdSeconds, double totalSeconds, float velocity = 1.0f)
     {
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
 
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
@@ -275,6 +276,7 @@ namespace
 
         SynthProcessor synth;
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
 
@@ -649,6 +651,7 @@ namespace
         // Switching a filter in during a note fades it in, rather than jumping.
         setFilter (synth, SynthProcessor::filterIds (0), false, 300.0f);
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
 
@@ -749,6 +752,7 @@ namespace
         setFilterType (synth, 0, FilterType::lowPass);
         setFilter (synth, SynthProcessor::filterIds (0), true, 1000.0f);
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         output.clear();
 
         for (int block = 0; block < 60; ++block)
@@ -844,6 +848,7 @@ namespace
         SynthProcessor lowRate;
         setFilter (lowRate, SynthProcessor::filterIds (0), true, 20000.0f);
         lowRate.prepareToPlay (11025.0, blockSize);
+        lowRate.restartLfos();
         std::vector<float> lowRateOutput;
 
         for (int block = 0; block < 20; ++block)
@@ -887,6 +892,7 @@ namespace
     std::vector<float> playNotes (SynthProcessor& synth, const std::vector<std::pair<double, int>>& notes, double totalSeconds)
     {
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
         const auto totalSamples = (int) (totalSeconds * sampleRate);
@@ -1439,6 +1445,7 @@ namespace
 
         // The window shows the cycle that's playing.
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
 
         for (int block = 0; block < 60; ++block)
@@ -1580,6 +1587,7 @@ namespace
         // While a key is held, the window shows where the newest note is in each envelope.
         setEnvelope (synth, 0, { 0.0f, 0.1f, 0.5f, 0.4f });
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
 
         for (int block = 0; block < 40; ++block)
@@ -1748,6 +1756,7 @@ namespace
                                                                       double totalSeconds)
     {
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::array<int, SynthProcessor::numOscillators> before {};
 
@@ -1982,6 +1991,7 @@ namespace
 
         // The window can show the newest note's velocity.
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         juce::MidiBuffer midi;
         midi.addEvent (juce::MidiMessage::noteOn (1, 60, medium), 0);
@@ -2063,6 +2073,7 @@ namespace
         const auto playWithWheel = [&synth] (std::optional<int> wheelBefore, int wheelHalfway)
         {
             synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             std::vector<float> output;
             const auto blocks = (int) (sampleRate / blockSize);
@@ -2164,6 +2175,7 @@ namespace
         const auto playWithWheelAt = [&synth] (int wheelBefore, double wheelTopAt)
         {
             synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             std::vector<float> output;
             const auto blocks = (int) (0.6 * sampleRate / blockSize);
@@ -2246,7 +2258,7 @@ namespace
     };
 
     /** An LFO can be synced to the host's tempo, running a number of cycles a beat rather than as its rate dial says
-        in hertz, and while the host plays, lining its periods up with the beats.
+        in hertz, and running on smoothly whatever the host's transport does.
     */
     void testLfoSync()
     {
@@ -2267,6 +2279,7 @@ namespace
         setParameter (synth, SynthProcessor::lfoBeatRateId (0), 7.0f);
 
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         juce::MidiBuffer noMidi;
         synth.processBlock (buffer, noMidi);
@@ -2282,15 +2295,29 @@ namespace
         check (! synth.getLivePosition (modulation::lfoRateTarget (0)).has_value(), "nothing moves a synced LFO's rate");
         synth.setModWheelAssignment (modulation::lfoRateTarget (0), {});
 
-        // While the host plays, a looping LFO at 1/4 a beat lasts a bar, and starts each one on a bar: at beat 10.25
-        // it's 2.25 beats, or 0.5625 of a bar, into its period, and moves on by the block from there.
+        // While the host plays, a looping LFO runs on from where it is, whatever the host's position: when it loops
+        // back to the start of the song, or jumps, or prepares to play again, the LFO carries on smoothly.
         setParameter (synth, SynthProcessor::lfoBeatRateId (0), 2.0f);
         host.info.setBpm (120.0);
         host.info.setIsPlaying (true);
         host.info.setPpqPosition (10.25);
         synth.processBlock (buffer, noMidi);
-        check (isNear (*synth.getLfoProgress (0), 0.5625 + blockSize / (2.0 * sampleRate), 1.0e-6),
-               "while the host plays, a synced LFO follows its beat, at 1/4 a beat starting each bar");
+        const auto before = *synth.getLfoProgress (0);
+        const auto step = blockSize / (2.0 * sampleRate);   // at 1/4 a beat and 120 BPM, a period is 2 seconds
+
+        host.info.setPpqPosition (0.0);
+        synth.processBlock (buffer, noMidi);
+        const auto afterLoop = *synth.getLfoProgress (0);
+        check (isNear (afterLoop, std::fmod (before + step, 1.0), 1.0e-6),
+               "when the host loops back to the start, a synced LFO runs on smoothly rather than starting again");
+
+        synth.prepareToPlay (sampleRate, blockSize);
+        host.info.setPpqPosition (37.5);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (*synth.getLfoProgress (0), std::fmod (afterLoop + step, 1.0), 1.0e-6),
+               "...as it does when the host prepares to play again, or jumps elsewhere");
+
+        host.info.setIsPlaying (false);
 
         // Without a host, it follows 120 BPM.
         synth.setPlayHead (nullptr);
@@ -2393,6 +2420,7 @@ namespace
             if (! once)
             {
                 synth.prepareToPlay (sampleRate, blockSize);
+                synth.restartLfos();
                 juce::AudioBuffer<float> buffer (2, blockSize);
                 const auto blocks = (int) (0.25 * sampleRate / blockSize);
 
@@ -2446,6 +2474,7 @@ namespace
         synth.setVelocityAssignment (modulation::volumeTarget, {});
         synth.setVelocityAssignment (rate, { modulation::velocitySource, 4.0f * doubling, false });
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> both;
 
@@ -2484,6 +2513,7 @@ namespace
         setLfo (synth, 0, 1.0f, false, waveform::Preset::sine);
         synth.setAssignment (modulation::harmonicTarget (0, 2), { 0, 1.0f, false, 0.25f });
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
 
         for (int block = 0; block < juce::roundToInt (0.5 * sampleRate / blockSize); ++block)
@@ -2572,6 +2602,7 @@ namespace
 
         // Retuning a harmonic while a note plays glides there without a click.
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
 
@@ -2759,6 +2790,7 @@ namespace
 
         // While a key is held, the window shows where the LFO has turned it.
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> heldBuffer (2, blockSize);
 
         for (int block = 0; block < 8; ++block)
@@ -2995,6 +3027,7 @@ namespace
         // its pitch, by half as much again for a 5th up.
         setParameter (synth, SynthProcessor::onId (0), 0.0f);
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
 
@@ -3143,6 +3176,7 @@ namespace
     std::vector<float> playEvents (SynthProcessor& synth, const std::vector<std::tuple<double, int, bool>>& events, double totalSeconds)
     {
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         std::vector<float> output;
 
@@ -3296,6 +3330,7 @@ namespace
     void moveControllers (SynthProcessor& synth, const std::vector<std::pair<int, int>>& moves)
     {
         synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
         juce::AudioBuffer<float> buffer (2, blockSize);
         juce::MidiBuffer midi;
         int position = 0;
@@ -3860,6 +3895,7 @@ namespace
         {
             SynthProcessor synth;
             synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
 
             const auto playBlock = [&synth, &buffer] (std::initializer_list<juce::MidiMessage> messages)
@@ -3889,6 +3925,7 @@ namespace
         {
             SynthProcessor synth;
             synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             std::vector<float> output;
             const auto at = [] (double seconds) { return (int) (seconds * sampleRate); };
@@ -4484,6 +4521,7 @@ namespace
             synth.keyboardState.allNotesOff (1);
             synth.keyboardState.noteOn (1, note, 1.0f);
             synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             juce::MidiBuffer midi;
             synth.processBlock (buffer, midi);
@@ -4683,6 +4721,7 @@ namespace
             tunedSynth.setHarmonicPhase (0, 4, juce::MathConstants<float>::pi * 1.25f);
             tunedSynth.keyboardState.noteOn (1, 48, 1.0f);
             tunedSynth.prepareToPlay (sampleRate, blockSize);
+            tunedSynth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             juce::MidiBuffer midi;
             tunedSynth.processBlock (buffer, midi);
@@ -4703,6 +4742,7 @@ namespace
             randomSynth.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 0.6f, false });
             randomSynth.editedSource = SynthProcessor::numOscillators;
             randomSynth.prepareToPlay (sampleRate, blockSize);
+            randomSynth.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
 
             for (int block = 0; block < 250; ++block)
@@ -4781,6 +4821,7 @@ namespace
             auto& appWindow = dynamic_cast<SynthEditor&> (*appEditor);
 
             app.prepareToPlay (sampleRate, blockSize);
+            app.restartLfos();
             juce::AudioBuffer<float> buffer (2, blockSize);
             juce::MidiBuffer midi;
             midi.addEvent (juce::MidiMessage::noteOn (1, 60, 0.8f), 0);
