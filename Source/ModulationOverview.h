@@ -28,6 +28,11 @@ public:
         int source = 0;   // for a source: the LFO or envelope
         int target = 0;
         juce::String description;
+
+        /** The MIDI controller the control is linked to, if it is, whatever the link: each row shows it in an amber
+            tag after the control's name, so a control an LFO moves can be seen to be on a knob as well.
+        */
+        std::optional<int> midiController;
     };
 
     /** Every link, grouped by what it comes from: the LFOs, the envelopes, velocity, the mod wheel, then MIDI

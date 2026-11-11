@@ -71,7 +71,8 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
             if (isLfo && assignment.phase > 0.0f)
                 parts.add (modulation::phaseToText (assignment.phase) + " behind");
 
-            links.push_back ({ Link::Kind::source, source, target, parts.joinIntoString (", ") });
+            links.push_back ({ Link::Kind::source, source, target, parts.joinIntoString (", "),
+                               synthProcessor.getMidiController (target) });
         }
     }
 
@@ -80,7 +81,8 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
         if (const auto& assignment = synthProcessor.getVelocityAssignment (target); assignment.isActive())
             links.push_back ({ Link::Kind::velocity, modulation::velocitySource, target,
                                modulation::isTrigger (target) ? triggerVerb (target) + " at " + percent (assignment.threshold)
-                                                              : minus + percent (assignment.range) + " of its travel for the softest notes" });
+                                                              : minus + percent (assignment.range) + " of its travel for the softest notes",
+                               synthProcessor.getMidiController (target) });
     }
 
     for (int target = 0; target < modulation::numTargets; ++target)
@@ -89,16 +91,18 @@ std::vector<ModulationOverview::Link> ModulationOverview::getLinks() const
             links.push_back ({ Link::Kind::modWheel, modulation::modWheelSource, target,
                                modulation::isTrigger (target)
                                    ? triggerVerb (target) + " at " + percent (assignment.threshold)
-                                   : (assignment.inverted ? minus : juce::String ("+")) + percent (assignment.range) + " of its travel at the top" });
+                                   : (assignment.inverted ? minus : juce::String ("+")) + percent (assignment.range) + " of its travel at the top",
+                               synthProcessor.getMidiController (target) });
     }
 
     for (int target = 0; target < modulation::numTargets; ++target)
     {
         if (const auto controller = synthProcessor.getMidiController (target))
             links.push_back ({ Link::Kind::midi, -1, target,
-                               "CC " + juce::String (*controller)
-                                   + (modulation::isTrigger (target) ? ", " + triggerVerb (target) + " at " + percent (synthProcessor.getMidiThreshold (target))
-                                                                  : juce::String (", across its whole travel")) });
+                               // Its number is in the tag after the control's name.
+                               modulation::isTrigger (target) ? triggerVerb (target) + " at " + percent (synthProcessor.getMidiThreshold (target))
+                                                              : juce::String ("across its whole travel"),
+                               controller });
     }
 
     return links;
@@ -296,9 +300,38 @@ void ModulationOverview::Row::paint (juce::Graphics& g)
     }
 
     area.removeFromRight (36);
-    g.setFont (fonts::body (13.5f));
-    g.setColour (colours::text);
-    g.drawText (modulation::getName (link.target), area.removeFromLeft (300).withTrimmedLeft (4), juce::Justification::centredLeft, true);
+    auto nameArea = area.removeFromLeft (300).withTrimmedLeft (4);
+    const auto name = modulation::getName (link.target);
+    const auto nameFont = fonts::body (13.5f);
+
+    // A control linked to a MIDI controller has its number in an amber tag after its name.
+    if (link.midiController.has_value())
+    {
+        const auto text = "CC " + juce::String (*link.midiController);
+        const auto tagFont = juce::FontOptions (10.0f, juce::Font::bold);
+        const auto tagWidth = juce::GlyphArrangement::getStringWidth (tagFont, text) + 10.0f;
+        const auto nameWidth = juce::jmin (juce::GlyphArrangement::getStringWidth (nameFont, name) + 2.0f,
+                                           (float) nameArea.getWidth() - tagWidth - 8.0f);
+        const auto tag = juce::Rectangle<float> ((float) nameArea.getX() + nameWidth + 8.0f, (float) nameArea.getCentreY() - 7.0f, tagWidth, 14.0f);
+
+        g.setColour (midiColour);
+        g.fillRoundedRectangle (tag, 4.0f);
+        g.setColour (colours::background);
+        g.setFont (tagFont);
+        g.drawText (text, tag, juce::Justification::centred);
+
+        g.setFont (nameFont);
+        g.setColour (colours::text);
+        g.drawText (name, nameArea.withWidth (juce::roundToInt (nameWidth)), juce::Justification::centredLeft, true);
+    }
+    else
+    {
+        g.setFont (nameFont);
+        g.setColour (colours::text);
+        g.drawText (name, nameArea, juce::Justification::centredLeft, true);
+    }
+
+    g.setFont (nameFont);
     g.setColour (colours::dimText);
     g.drawText (link.description, area, juce::Justification::centredLeft, true);
 }

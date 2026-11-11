@@ -334,7 +334,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   left of its window. It lists every link, grouped by
   what it comes from: each LFO and envelope, velocity, the mod wheel, and the MIDI controllers learned.
   Each row names the control and says what's done to it, such as *±20% of its travel, inverted, 90°
-  behind* or *CC 74, across its whole travel*.
+  behind* or *across its whole travel*. A control linked to a MIDI controller has an amber tag with its
+  number, such as **CC 74**, after its name on every row, so a control an LFO moves can be seen to be on a
+  knob too.
 - **Click a row** to open the control's modulation editor beside it, as right-clicking the control does,
   or its **×** to take that link off, leaving anything else on the same control. **Done**, or Escape, or
   choosing the menu item again, goes back to the synth. The list follows changes as they're made.
@@ -351,7 +353,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   **Threshold**, either way. The threshold's slider is under the MIDI CC row. It starts at 100%, where only
   turning the knob right up counts, and at 0% only turning it right down does. It's kept with the link.
 - **See what's linked** in the **Modulation** overview, which lists every control linked to a MIDI
-  controller, with its number, such as *CC 74*, as well as in each control's own right-click window.
+  controller, with its number in an amber tag, such as **CC 74**, on every row for that control, as well as in each control's own right-click window.
 - **One control for each controller.** Linking a controller to a second control unlinks it from the first.
   Controllers 120 and up, such as All Notes Off, can't be learned. The mod wheel, controller 1, can, though
   it also goes on moving whatever it's set to move as a modulator.

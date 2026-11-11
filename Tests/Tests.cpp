@@ -3438,8 +3438,19 @@ namespace
                                                  "Env 1: Volume: +100% of its travel",
                                                  "Velocity: Volume: " + minus + "35% of its travel for the softest notes",
                                                  "Mod wheel: Osc 1 level: +50% of its travel at the top",
-                                                 "MIDI controllers: Filter 1 cutoff: CC 74, across its whole travel" },
+                                                 "MIDI controllers: Filter 1 cutoff: across its whole travel" },
                "it lists every link, grouped by what it comes from, with what each moves and by how much");
+
+        {
+            juce::StringArray tagged;
+
+            for (const auto& link : overview.getLinks())
+                if (link.midiController.has_value())
+                    tagged.add (ModulationOverview::getGroupName (link) + ": " + juce::String (*link.midiController));
+
+            check (tagged == juce::StringArray { "LFO 1: 74", "MIDI controllers: 74" },
+                   "each row whose control is linked to a MIDI controller is marked with it, whatever moves the control");
+        }
 
         // Taking links off.
         for (const auto& link : overview.getLinks())
