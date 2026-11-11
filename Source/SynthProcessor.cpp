@@ -1091,6 +1091,18 @@ void SynthProcessor::toggleHarmonic (int oscillator, int harmonic)
         setHarmonicSwitch (oscillator, harmonic, harmonic <= getNumHarmonics (oscillator) ? Switch::follows : Switch::on);
 }
 
+void SynthProcessor::cycleHarmonicSwitch (int oscillator, int harmonic)
+{
+    using Switch = waveform::HarmonicSwitch;
+
+    switch (getHarmonicSwitch (oscillator, harmonic))
+    {
+        case Switch::follows:  setHarmonicSwitch (oscillator, harmonic, Switch::off); break;
+        case Switch::off:      setHarmonicSwitch (oscillator, harmonic, Switch::on); break;
+        case Switch::on:       setHarmonicSwitch (oscillator, harmonic, Switch::follows); break;
+    }
+}
+
 void SynthProcessor::randomizeHarmonics (int oscillator, juce::Random& random)
 {
     markEdited();

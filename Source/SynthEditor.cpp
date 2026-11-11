@@ -78,11 +78,11 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
-    // A harmonic's box switches it on or off.
+    // Each click on a harmonic's box steps it on: following the slider, then off, then on, then following again.
     harmonicSelector.onToggle = [this] (int harmonic)
     {
         userTouched = true;
-        synthProcessor.toggleHarmonic (synthProcessor.editedSource, harmonic);
+        synthProcessor.cycleHarmonicSwitch (synthProcessor.editedSource, harmonic);
         refresh();
     };
 

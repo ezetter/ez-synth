@@ -77,9 +77,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Switch harmonics on and off** with the numbered boxes under the slider, one for each harmonic. A box
   following the slider, the fundamental's included, has a border in its harmonic's colour on dark while the
   harmonic plays, and just a faint number above the slider. Switched on by a click, it's solid in its colour;
-  switched off by a click, it's light grey with a black number. Either way it's fainter if the wave hasn't got the harmonic. Click a box to switch its harmonic off, or on. A harmonic switched off stays off as the
-  slider passes it, and one switched on above the slider stays on as the slider falls below it; switched
-  back on within the slider, a harmonic follows the slider again. A harmonic that's off leaves the window:
+  switched off by a click, it's light grey with a black number. Either way it's fainter if the wave hasn't got the harmonic. Each click steps a box round three states, wherever the slider is: following the slider,
+  then switched off, then switched on, then following the slider again. A harmonic switched off stays off as
+  the slider passes it, and one switched on stays on as the slider falls below it. A harmonic that's off leaves the window:
   its row of controls, and its line on the grid, go, so with the 2nd off the 1st and 3rd are side by side.
   The oscillator's card counts the harmonics playing.
 - **Switch a harmonic from a modulator.** Right-click, or Control-click, a box to have an LFO, envelope,

@@ -147,6 +147,11 @@ public:
     */
     void toggleHarmonic (int oscillator, int harmonic);
 
+    /** What clicking a harmonic's box does, whatever the number of harmonics: a harmonic following the number is
+        switched off, one switched off is switched on, and one switched on goes back to following the number.
+    */
+    void cycleHarmonicSwitch (int oscillator, int harmonic);
+
     /** Gives every one of an oscillator's 16 harmonics a random amplitude and phase, making a new Custom wave. The
         amplitudes are spread evenly along their sliders' travel, so weak harmonics are as likely as along the
         sliders. A wave that would reach beyond full scale is turned down to fit the grid. The harmonics' tunings

@@ -3561,6 +3561,24 @@ namespace
                "switched back on within the number, a harmonic follows the number again; switched off, one above it stays off");
         synth.setHarmonicSwitch (0, 12, Switch::follows);
 
+        // A click steps a harmonic round, wherever the number is: following it, off, on, and following it again.
+        for (const auto harmonic : { 2, 9 })
+        {
+            juce::StringArray steps;
+
+            for (int click = 0; click < 3; ++click)
+            {
+                synth.cycleHarmonicSwitch (0, harmonic);
+                const auto state = synth.getHarmonicSwitch (0, harmonic);
+                steps.add (state == Switch::off ? "off" : state == Switch::on ? "on" : "follows");
+                steps.add (synth.isHarmonicPlayed (0, harmonic) ? "played" : "silent");
+            }
+
+            check (steps.joinIntoString (" ") == "off silent on played follows " + juce::String (harmonic <= 3 ? "played" : "silent"),
+                   "clicking harmonic " + juce::String (harmonic) + (harmonic <= 3 ? ", within" : ", above")
+                       + " the number, switches it off, then on, then back to following the number");
+        }
+
         // The peaks the voices turn the wave down by follow the harmonics played.
         {
             const auto& decomposition = synth.getDecomposition (0);
@@ -3702,6 +3720,7 @@ namespace
                 check (sliderShown ("Harmonic 1") && ! sliderShown ("Harmonic 2") && sliderShown ("Harmonic 3"),
                        "...and its controls leave the window, the others staying");
 
+                selector->onToggle (6);
                 selector->onToggle (6);
                 synthEditor.refresh();
                 check (selector->showsSwitch (1) == Switch::follows && selector->showsSwitch (3) == Switch::follows
