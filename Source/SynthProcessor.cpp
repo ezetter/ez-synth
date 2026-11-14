@@ -2012,6 +2012,16 @@ void SynthProcessor::loadInitPreset()
     presetFile = juce::File();
 }
 
+void SynthProcessor::nameSound (const juce::String& name)
+{
+    presetName = name.isNotEmpty() ? name : juce::String (initPresetName);
+    presetEdited = false;
+    factoryPreset = false;
+    presetFile = juce::File();
+    ++presetVersion;
+    ++changeCount;
+}
+
 juce::StringArray SynthProcessor::getFactoryPresetNames()
 {
     juce::StringArray names;

@@ -459,6 +459,53 @@ WAV file. Name a factory preset, or a preset's file:
 Everything is also saved with your DAW project, including which preset the sound came from and whether it's
 been edited since. Everything except the waves and what moves what can be automated.
 
+### Matching a sample with Claude (experimental)
+
+EZ Synth can hand Claude everything it needs to know to make a sound like a recording: a WAV, MP3 or other
+audio file of one note, such as a cello, a bell or a synth from another record. Claude measures the sample,
+writes settings for every control, from each oscillator's 16 harmonics to the LFOs, envelopes and filters,
+plays its attempt, measures that against the sample, and refines it, then saves it where EZ Synth finds it.
+How close it gets is an experiment: steady, pitched notes should come closest, and noisy or breathy ones least,
+as EZ Synth has no noise.
+
+1. Click the preset's name, and under **From Claude (experimental)** choose **Copy the prompt for Claude**. It
+   copies a long prompt, made from EZ Synth itself, so it covers every control: how the synth makes sound,
+   every parameter with its range, what can move what, the sound description format Claude answers in, and
+   two factory presets as examples. It's saved too, as `~/Documents/EZ Synth/From Claude/Prompt for Claude.md`.
+2. Start a new Claude Code conversation, paste the prompt, and say where the sample is, such as *The sample
+   is ~/Music/cello.wav*. Or tell Claude to read the saved prompt and match the sample.
+3. Claude saves its sound in `~/Documents/EZ Synth/From Claude` as a `.json` file. Click the preset's name, and
+   it's listed under **From Claude**, newest first; choose it to load it. **Save** keeps it as a preset.
+   If Claude shows you the JSON instead, copy it and choose **Paste a sound from Claude**.
+
+If part of a sound can't be understood, such as a parameter that doesn't exist, the rest still loads, and EZ
+Synth says what was left out. **Show the From Claude folder** opens the folder in Finder.
+
+**The sound description** is JSON: the parameters by ID, in their own units (hertz, seconds, or a choice's
+name), each oscillator's harmonics, each with an amplitude, phase, tune and switch, each LFO's wave as a preset
+or as points, and what moves what. Anything left out is as Init has it. `Source/SoundDescription.cpp` reads and
+writes it, and writing a sound out and reading it back plays the same sound.
+
+**The sound tool**, `build/EZSynthSoundTool`, is how Claude listens. The prompt tells Claude where it is.
+
+```bash
+./build/EZSynthSoundTool analyze sample.wav
+./build/EZSynthSoundTool compare sound.json sample.wav
+./build/EZSynthSoundTool render sound.json out.wav --note 60 --hold 1 --length 2
+./build/EZSynthSoundTool describe "Grand Piano"
+./build/EZSynthSoundTool prompt
+```
+
+- `analyze` measures a sample: its pitch and nearest MIDI note, any vibrato, its loudness at moments after it
+  starts, the amplitudes of its first 32 harmonics at moments through the note (against the strongest, as EZ
+  Synth's are), how bright it is, how much of it is noise, harmonics that aren't whole multiples, and its
+  strongest peaks, for inharmonic sounds such as bells.
+- `compare` plays a sound as the sample's note, for as long, measures both the same way, and shows them side by
+  side, with the average differences in loudness and harmonics in dB, and in pitch in cents. It saves what it
+  played beside the sound, as *name (EZ Synth).wav*, so you can listen to both.
+- `render` plays a sound as one note into a WAV file; `describe` prints a sound, such as a factory preset, as a
+  description; `prompt` prints the prompt.
+
 ## Building
 
 You need CMake 3.22 or later and Xcode or its command line tools. JUCE 9.0.2 is downloaded during the
@@ -602,9 +649,13 @@ save pictures of the window showing several waves.
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |
 | `Source/PresetBar.*` | Loading, stepping through and saving presets |
+| `Source/SoundDescription.*` | Sounds as JSON descriptions, for Claude to write and EZ Synth to load |
+| `Source/SoundPrompt.*` | The prompt that teaches Claude EZ Synth, made from its own parameters |
+| `Source/SoundAnalysis.*` | Measuring a note's pitch, loudness and harmonics, and comparing two |
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
 | `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
+| `Tools/SoundTool.cpp` | The tool Claude uses to measure samples and its own attempts |
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
 | `Source/FilterPanel.*` | A filter's switch, type, cutoff dial, and resonance, width, or Q and depth dials |
 | `Source/FilterStage.*` | A low, mid or high pass or notch filter that switches, changes type and sweeps without clicks |

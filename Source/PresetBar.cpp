@@ -1,5 +1,7 @@
 #include "PresetBar.h"
 
+#include "SoundDescription.h"
+#include "SoundPrompt.h"
 #include "SynthLookAndFeel.h"
 
 PresetBar::StepButton::StepButton (int stepDirection)
@@ -158,6 +160,21 @@ void PresetBar::showMenu()
     for (const auto& file : presets)
         menu.addItem (file.getFileNameWithoutExtension(), true, file == current, [this, file] { load (file); });
 
+    // Sounds Claude has made to match a sample, and how to ask it for one. Experimental.
+    menu.addSeparator();
+    menu.addSectionHeader ("From Claude (experimental)");
+
+    for (const auto& file : sound::findClaudeSounds())
+        menu.addItem (file.getFileNameWithoutExtension(), [this, file] { loadFromClaude (file); });
+
+    menu.addItem ("Copy the prompt for Claude", [] { copyPrompt(); });
+    menu.addItem ("Paste a sound from Claude", [this] { pasteFromClaude(); });
+    menu.addItem ("Show the From Claude folder", []
+    {
+        savePrompt();
+        sound::getClaudeFolder().startAsProcess();
+    });
+
     menu.addSeparator();
     menu.addItem ("Open a preset file...", [this] { open(); });
     menu.addItem ("Show the presets folder", []
@@ -206,6 +223,51 @@ void PresetBar::load (const juce::File& file)
                                                 file.getFullPathName() + " isn't an EZ Synth preset.");
 
     refresh();
+}
+
+juce::File PresetBar::savePrompt()
+{
+    const auto folder = sound::getClaudeFolder();
+    folder.createDirectory();
+    const auto file = folder.getChildFile ("Prompt for Claude.md");
+    file.replaceWithText (prompt::make());
+    return file;
+}
+
+void PresetBar::copyPrompt()
+{
+    const auto file = savePrompt();
+    juce::SystemClipboard::copyTextToClipboard (file.loadFileAsString());
+
+    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, "The prompt for Claude is copied",
+        "Start a new Claude Code conversation, paste the prompt, and give it your sample, such as:\n\n"
+        "  The sample is ~/Music/cello.wav\n\n"
+        "It's saved too, as " + file.getFullPathName() + ", so you can tell Claude to read that instead.\n\n"
+        "Claude saves the sound it makes in " + file.getParentDirectory().getFullPathName()
+        + ", and it's listed in this menu, under From Claude.");
+}
+
+void PresetBar::showLoadResult (const sound::LoadResult& result, const juce::String& from)
+{
+    if (! result.loaded)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't load the sound",
+                                                from + " isn't a sound from Claude. " + result.problems.joinIntoString (" "));
+    else if (! result.problems.isEmpty())
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, "Loaded, with some things left out",
+                                                "Parts of the sound couldn't be understood, so they were left as Init has them:\n\n- "
+                                                    + result.problems.joinIntoString ("\n- "));
+
+    refresh();
+}
+
+void PresetBar::loadFromClaude (const juce::File& file)
+{
+    showLoadResult (sound::loadFile (synthProcessor, file), file.getFileName());
+}
+
+void PresetBar::pasteFromClaude()
+{
+    showLoadResult (sound::load (synthProcessor, juce::SystemClipboard::getTextFromClipboard()), "What's on the clipboard");
 }
 
 void PresetBar::loadFactory (const juce::String& name)

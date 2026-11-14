@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SoundDescription.h"
 #include "SynthProcessor.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -38,6 +39,15 @@ private:
     void step (int direction);
     void load (const juce::File&);
     void loadFactory (const juce::String& name);
+
+    /** Loads a sound Claude made, from a file or the clipboard, and says what it couldn't understand, if anything. */
+    void loadFromClaude (const juce::File&);
+    void pasteFromClaude();
+    void showLoadResult (const sound::LoadResult&, const juce::String& from);
+
+    /** Copies the prompt for Claude, and saves it in the From Claude folder, which saving it returns. */
+    static void copyPrompt();
+    static juce::File savePrompt();
     void open();
     void save();
 

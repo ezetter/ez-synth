@@ -65,6 +65,9 @@ target_sources(EZSynth
         Source/ModulationOverview.cpp
         Source/PresetBar.cpp
         Source/RandomWave.cpp
+        Source/SoundAnalysis.cpp
+        Source/SoundDescription.cpp
+        Source/SoundPrompt.cpp
         Source/SourceCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
@@ -90,7 +93,10 @@ juce_add_binary_data(EZSynthFactoryPresets
         "Presets/Step Filter.ezsynth"
         "Presets/Wobble Bass.ezsynth")
 
+# The prompt for Claude points it at the sound tool, built beside everything else.
 target_compile_definitions(EZSynth
+    PRIVATE
+        EZSYNTH_SOUND_TOOL="${CMAKE_BINARY_DIR}/EZSynthSoundTool"
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
@@ -139,6 +145,12 @@ target_link_libraries(EZSynthMakeFactoryPresets PRIVATE EZSynth)
 add_executable(EZSynthRenderPreset Tools/RenderPreset.cpp)
 target_include_directories(EZSynthRenderPreset PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
 target_link_libraries(EZSynthRenderPreset PRIVATE EZSynth)
+
+# Measures samples, and plays and measures sound descriptions, for matching a sample with EZ Synth. The prompt EZ
+# Synth makes for Claude tells it where this is.
+add_executable(EZSynthSoundTool Tools/SoundTool.cpp)
+target_include_directories(EZSynthSoundTool PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
+target_link_libraries(EZSynthSoundTool PRIVATE EZSynth)
 
 # Draws the icon in Resources/Icon.png. Run it after changing the drawing, then build again.
 add_executable(EZSynthMakeIcon Tools/MakeIcon.cpp)

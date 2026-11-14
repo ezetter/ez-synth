@@ -404,6 +404,11 @@ public:
     /** Goes back to the sound the synth starts with. */
     void loadInitPreset();
 
+    /** Names the sound as a preset that hasn't been saved, such as one loaded from a sound description, so it's shown
+        under that name, unedited, until it's saved or changed.
+    */
+    void nameSound (const juce::String& name);
+
     /** The presets that come with EZ Synth, which are built into it, in order of name. */
     static juce::StringArray getFactoryPresetNames();
 

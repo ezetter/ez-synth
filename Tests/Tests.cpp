@@ -7,6 +7,9 @@
 #include "../Source/ModulationEditor.h"
 #include "../Source/ModulationOverview.h"
 #include "../Source/RandomWave.h"
+#include "../Source/SoundAnalysis.h"
+#include "../Source/SoundDescription.h"
+#include "../Source/SoundPrompt.h"
 #include "../Source/SourceCard.h"
 #include "../Source/SynthEditor.h"
 #include "../Source/SynthProcessor.h"
@@ -3741,6 +3744,151 @@ namespace
         }
     }
 
+    /** A sound written out as a description, as Claude writes one to match a sample, loads back as the same sound;
+        a description written by hand loads as it says, and says what it couldn't understand; the analysis measures
+        a note's pitch and harmonics as they are; and the prompt covers every parameter.
+    */
+    void testSoundDescriptions()
+    {
+        std::cout << "Sound descriptions for Claude" << std::endl;
+
+        const auto play = [] (SynthProcessor& synth, int note)
+        {
+            return analysis::renderNote (synth, note, 1.0f, 0.6, 1.0);
+        };
+
+        const auto sameSound = [] (const analysis::Audio& a, const analysis::Audio& b)
+        {
+            auto largest = 0.0f;
+
+            for (size_t i = 0; i < std::min (a.samples.size(), b.samples.size()); ++i)
+                largest = std::max (largest, std::abs (a.samples[i] - b.samples[i]));
+
+            // A drawn LFO's wave is written as 128 points along it, close to the 512 it's drawn with, but not exactly.
+            return a.samples.size() == b.samples.size() && largest < 1.0e-3f;
+        };
+
+        // Every factory preset, written out and loaded back, plays just as it did, and under its name.
+        auto allSame = true;
+        juce::StringArray different;
+
+        for (const auto& name : SynthProcessor::getFactoryPresetNames())
+        {
+            SynthProcessor original, copy;
+            original.loadFactoryPreset (name);
+            const auto result = sound::load (copy, sound::toJson (original, true));
+            const auto same = result.loaded && result.problems.isEmpty() && copy.getPresetName() == name && ! copy.isPresetEdited()
+                           && sameSound (play (original, 57), play (copy, 57));
+
+            if (! same)
+                different.add (name);
+
+            allSame = allSame && same;
+        }
+
+        check (allSame, "every factory preset, written as a description and loaded back, plays as it did, to within a thousandth"
+                            + (different.isEmpty() ? juce::String() : " (not " + different.joinIntoString (", ") + ")"));
+
+        // A description written by hand, as Claude might, wrapped in a Markdown code block.
+        SynthProcessor synth;
+        const auto result = sound::load (synth, R"(Here it is:
+```json
+{
+  "format": "EZ Synth sound", "version": 1, "name": "Hand made",
+  "parameters": { "osc2On": true, "osc2Tune": 12, "filter1On": true, "filter1Type": "notch", "lfo2Mode": "Once",
+                  "nonsense": 3, "filter2Type": "Band pass" },
+  "oscillators": [
+    { "harmonics": [ { "harmonic": 1, "amplitude": 1 }, { "harmonic": 3, "amplitude": 0.5, "phase": 90 },
+                     { "harmonic": 5, "amplitude": 0.25, "tune": 0.2, "switch": "off" }, { "harmonic": 20, "amplitude": 1 } ] },
+    { "wave": "Square" },
+    {}
+  ],
+  "lfos": [ {}, { "points": [1, 0, -1, 0.5], "stepped": true } ],
+  "modulation": [ { "target": "osc1Level", "source": "Envelope 2", "range": 0.8 },
+                  { "target": "filter1Cutoff", "source": "LFO 2", "range": 0.3, "phase": 90 },
+                  { "target": "lfo1Period", "source": "LFO 1" } ],
+  "velocity": []
+}
+```
+)");
+        const auto& harmonics = synth.getDecomposition (0).harmonics;
+        check (result.loaded && synth.getPresetName() == "Hand made" && ! synth.isPresetEdited()
+                 && isNear (harmonics[0].amplitude, 1.0, 1.0e-3) && isNear (harmonics[1].amplitude, 0.0, 1.0e-3)
+                 && isNear (harmonics[2].amplitude, 0.5, 1.0e-3) && isNear (harmonics[2].phase, juce::MathConstants<double>::halfPi, 1.0e-3)
+                 && isNear (synth.getHarmonicTune (0, 5), 0.2, 1.0e-6)
+                 && synth.getHarmonicSwitch (0, 5) == waveform::HarmonicSwitch::off && synth.getNumHarmonics (0) == 5,
+               "a hand-written description sets an oscillator's harmonics, phases, tunes and switches, and how many it plays");
+        check (synth.isOn (1) && isNear (synth.getTune (1), 12.0, 1.0e-4) && synth.getPreset (1) == waveform::Preset::square
+                 && synth.getNumHarmonics (1) == 3 && ! synth.isOn (2),
+               "...an oscillator's preset wave, keeping the number of harmonics it's given, and leaves the rest as Init has them");
+        check (juce::roundToInt (synth.parameters.getRawParameterValue (SynthProcessor::filterIds (0).type)->load()) == (int) FilterType::notch
+                 && synth.getLfoMode (1) == 1 && synth.getDrawing (SynthProcessor::numOscillators + 1).stepped
+                 && synth.getDrawing (SynthProcessor::numOscillators + 1).numSteps == 4
+                 && isNear (synth.getLfoShape (1)[0], 1.0, 1.0e-6) && isNear (synth.getLfoShape (1)[300], -1.0, 1.0e-6),
+               "...choices by name, and an LFO's wave drawn in steps from its points");
+        check (synth.getAssignment (modulation::oscillatorLevelTarget (0)).source == modulation::envelopeSource (1)
+                 && isNear (synth.getAssignment (modulation::oscillatorLevelTarget (0)).range, 0.8, 1.0e-6)
+                 && synth.getAssignment (modulation::filterCutoffTarget (0)).source == 1
+                 && isNear (synth.getAssignment (modulation::filterCutoffTarget (0)).phase, 0.25, 1.0e-6)
+                 && ! synth.getVelocityAssignment (modulation::volumeTarget).isActive(),
+               "...what moves what, and velocity taken off the volume by an empty list");
+
+        const auto mentions = [&result] (const juce::String& text)
+        {
+            return std::any_of (result.problems.begin(), result.problems.end(), [&text] (const juce::String& problem) { return problem.contains (text); });
+        };
+
+        check (result.problems.size() == 4 && mentions ("nonsense") && mentions ("Band pass") && mentions ("harmonic 20")
+                 && mentions ("own rate") && ! synth.getAssignment (modulation::lfoRateTarget (0)).isActive(),
+               "...and says what it couldn't understand: an unknown parameter, choice and harmonic, and an LFO on its own rate");
+
+        // Something that isn't a description leaves the sound alone.
+        const auto before = synth.getPresetName();
+        const auto broken = sound::load (synth, "{ \"parameters\": ");
+        check (! broken.loaded && broken.problems.size() == 1 && synth.getPresetName() == before, "something that isn't JSON leaves the sound alone");
+
+        // The analysis finds a note's pitch and harmonics as they are, a tuned one's frequency, and a sound's distance
+        // from itself is nothing.
+        {
+            SynthProcessor known;
+            sound::load (known, R"({ "parameters": { "osc1Tune": 0.2 }, "oscillators": [ { "harmonics": [ { "harmonic": 1, "amplitude": 1 },
+                                    { "harmonic": 2, "amplitude": 0.5 }, { "harmonic": 3, "amplitude": 0.25, "tune": 0.1 } ] } ] })");
+            const auto audio = analysis::renderNote (known, 57, 1.0f, 1.0, 1.4);
+            const auto measured = analysis::analyse (audio);
+            const auto& snapshot = measured.snapshots[4];
+            check (measured.fundamental.has_value() && measured.midiNote == 57 && isNear (measured.centsOff, 20.0, 1.0)
+                     && isNear (measured.onset, 0.0, 0.005) && isNear (measured.end, 1.25, 0.1),
+                   "the analysis finds the note, how far it's tuned, when it starts and when it's faded");
+            check (isNear (snapshot.amplitudes[0], 1.0, 0.01) && isNear (snapshot.amplitudes[1], 0.5, 0.01)
+                     && isNear (snapshot.amplitudes[2], 0.25, 0.01) && snapshot.amplitudes[3] < 0.005f
+                     && isNear (snapshot.ratios[2], 3.1, 0.005) && snapshot.harmonicShare > 0.99f
+                     && ! snapshot.peaks.empty() && isNear (snapshot.peaks[0].first, 1.0, 0.002),
+                   "...each harmonic's amplitude against the strongest, a tuned harmonic's frequency, and the strongest peaks");
+
+            const auto distance = analysis::measureDistance (measured, analysis::analyse (audio));
+            check (juce::exactlyEqual (distance.envelopeDb, 0.0f) && juce::exactlyEqual (distance.harmonicsDb, 0.0f)
+                     && juce::exactlyEqual (distance.pitchCents, 0.0f),
+                   "...and a note is no distance from itself");
+        }
+
+        // The prompt covers every parameter, and the harmonics' keys it gives as patterns are the real ones.
+        const auto text = prompt::make();
+        auto everyParameter = true;
+
+        for (auto* parameter : synth.getParameters())
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+                everyParameter = everyParameter && text.contains ("`" + ranged->paramID + "`");
+
+        check (everyParameter && text.contains ("`filter4Cutoff`") && text.contains ("```json")
+                 && modulation::getKey (modulation::harmonicTarget (1, 3)) == "osc2Harmonic3"
+                 && modulation::getKey (modulation::harmonicTuneTarget (2, 16)) == "osc3Harmonic16Tune"
+                 && modulation::getKey (modulation::harmonicPhaseTarget (0, 1)) == "osc1Harmonic1Phase"
+                 && modulation::getKey (modulation::harmonicSwitchTarget (0, 7)) == "osc1Harmonic7Switch",
+               "the prompt for Claude names every parameter, and the harmonics' keys follow its patterns");
+        check (prompt::getSoundTool().existsAsFile() == text.contains (prompt::getSoundTool().getFullPathName() + "`"),
+               "...and points to the sound tool where it's built");
+    }
+
     void testModulationOverview()
     {
         std::cout << "Modulation overview" << std::endl;
@@ -5242,6 +5390,7 @@ int main (int argc, char* argv[])
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();
+    testSoundDescriptions();
     testHarmonicSwitches();
     testModulationOverview();
     testPresets();
