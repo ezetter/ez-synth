@@ -642,6 +642,34 @@ namespace
         check (isNear (gainAt (band, 880.0), expectedGain (false, 880.0, 500.0, flatQ) * expectedGain (true, 880.0, 2000.0, flatQ), 0.02),
                "both filters at once shape the sound one after the other");
 
+        // There are four filters, the last two starting as a mid pass and a notch, and all switched out.
+        SynthProcessor fresh;
+        const auto isIn = [&fresh] (int filter) { return fresh.parameters.getRawParameterValue (SynthProcessor::filterIds (filter).on)->load() >= 0.5f; };
+        check (modulation::numFilters == 4
+                 && juce::roundToInt (synth.parameters.getRawParameterValue (SynthProcessor::filterIds (2).type)->load()) == (int) FilterType::midPass
+                 && juce::roundToInt (synth.parameters.getRawParameterValue (SynthProcessor::filterIds (3).type)->load()) == (int) FilterType::notch
+                 && ! isIn (2) && ! isIn (3),
+               "there are four filters, the 3rd starting as a mid pass and the 4th a notch, both out");
+
+        // The 3rd and 4th shape the sound one after the other too, as the first two do.
+        setFilter (synth, SynthProcessor::filterIds (0), false, 2000.0f);
+        setFilter (synth, SynthProcessor::filterIds (1), false, 500.0f);
+        setFilterType (synth, 2, FilterType::highPass);
+        setFilterType (synth, 3, FilterType::lowPass);
+        setFilter (synth, SynthProcessor::filterIds (2), true, 500.0f);
+        setFilter (synth, SynthProcessor::filterIds (3), true, 2000.0f);
+        const auto laterBand = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
+        check (isNear (gainAt (laterBand, 880.0), expectedGain (false, 880.0, 500.0, flatQ) * expectedGain (true, 880.0, 2000.0, flatQ), 0.02)
+                 && isNear (gainAt (laterBand, 3960.0), expectedGain (false, 3960.0, 500.0, flatQ) * expectedGain (true, 3960.0, 2000.0, flatQ), 0.05),
+               "the 3rd and 4th filters shape the sound as the first two do");
+        setFilter (synth, SynthProcessor::filterIds (2), false, 500.0f);
+        setFilter (synth, SynthProcessor::filterIds (3), false, 2000.0f);
+        check (modulation::getName (modulation::filterCutoffTarget (3)) == "Filter 4 cutoff"
+                 && modulation::findTarget ("filter4Depth") == modulation::filterDepthTarget (3)
+                 && modulation::findTarget ("filter3Width") == modulation::filterWidthTarget (2)
+                 && modulation::findTarget ("highPassCutoff") == modulation::filterCutoffTarget (1),
+               "the 3rd and 4th filters' controls can be moved, as the first two's can");
+
         setFilter (synth, SynthProcessor::filterIds (1), false, 500.0f);
         setFilter (synth, SynthProcessor::filterIds (0), true, 1320.0f, 1.0f);
         const auto resonant = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45);
@@ -827,10 +855,12 @@ namespace
         // The panel shows a resonance dial beside a low or high pass's cutoff, and a width dial beside a mid pass's.
         {
             SynthProcessor shown;
-            FilterPanel panel (shown.parameters);
-            const auto isShown = [&panel] (const juce::String& title)
+            FilterPanel firstPanel (shown.parameters, 0), secondPanel (shown.parameters, 1);
+            const auto isShown = [&firstPanel, &secondPanel] (const juce::String& title)
             {
-                return std::any_of (panel.getChildren().begin(), panel.getChildren().end(),
+                return std::any_of (firstPanel.getChildren().begin(), firstPanel.getChildren().end(),
+                                    [&title] (juce::Component* child) { return child->isVisible() && child->getTitle() == title; })
+                    || std::any_of (secondPanel.getChildren().begin(), secondPanel.getChildren().end(),
                                     [&title] (juce::Component* child) { return child->isVisible() && child->getTitle() == title; });
             };
 
@@ -3634,6 +3664,10 @@ namespace
             check (envelopes.getFirstShown() == 2, "the envelopes scroll to show one out of sight");
             synthEditor.scrollToEnvelope (3);
             check (envelopes.getFirstShown() == 2, "...and not for one already shown");
+
+            const auto& filters = synthEditor.getFilterStrip();
+            check (filters.getNumCards() == 4 && filters.getNumShown() == 2 && filters.getFirstShown() == 0,
+                   "the window shows 2 of the 4 filters at a time, the first two to start with");
 
             // A trackpad's swipe moves the row with the fingers, a little at a time, without snapping as it goes,
             // and once it's over the row settles on the nearest whole card.

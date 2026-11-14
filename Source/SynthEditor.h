@@ -48,6 +48,7 @@ public:
     void scrollToEnvelope (int envelope)   { envelopeStrip.scrollToShow (envelope); }
     const CardStrip& getLfoStrip() const noexcept        { return lfoStrip; }
     const CardStrip& getEnvelopeStrip() const noexcept   { return envelopeStrip; }
+    const CardStrip& getFilterStrip() const noexcept     { return filterStrip; }
 
     /** Shows the screen listing everything that moves a control, or is linked to one, over the synth, or hides it. */
     void showModulationOverview (bool);
@@ -99,11 +100,14 @@ private:
 
     /** The LFOs' cards and the envelopes' panels, three of each shown at a time, scrolling sideways to the others. */
     CardStrip lfoStrip { 3 }, envelopeStrip { 3 };
+
+    /** The filters, two shown at a time, scrolling sideways to the others. */
+    CardStrip filterStrip { 2 };
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
     TuneSlider tuneSlider;
     LfoPanel lfoPanel;
-    FilterPanel filterPanel;
+    std::array<std::unique_ptr<FilterPanel>, modulation::numFilters> filterPanels;
     std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
     HarmonicSelector harmonicSelector;
 

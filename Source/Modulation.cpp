@@ -7,7 +7,7 @@ namespace modulation
     namespace
     {
         /** What the filters' keys started with before each could be any type. */
-        const std::array<const char*, numFilters> oldFilterKeys { "lowPass", "highPass" };
+        const std::array<const char*, 2> oldFilterKeys { "lowPass", "highPass" };
     }
 
     juce::String getSourceName (int source)

@@ -47,6 +47,20 @@
   <PARAM id="filter2Resonance" value="0.0"/>
   <PARAM id="filter2Type" value="2.0"/>
   <PARAM id="filter2Width" value="1.999999761581421"/>
+  <PARAM id="filter3Cutoff" value="800.0000610351562"/>
+  <PARAM id="filter3Depth" value="60.0"/>
+  <PARAM id="filter3On" value="0.0"/>
+  <PARAM id="filter3Q" value="2.0"/>
+  <PARAM id="filter3Resonance" value="0.0"/>
+  <PARAM id="filter3Type" value="1.0"/>
+  <PARAM id="filter3Width" value="1.999999761581421"/>
+  <PARAM id="filter4Cutoff" value="1500.000244140625"/>
+  <PARAM id="filter4Depth" value="60.0"/>
+  <PARAM id="filter4On" value="0.0"/>
+  <PARAM id="filter4Q" value="2.0"/>
+  <PARAM id="filter4Resonance" value="0.0"/>
+  <PARAM id="filter4Type" value="3.0"/>
+  <PARAM id="filter4Width" value="1.999999761581421"/>
   <PARAM id="lfo1BeatRate" value="6.0"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="0.0"/>

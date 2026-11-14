@@ -3,7 +3,7 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note, through two filters, each a low pass, mid pass, high pass or notch. Eight LFOs, each with a drawn wave of its own, eight
+each note, through four filters, each a low pass, mid pass, high pass or notch. Eight LFOs, each with a drawn wave of its own, eight
 envelopes, which run with each key pressed, and how hard each key is played can move almost any control.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
@@ -141,8 +141,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   harmonic, at its true size and phase, coloured like its slider. The white line is their sum, the key's
   **Actual wave**, which is the wave that oscillator plays.
   Playing more harmonics makes the white line follow the wave more closely.
-- **Filter the sound** with the Filters panel, at the right of the row above the keys. It has two filters,
-  which shape all the oscillators together, the first and then the second. Each has a switch, a choice of
+- **Filter the sound** with the filters, at the right of the row above the keys. There are four, Filter 1 to
+  Filter 4, which shape all the oscillators together, one after another from the first to the last. Two show
+  at a time; swipe sideways over them, turn a mouse wheel, or drag the thin scroll bar under them to see the
+  others, and the row settles on whole filters, as the LFOs' and envelopes' rows do. They start switched out,
+  as a low pass, a high pass, a mid pass and a notch, and projects and presets saved when there were two load
+  with the 3rd and 4th that way, sounding as they did. Each has a switch, a choice of
   type, and a cutoff dial from 20 Hz to 20 kHz. The four types are drawn as the shape of what they let
   through, with low frequencies at the left: a **low pass**, a **mid pass**, a **high pass** and a
   **notch**. Hover over one to see its name.
@@ -543,7 +547,7 @@ save pictures of the window showing several waves.
   new sound, most of the way in 1.5 ms and all of it in about 6, rather than clicking, quickly enough to follow
   an LFO at 100 Hz. The volume glides over 1.5 ms. Notes
   start in 8 ms and fade out over 250 ms when let go.
-- **Filtering.** Each note goes through its own two filters, the first and then the second
+- **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
   low pass, band pass and high pass at once, so changing type fades from one to the other over 20 ms. A mid
@@ -584,7 +588,7 @@ save pictures of the window showing several waves.
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
-| `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards and the envelopes |
+| `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/TuneSlider.*` | The tune slider, with its intervals marked, and the zoom slider above it |
@@ -602,7 +606,7 @@ save pictures of the window showing several waves.
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
 | `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
-| `Source/FilterPanel.*` | The filters' switches, types, cutoff dials, and resonance, width, or Q and depth dials |
+| `Source/FilterPanel.*` | A filter's switch, type, cutoff dial, and resonance, width, or Q and depth dials |
 | `Source/FilterStage.*` | A low, mid or high pass or notch filter that switches, changes type and sweeps without clicks |
 | `Source/WaveGrid.*` | The grid you draw on, smoothly or in steps |
 | `Source/NumberStepper.*` | A number with arrows to step it, for the number of steps |

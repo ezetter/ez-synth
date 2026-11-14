@@ -11,7 +11,6 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     : AudioProcessorEditor (p),
       synthProcessor (p),
       lfoPanel (p),
-      filterPanel (p.parameters),
       harmonicSelector (*p.parameters.getParameter (SynthProcessor::harmonicsId (0))),
       presetBar (p),
       volumeAttachment (p.parameters, SynthProcessor::volumeId, volumeKnob),
@@ -130,7 +129,13 @@ SynthEditor::SynthEditor (SynthProcessor& p)
 
     addAndMakeVisible (envelopeStrip);
 
-    addAndMakeVisible (filterPanel);
+    for (size_t i = 0; i < filterPanels.size(); ++i)
+    {
+        filterPanels[i] = std::make_unique<FilterPanel> (p.parameters, (int) i);
+        filterStrip.addCard (*filterPanels[i]);
+    }
+
+    addAndMakeVisible (filterStrip);
     addAndMakeVisible (presetBar);
     addAndMakeVisible (keyboard);
 
@@ -305,11 +310,14 @@ void SynthEditor::resized()
     auto controls = area.removeFromBottom (FilterPanel::preferredHeight);
     volumePanel = controls.removeFromLeft (90);
     controls.removeFromLeft (controlGap);
-    filterPanel.setBounds (controls.removeFromRight (juce::jlimit (280, 380, controls.getWidth() / 3)));
-    controls.removeFromRight (controlGap);
 
-    // Three envelopes show at a time, scrolling sideways to the others, with the scroll bar in the gap under them.
+    // Two filters, and three envelopes, show at a time, each row scrolling sideways to the others, with its scroll
+    // bar in the gap under it.
     constexpr auto underEnvelopes = 12;
+    filterStrip.setGaps (controlGap, underEnvelopes);
+    filterStrip.setBounds (controls.removeFromRight (juce::jlimit (300, 400, controls.getWidth() * 9 / 25))
+                                   .withHeight (controls.getHeight() + underEnvelopes));
+    controls.removeFromRight (controlGap);
     envelopeStrip.setGaps (controlGap, underEnvelopes);
     envelopeStrip.setBounds (controls.withHeight (controls.getHeight() + underEnvelopes));
 

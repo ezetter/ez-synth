@@ -15,9 +15,9 @@ namespace
     }
 }
 
-FilterPanel::Filter::Filter (juce::AudioProcessorValueTreeState& parameters, int filterNumber)
-    : ids (SynthProcessor::filterIds (filterNumber)),
-      name ("Filter " + juce::String (filterNumber + 1)),
+FilterPanel::Filter::Filter (juce::AudioProcessorValueTreeState& parameters, int number)
+    : ids (SynthProcessor::filterIds (number)),
+      name ("Filter " + juce::String (number + 1)),
       type (getTypeNames()),
       onAttachment (parameters, ids.on, onSwitch),
       typeAttachment (*parameters.getParameter (ids.type), [this] (float value)
@@ -39,12 +39,12 @@ FilterPanel::Filter::Filter (juce::AudioProcessorValueTreeState& parameters, int
     q.caption = "Q";
     depth.caption = "DEPTH";
 
-    modulatable::setTarget (onSwitch, modulation::filterOnTarget (filterNumber));
-    modulatable::setTarget (cutoff.knob, modulation::filterCutoffTarget (filterNumber));
-    modulatable::setTarget (resonance.knob, modulation::filterResonanceTarget (filterNumber));
-    modulatable::setTarget (width.knob, modulation::filterWidthTarget (filterNumber));
-    modulatable::setTarget (q.knob, modulation::filterQTarget (filterNumber));
-    modulatable::setTarget (depth.knob, modulation::filterDepthTarget (filterNumber));
+    modulatable::setTarget (onSwitch, modulation::filterOnTarget (number));
+    modulatable::setTarget (cutoff.knob, modulation::filterCutoffTarget (number));
+    modulatable::setTarget (resonance.knob, modulation::filterResonanceTarget (number));
+    modulatable::setTarget (width.knob, modulation::filterWidthTarget (number));
+    modulatable::setTarget (q.knob, modulation::filterQTarget (number));
+    modulatable::setTarget (depth.knob, modulation::filterDepthTarget (number));
 }
 
 std::vector<FilterPanel::Dial*> FilterPanel::Filter::getDials()
@@ -60,20 +60,19 @@ std::vector<FilterPanel::Dial*> FilterPanel::Filter::getDials()
     return { &cutoff, &resonance };
 }
 
-FilterPanel::FilterPanel (juce::AudioProcessorValueTreeState& parameters)
-    : first (parameters, 0),
-      second (parameters, 1)
+FilterPanel::FilterPanel (juce::AudioProcessorValueTreeState& parameters, int number)
+    : filterNumber (number),
+      filter (parameters, number)
 {
-    setUp (first, parameters);
-    setUp (second, parameters);
+    setUp (parameters);
 }
 
-void FilterPanel::setUp (Filter& filter, juce::AudioProcessorValueTreeState& parameters)
+void FilterPanel::setUp (juce::AudioProcessorValueTreeState& parameters)
 {
     filter.onSwitch.setTitle (filter.name + " on");
     filter.onSwitch.setMouseClickGrabsKeyboardFocus (false);
     filter.onSwitch.setWantsKeyboardFocus (false);
-    filter.onSwitch.onStateChange = [this, &filter] { showSettings (filter); };
+    filter.onSwitch.onStateChange = [this] { showSettings(); };
     addAndMakeVisible (filter.onSwitch);
 
     filter.type.setTitle (filter.name + " type");
@@ -81,7 +80,7 @@ void FilterPanel::setUp (Filter& filter, juce::AudioProcessorValueTreeState& par
     {
         drawTypePicture (g, area, allFilterTypes[(size_t) index]);
     };
-    filter.type.onChoose = [&filter] (int index) { filter.typeAttachment.setValueAsCompleteGesture ((float) index); };
+    filter.type.onChoose = [this] (int index) { filter.typeAttachment.setValueAsCompleteGesture ((float) index); };
     addAndMakeVisible (filter.type);
 
     for (auto [dial, id] : { std::pair (&filter.cutoff, filter.ids.cutoff), std::pair (&filter.resonance, filter.ids.resonance),
@@ -115,11 +114,11 @@ void FilterPanel::setUp (Filter& filter, juce::AudioProcessorValueTreeState& par
     };
 
     describeBandwidth();
-    filter.onTypeChange = [this, &filter] { showSettings (filter); };
+    filter.onTypeChange = [this] { showSettings(); };
     filter.typeAttachment.sendInitialUpdate();
 }
 
-void FilterPanel::showSettings (Filter& filter)
+void FilterPanel::showSettings()
 {
     const auto dials = filter.getDials();
 
@@ -133,11 +132,11 @@ void FilterPanel::showSettings (Filter& filter)
         dial->knob.setColour (juce::Slider::rotarySliderFillColourId, colour);
 
     filter.type.setAlpha (filter.isOn() ? 1.0f : 0.55f);
-    layOutDials (filter);
+    layOutDials();
     repaint();
 }
 
-void FilterPanel::layOutDials (Filter& filter)
+void FilterPanel::layOutDials()
 {
     // The dials share the width: two side by side, or three for a notch.
     const auto dials = filter.getDials();
@@ -159,23 +158,14 @@ void FilterPanel::resized()
     captionArea = area.removeFromTop (18);
     area.removeFromTop (8);
 
-    constexpr auto gap = 16;
-    const auto halfWidth = (area.getWidth() - gap) / 2;
-    first.area = area.removeFromLeft (halfWidth);
-    area.removeFromLeft (gap);
-    second.area = area;
-
-    for (auto* filter : { &first, &second })
-    {
-        auto filterArea = filter->area;
-        auto top = filterArea.removeFromTop (22);
-        filter->onSwitch.setBounds (top.removeFromLeft (36));
-        top.removeFromLeft (8);
-        filter->type.setBounds (top);
-        filterArea.removeFromTop (6);
-        filter->dialArea = filterArea;
-        layOutDials (*filter);
-    }
+    filter.area = area;
+    auto top = area.removeFromTop (22);
+    filter.onSwitch.setBounds (top.removeFromLeft (36));
+    top.removeFromLeft (8);
+    filter.type.setBounds (top);
+    area.removeFromTop (6);
+    filter.dialArea = area;
+    layOutDials();
 }
 
 void FilterPanel::drawTypePicture (juce::Graphics& g, juce::Rectangle<float> area, FilterType type)
@@ -228,19 +218,18 @@ void FilterPanel::paint (juce::Graphics& g)
 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    g.drawText ("FILTERS", captionArea, juce::Justification::centredLeft);
+    g.drawText ("FILTER " + juce::String (filterNumber + 1), captionArea, juce::Justification::centredLeft);
+
+    // The first filters all the oscillators together, and each after it what the one before let through.
     g.setFont (fonts::body (12.5f));
-    g.drawText ("On all the oscillators together", captionArea, juce::Justification::centredRight);
+    fonts::drawFirstThatFits (g, filterNumber == 0 ? juce::StringArray { "All oscillators", "First" }
+                                                   : juce::StringArray { "After filter " + juce::String (filterNumber), "After " + juce::String (filterNumber) },
+                              captionArea.withTrimmedLeft (74), juce::Justification::centredRight);
 
-    const auto dividerX = (float) (first.area.getRight() + second.area.getX()) / 2.0f;
-    g.setColour (colours::outline);
-    g.drawVerticalLine (juce::roundToInt (dividerX), (float) first.area.getY(), (float) first.area.getBottom());
-
-    paintFilter (g, first);
-    paintFilter (g, second);
+    paintDials (g);
 }
 
-void FilterPanel::paintFilter (juce::Graphics& g, Filter& filter)
+void FilterPanel::paintDials (juce::Graphics& g)
 {
     const auto on = filter.isOn();
     const auto dials = filter.getDials();

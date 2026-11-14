@@ -28,8 +28,8 @@ namespace modulation
     /** What a source is called, such as "LFO 2", "Env 1", "Velocity" or "Mod wheel". */
     juce::String getSourceName (int source);
 
-    /** The two filters, numbered from 0, each of which can be a low pass, a mid pass or a high pass. */
-    inline constexpr int numFilters = 2;
+    /** The four filters, numbered from 0, each of which can be a low pass, a mid pass, a high pass or a notch. */
+    inline constexpr int numFilters = 4;
 
     // Every control an LFO or envelope can move is a target, with a number. The numbers are worked out from how many
     // harmonics there can be. They're never saved: a sound saves each control by its key.
@@ -42,18 +42,18 @@ namespace modulation
     namespace detail
     {
         inline constexpr int afterHarmonics = 10 + numOscillators * waveform::maxHarmonics;
-        inline constexpr int afterFilters = afterHarmonics + 15;
+        inline constexpr int afterFilters = afterHarmonics + 6 * numFilters + numOscillators;
         inline constexpr int afterHarmonicTunes = afterFilters + numOscillators * (waveform::maxHarmonics - 1);
         inline constexpr int afterHarmonicPhases = afterHarmonicTunes + numOscillators * waveform::maxHarmonics;
     }
 
     constexpr int filterOnTarget (int filter)                       { return detail::afterHarmonics + filter; }
-    constexpr int filterCutoffTarget (int filter)                   { return detail::afterHarmonics + 2 + filter; }
-    constexpr int filterResonanceTarget (int filter)                { return detail::afterHarmonics + 4 + filter; }
-    constexpr int oscillatorTuneTarget (int oscillator)             { return detail::afterHarmonics + 6 + oscillator; }
-    constexpr int filterWidthTarget (int filter)                    { return detail::afterHarmonics + 9 + filter; }
-    constexpr int filterQTarget (int filter)                        { return detail::afterHarmonics + 11 + filter; }
-    constexpr int filterDepthTarget (int filter)                    { return detail::afterHarmonics + 13 + filter; }
+    constexpr int filterCutoffTarget (int filter)                   { return detail::afterHarmonics + numFilters + filter; }
+    constexpr int filterResonanceTarget (int filter)                { return detail::afterHarmonics + 2 * numFilters + filter; }
+    constexpr int oscillatorTuneTarget (int oscillator)             { return detail::afterHarmonics + 3 * numFilters + oscillator; }
+    constexpr int filterWidthTarget (int filter)                    { return oscillatorTuneTarget (numOscillators) + filter; }
+    constexpr int filterQTarget (int filter)                        { return oscillatorTuneTarget (numOscillators) + numFilters + filter; }
+    constexpr int filterDepthTarget (int filter)                    { return oscillatorTuneTarget (numOscillators) + 2 * numFilters + filter; }
 
     /** The tune of a harmonic above the fundamental, from the 2nd up. */
     constexpr int harmonicTuneTarget (int oscillator, int harmonic) { return detail::afterFilters + oscillator * (waveform::maxHarmonics - 1) + harmonic - 2; }

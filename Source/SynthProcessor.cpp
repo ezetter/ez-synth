@@ -191,10 +191,12 @@ namespace
                         .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); }))));
         }
 
-        // Both filters start switched out, a low pass and a high pass, at cutoffs that change the sound clearly once
-        // they're switched in.
+        // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
+        // sound clearly once they're switched in.
         layout.add (createFilterParameters (0, FilterType::lowPass, 1000.0f));
         layout.add (createFilterParameters (1, FilterType::highPass, 250.0f));
+        layout.add (createFilterParameters (2, FilterType::midPass, 800.0f));
+        layout.add (createFilterParameters (3, FilterType::notch, 1500.0f));
 
         // The LFOs start off, ready to switch on, which giving one something to move does. Each keeps its period, in seconds,
         // but it's shown as a rate, in hertz, which rises as its dial turns up, from 0.1 to 10 Hz.

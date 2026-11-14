@@ -6,15 +6,15 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The two filters' controls. Each has a switch, a choice of type, low pass, mid pass, high pass or notch, shown as
-    the shape of what it lets through, and a cutoff dial. Beside the cutoff are a resonance dial for a low or high
-    pass, a width dial for a mid pass, or Q and depth dials for a notch. The filters shape the sound of all the
-    oscillators together, the first and then the second.
+/** One filter's controls: a switch, a choice of type, low pass, mid pass, high pass or notch, shown as the shape of
+    what it lets through, and a cutoff dial. Beside the cutoff are a resonance dial for a low or high pass, a width
+    dial for a mid pass, or Q and depth dials for a notch. The filters shape the sound of all the oscillators
+    together, one after another, from the first to the last.
 */
 class FilterPanel final : public juce::Component
 {
 public:
-    explicit FilterPanel (juce::AudioProcessorValueTreeState&);
+    FilterPanel (juce::AudioProcessorValueTreeState&, int filterNumber);
 
     /** The height the panel needs. */
     static constexpr int preferredHeight = 164;
@@ -35,7 +35,7 @@ private:
 
     struct Filter
     {
-        Filter (juce::AudioProcessorValueTreeState&, int filterNumber);
+        Filter (juce::AudioProcessorValueTreeState&, int number);
 
         bool isOn() const   { return onSwitch.getToggleState(); }
         FilterType getType() const   { return (FilterType) type.getChosen(); }
@@ -60,12 +60,13 @@ private:
         juce::Rectangle<int> area, dialArea;
     };
 
-    void setUp (Filter&, juce::AudioProcessorValueTreeState&);
-    void showSettings (Filter&);
-    void layOutDials (Filter&);
-    void paintFilter (juce::Graphics&, Filter&);
+    void setUp (juce::AudioProcessorValueTreeState&);
+    void showSettings();
+    void layOutDials();
+    void paintDials (juce::Graphics&);
 
-    Filter first, second;
+    const int filterNumber;
+    Filter filter;
     juce::Rectangle<int> captionArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FilterPanel)
