@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<EZSynth>
+<EZSynth beatRates="12">
   <PARAM id="env1Attack" value="0.009999994188547134"/>
   <PARAM id="env1Decay" value="0.2999999821186066"/>
   <PARAM id="env1Release" value="0.5000001192092896"/>
@@ -27,21 +27,21 @@
   <PARAM id="filter2Resonance" value="0.0"/>
   <PARAM id="filter2Type" value="2.0"/>
   <PARAM id="filter2Width" value="1.999999761581421"/>
-  <PARAM id="lfo1BeatRate" value="5.0"/>
+  <PARAM id="lfo1BeatRate" value="6.0"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="1.0"/>
   <PARAM id="lfo1Period" value="6.000000476837158"/>
   <PARAM id="lfo1Random" value="0.0"/>
   <PARAM id="lfo1StartOnPlay" value="1.0"/>
   <PARAM id="lfo1Sync" value="0.0"/>
-  <PARAM id="lfo2BeatRate" value="5.0"/>
+  <PARAM id="lfo2BeatRate" value="6.0"/>
   <PARAM id="lfo2Mode" value="0.0"/>
   <PARAM id="lfo2On" value="1.0"/>
   <PARAM id="lfo2Period" value="3.0"/>
   <PARAM id="lfo2Random" value="0.0"/>
   <PARAM id="lfo2StartOnPlay" value="1.0"/>
   <PARAM id="lfo2Sync" value="0.0"/>
-  <PARAM id="lfo3BeatRate" value="5.0"/>
+  <PARAM id="lfo3BeatRate" value="6.0"/>
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="0.0"/>
   <PARAM id="lfo3Period" value="3.999999523162842"/>

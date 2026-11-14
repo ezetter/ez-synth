@@ -1647,6 +1647,7 @@ juce::ValueTree SynthProcessor::createState()
     state.setProperty ("presetName", presetName, nullptr);
     state.setProperty ("presetEdited", presetEdited.load(), nullptr);
     state.setProperty ("presetFactory", factoryPreset, nullptr);
+    state.setProperty ("beatRates", (int) modulation::beatRates.size(), nullptr);
 
     const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
                                    std::optional<waveform::Preset> preset, const waveform::Drawing& drawing)
@@ -1766,6 +1767,15 @@ void SynthProcessor::loadState (juce::ValueTree state)
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
+
+    // A save from before the slowest beat rates were added counts its LFOs' beat rates from 1/8 a beat, so each
+    // moves up by as many as were added below it.
+    const auto ratesAdded = (int) modulation::beatRates.size() - (int) state.getProperty ("beatRates", 11);
+    state.removeProperty ("beatRates", nullptr);
+
+    for (int i = 0; i < numLfos && ratesAdded > 0; ++i)
+        if (auto rate = state.getChildWithProperty ("id", lfoBeatRateId (i)); rate.isValid())
+            rate.setProperty ("value", (double) rate["value"] + ratesAdded, nullptr);
 
     std::vector<juce::ValueTree> waves, modulations;
 

@@ -2260,10 +2260,10 @@ namespace
     {
         std::cout << "LFOs synced to the tempo" << std::endl;
 
-        check (modulation::getBeatRateNames() == juce::StringArray { "1/8 per beat", "1/6 per beat", "1/4 per beat", "1/3 per beat",
-                                                                     "1/2 per beat", "1 per beat", "2 per beat", "3 per beat",
-                                                                     "4 per beat", "6 per beat", "8 per beat" },
-               "a synced LFO runs 1/8, 1/6, 1/4, 1/3, 1/2, 1, 2, 3, 4, 6 or 8 cycles a beat");
+        check (modulation::getBeatRateNames() == juce::StringArray { "1/16 per beat", "1/8 per beat", "1/6 per beat", "1/4 per beat",
+                                                                     "1/3 per beat", "1/2 per beat", "1 per beat", "2 per beat",
+                                                                     "3 per beat", "4 per beat", "6 per beat", "8 per beat" },
+               "a synced LFO runs 1/16, 1/8, 1/6, 1/4, 1/3, 1/2, 1, 2, 3, 4, 6 or 8 cycles a beat");
 
         SynthProcessor synth;
         check (! synth.isLfoSynced (0) && isNear (synth.getLfoCyclesPerBeat (0), 1.0, 1.0e-9), "an LFO starts unsynced, ready to run a cycle a beat");
@@ -2272,7 +2272,7 @@ namespace
         host.info.setBpm (90.0);
         synth.setPlayHead (&host);
         setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 7.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 8.0f);
 
         synth.prepareToPlay (sampleRate, blockSize);
         synth.restartLfos();
@@ -2282,6 +2282,39 @@ namespace
         check (synth.isLfoSynced (0) && isNear (synth.getTempo(), 90.0, 1.0e-9) && synth.isTempoFromHost()
                  && isNear (synth.getLfoPeriod (0), 2.0 / 9.0, 1.0e-6),
                "synced at 90 BPM, 3 cycles a beat last 2/9 of a second each");
+
+        // At its slowest, a cycle lasts 16 beats, 4 bars of 4/4: at 90 BPM, 32/3 of a second.
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 0.0f);
+        synth.processBlock (buffer, noMidi);
+        check (isNear (synth.getLfoCyclesPerBeat (0), 1.0 / 16.0, 1.0e-9) && isNear (synth.getLfoPeriod (0), 32.0 / 3.0, 1.0e-6),
+               "synced at 90 BPM, 1/16 of a cycle a beat lasts 32/3 of a second");
+
+        {
+            // A save from before 1/16 a beat counted its beat rates from 1/8, so its 2 was 1/4 a beat, and its 5
+            // 1 a beat, and still are.
+            juce::MemoryBlock saved;
+            synth.getStateInformation (saved);
+            auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), (int) saved.getSize());
+            xml->removeAttribute ("beatRates");
+
+            for (auto* parameter : xml->getChildWithTagNameIterator ("PARAM"))
+                for (int i = 0; i < SynthProcessor::numLfos; ++i)
+                    if (parameter->getStringAttribute ("id") == SynthProcessor::lfoBeatRateId (i))
+                        parameter->setAttribute ("value", i == 0 ? 2.0 : 5.0);
+
+            juce::AudioProcessor::copyXmlToBinary (*xml, saved);
+            SynthProcessor older;
+            older.setStateInformation (saved.getData(), (int) saved.getSize());
+            check (isNear (older.getLfoCyclesPerBeat (0), 0.25, 1.0e-9) && isNear (older.getLfoCyclesPerBeat (1), 1.0, 1.0e-9),
+                   "an older save keeps its LFOs' beat rates");
+
+            SynthProcessor restored;
+            synth.getStateInformation (saved);
+            restored.setStateInformation (saved.getData(), (int) saved.getSize());
+            check (isNear (restored.getLfoCyclesPerBeat (0), 1.0 / 16.0, 1.0e-9), "a save keeps 1/16 a beat");
+        }
+
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 8.0f);
 
         // The mod wheel on its rate does nothing while it's synced.
         synth.setModWheelAssignment (modulation::lfoRateTarget (0), { modulation::modWheelSource, 0.5f, false });
@@ -2294,7 +2327,7 @@ namespace
         // When the host starts playing, a looping LFO lines up with the bar: at 1/4 a beat it lasts a bar, so at beat
         // 10.25 it's 2.25 beats, or 0.5625 of a bar, into its period, and moves on by the block from there.
         check (synth.isLfoStartedOnPlay (0), "an LFO starts when the host starts playing, to start with");
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 2.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 3.0f);
         host.info.setBpm (120.0);
         host.info.setIsPlaying (true);
         host.info.setPpqPosition (10.25);
@@ -2368,7 +2401,7 @@ namespace
             setParameter (played, SynthProcessor::levelId (0), 0.5f);
             setLfo (played, 0, synced ? 1.0f : 0.25f, false, waveform::Preset::sine);
             setParameter (played, SynthProcessor::lfoSyncId (0), synced ? 1.0f : 0.0f);
-            setParameter (played, SynthProcessor::lfoBeatRateId (0), 8.0f);
+            setParameter (played, SynthProcessor::lfoBeatRateId (0), 9.0f);
             played.setAssignment (modulation::oscillatorLevelTarget (0), { 0, 1.0f, false });
             const auto signal = playNotes (played, { { 0.0, 69 } }, 0.6);
             played.setPlayHead (nullptr);
@@ -2403,14 +2436,18 @@ namespace
 
         if (dial != nullptr)
         {
-            dial->setValue (8.4, juce::sendNotificationSync);
+            dial->setValue (9.4, juce::sendNotificationSync);
             check (isNear (synth.getLfoCyclesPerBeat (0), 4.0, 1.0e-9) && card.getShownRate().first == "4 per beat"
-                     && isNear (dial->getValue(), 8.0, 1.0e-9),
+                     && isNear (dial->getValue(), 9.0, 1.0e-9),
                    "...and turning it snaps to the rates a beat it can run");
 
-            dial->setValue (1.2, juce::sendNotificationSync);
+            dial->setValue (2.2, juce::sendNotificationSync);
             check (isNear (synth.getLfoCyclesPerBeat (0), 1.0 / 6.0, 1.0e-9) && card.getShownRate().first == "1/6 per beat",
                    "...including 1/6 a beat, a cycle every 6 beats");
+
+            dial->setValue (0.3, juce::sendNotificationSync);
+            check (isNear (synth.getLfoCyclesPerBeat (0), 1.0 / 16.0, 1.0e-9) && card.getShownRate().first == "1/16 per beat",
+                   "...and 1/16 a beat, a cycle every 16 beats");
         }
 
         card.showSynced (false);
@@ -4690,7 +4727,7 @@ namespace
         setParameter (synth, SynthProcessor::lfoModeId (1), 5.0f);
         setParameter (synth, SynthProcessor::lfoModeId (2), (float) modulation::lfoForever);
         setParameter (synth, SynthProcessor::lfoSyncId (0), 1.0f);
-        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 4.0f);
+        setParameter (synth, SynthProcessor::lfoBeatRateId (0), 5.0f);
         synth.editedSource = SynthProcessor::numOscillators;
 
         // Plays on a while, so the LFOs are partway through their periods.

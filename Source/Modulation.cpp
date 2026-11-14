@@ -303,7 +303,7 @@ namespace modulation
 
     juce::StringArray getBeatRateNames()
     {
-        return { "1/8 per beat", "1/6 per beat", "1/4 per beat", "1/3 per beat", "1/2 per beat", "1 per beat", "2 per beat",
+        return { "1/16 per beat", "1/8 per beat", "1/6 per beat", "1/4 per beat", "1/3 per beat", "1/2 per beat", "1 per beat", "2 per beat",
                  "3 per beat", "4 per beat", "6 per beat", "8 per beat" };
     }
 

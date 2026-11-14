@@ -204,9 +204,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the LFO's period in time, and a line shows where the LFO has got to.
 - **Sync rate to tempo.** Click an LFO's card, and at the top of the panel beside the grid, a switch syncs its
   rate to your DAW's tempo. The **Rate** dial then sets how many cycles the LFO runs a beat rather than a
-  second, snapping to **1/8**, **1/6**, **1/4**, **1/3**, **1/2**, **1**, **2**, **3**, **4**, **6** and
+  second, snapping to **1/16**, **1/8**, **1/6**, **1/4**, **1/3**, **1/2**, **1**, **2**, **3**, **4**, **6** and
   **8 per beat**, as it shows under the dial. At 1 per beat, a cycle lasts a quarter note in 4/4; at 1/4 per
-  beat, a whole bar; at 1/3 and 1/6 per beat, 3 and 6 beats, for bars of 3/4 and 6/8.
+  beat, a whole bar; at 1/16 per beat, 4 bars; at 1/3 and 1/6 per beat, 3 and 6 beats, for bars of 3/4 and 6/8.
+  Projects and presets saved before 1/16 was added keep the rates they had.
   The panel shows the tempo it's following; the standalone app has no DAW to give one, so it follows 120 BPM. The rate in hertz is kept for
   when it's unsynced. Nothing moves a synced LFO's rate: an LFO, envelope, velocity or mod wheel given its rate
   leaves it alone until it's unsynced.

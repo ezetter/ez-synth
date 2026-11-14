@@ -177,7 +177,7 @@ void LfoPanel::paint (juce::Graphics& g)
     g.setFont (fonts::body (12.5f));
     g.drawText (shownTempo, tempoArea, juce::Justification::centredRight, true);
     g.drawFittedText (syncSwitch.getToggleState()
-                          ? "The Rate dial sets how many cycles it runs a beat, from 1/8 to 8. At 1 per beat, a cycle "
+                          ? "The Rate dial sets how many cycles it runs a beat, from 1/16 to 8. At 1 per beat, a cycle "
                             "lasts a quarter note in 4/4."
                           : "Synced, the Rate dial sets how many cycles it runs a beat, rather than how many a second.",
                       syncHintArea, juce::Justification::topLeft, 2);
