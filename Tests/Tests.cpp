@@ -3709,6 +3709,43 @@ namespace
             countRandomizing (evenly, {}, 2.1);
             check (evenly.isHarmonicPlayed (0, 2), "...and back on at each crossing after, four in 2.1 seconds");
 
+            // A filter's switch is triggered the same way, switching it at each crossing rather than following the LFO.
+            {
+                const auto filterSwitch = modulation::filterOnTarget (0);
+                const auto filterOn = [] (SynthProcessor& s)
+                {
+                    return s.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() >= 0.5f;
+                };
+
+                check (modulation::isTrigger (filterSwitch) && modulation::describeTrigger (filterSwitch) == "switches Filter 1 on or off",
+                       "a filter's switch is a control that's triggered");
+
+                SynthProcessor filtered;
+                setLfo (filtered, 0, 1.0f, false, waveform::Preset::square);
+                filtered.setAssignment (filterSwitch, { 0, 1.0f, false, 0.0f, 0.5f });
+                const auto wasOn = filterOn (filtered);
+                countRandomizing (filtered, {}, 1.6);
+                const auto afterThree = filterOn (filtered);
+
+                SynthProcessor filteredEvenly;
+                setLfo (filteredEvenly, 0, 1.0f, false, waveform::Preset::square);
+                filteredEvenly.setAssignment (filterSwitch, { 0, 1.0f, false, 0.0f, 0.5f });
+                countRandomizing (filteredEvenly, {}, 2.1);
+                check (afterThree != wasOn && filterOn (filteredEvenly) == wasOn,
+                       "an LFO switches a filter each time it crosses its threshold: three times in 1.6 seconds, four in 2.1");
+
+                // A MIDI knob, at the threshold MIDI links start with, switches it only when it's turned right up.
+                filtered.setAssignment (filterSwitch, {});
+                filtered.setMidiController (filterSwitch, 40);
+                const auto before = filterOn (filtered);
+                moveControllers (filtered, { { 40, 10 } });
+                moveControllers (filtered, { { 40, 100 } });
+                const auto partWay = filterOn (filtered);
+                moveControllers (filtered, { { 40, 127 } });
+                check (partWay == before && filterOn (filtered) != before,
+                       "a MIDI controller switches a filter when it's turned right up, not part way");
+            }
+
             // MIDI learn: a knob turned past halfway switches it.
             modulated.setAssignment (target, {});
             modulated.setMidiController (modulation::harmonicSwitchTarget (0, 3), 30);

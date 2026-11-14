@@ -641,19 +641,20 @@ private:
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
 
-    // The controls that are triggered: each oscillator's randomizing, then each of its harmonics' switches.
-    static constexpr int firstTrigger = modulation::randomizeTarget (0);
-    static constexpr int numTriggers = modulation::numTargets - firstTrigger;
+    // The controls that are triggered rather than moved: the filters' switches, each oscillator's randomizing, and
+    // each of its harmonics' switches.
+    std::vector<int> triggerTargets;
 
-    // For each trigger, what's given it, as moving, by velocity and by the mod wheel, each watched for crossing its
-    // threshold. The audio thread counts up the times it's asked for, the message thread how many it's carried out.
-    std::array<std::array<modulation::ThresholdCrossing, 3>, numTriggers> triggerCrossings {};
-    std::array<std::atomic<int>, numTriggers> triggerRequests {};
-    std::array<int, numTriggers> triggerRequestsDone {};
+    // For each control, if it's triggered, what's given it, as moving, by velocity and by the mod wheel, each watched
+    // for crossing its threshold. The audio thread counts up the times it's asked for, the message thread how many
+    // it's carried out.
+    std::array<std::array<modulation::ThresholdCrossing, 3>, modulation::numTargets> triggerCrossings {};
+    std::array<std::atomic<int>, modulation::numTargets> triggerRequests {};
+    std::array<int, modulation::numTargets> triggerRequestsDone {};
     std::array<int, numOscillators> randomizeCounts {};
     juce::Random randomizer;
 
-    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches a harmonic on or off. */
+    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches a filter or harmonic on or off. */
     void carryOutTrigger (int target);
 
     // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the
@@ -662,7 +663,7 @@ private:
     std::atomic<int> learningTarget { -1 }, learnedController { -1 };
     std::array<int, modulation::numTargets> targetControllers {}, appliedMoves {};
     std::array<float, modulation::numTargets> midiThresholds {};
-    std::array<modulation::ThresholdCrossing, numTriggers> controllerTriggerCrossings {};
+    std::array<modulation::ThresholdCrossing, modulation::numTargets> controllerTriggerCrossings {};
     int midiLearnVersion = 0;
 
     /** Sets a control to a position along its travel, from 0 to 1, as a MIDI controller does. */

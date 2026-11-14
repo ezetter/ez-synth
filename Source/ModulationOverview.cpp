@@ -17,7 +17,7 @@ namespace
     /** What a trigger does, in a word or two: "randomizes", or "switches on or off". */
     juce::String triggerVerb (int target)
     {
-        return modulation::describe (target).kind == modulation::Kind::harmonicSwitch ? "switches on or off" : "randomizes";
+        return modulation::describe (target).kind == modulation::Kind::randomize ? "randomizes" : "switches on or off";
     }
     const juce::String plusOrMinus (juce::CharPointer_UTF8 ("\xc2\xb1"));
 }

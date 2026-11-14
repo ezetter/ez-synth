@@ -296,6 +296,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     it was left. It's MIDI controller 1, which most keyboards' mod wheels send, so in a DAW the wheel can be
     recorded and drawn like any other MIDI. To open a filter with the wheel, for instance, set its cutoff
     low and give it the mod wheel with a range of 60% or so.
+  - **A filter's switch** is triggered, as **Randomize** and the harmonics' switches are, rather than moved:
+    each time its LFO, envelope, velocity or mod wheel crosses its **Threshold**, either way, it switches the
+    filter in if it's out, and out if it's in, for every note. A square LFO at 50% switches it every half
+    period.
   - **An LFO's rate** can be moved too: right-click the **Rate** dial on its card. Another LFO, an envelope,
     velocity and the mod wheel can each move it, faster as they rise, or slower if **Inverted**. The dial runs
     from 0.1 to 100 Hz, so each 10% of range is about twice as fast: give the mod wheel 10% for it to double
@@ -353,7 +357,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   is, such as *CC 74*; click **Learn** again before moving anything to cancel, or **Forget** to unlink it.
 - **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
   each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
-  Linked to **Randomize**, or a harmonic's switch, a knob triggers it each time it's turned past its
+  Linked to **Randomize**, or a filter's or a harmonic's switch, a knob triggers it each time it's turned past its
   **Threshold**, either way. The threshold's slider is under the MIDI CC row. It starts at 100%, where only
   turning the knob right up counts, and at 0% only turning it right down does. It's kept with the link.
 - **See what's linked** in the **Modulation** overview, which lists every control linked to a MIDI

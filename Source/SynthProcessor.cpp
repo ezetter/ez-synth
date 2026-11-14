@@ -358,6 +358,10 @@ SynthProcessor::SynthProcessor()
                                       parameters.getRawParameterValue (lfoBeatRateId (i)),
                                       parameters.getRawParameterValue (lfoStartOnPlayId (i)) };
 
+    for (int target = 0; target < modulation::numTargets; ++target)
+        if (modulation::isTrigger (target))
+            triggerTargets.push_back (target);
+
     // Each looping LFO's random wave is its own.
     for (auto& seed : randomSeeds)
         seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
@@ -590,15 +594,15 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     // that only touches a threshold near its end, at its lowest or highest, is caught there.
     constexpr auto lookInterval = HarmonicVoice::controlInterval;
 
-    for (size_t i = 0; i < (size_t) numTriggers; ++i)
+    for (const auto triggerTarget : triggerTargets)
     {
-        const auto target = (size_t) firstTrigger + i;
+        const auto target = (size_t) triggerTarget;
 
         if (! patch.assignments[target].isActive() && ! patch.velocityAssignments[target].isActive()
              && ! patch.modWheelAssignments[target].isActive())
             continue;
 
-        auto& crossings = triggerCrossings[i];
+        auto& crossings = triggerCrossings[target];
         auto triggered = false;
 
         const auto watch = [this, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
@@ -621,7 +625,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         watch (crossings[2], patch.modWheelAssignments[target]);
 
         if (triggered)
-            ++triggerRequests[i];
+            ++triggerRequests[target];
     }
 }
 
@@ -664,8 +668,9 @@ std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase
 
 void SynthProcessor::randomizeAsTriggered()
 {
-    for (size_t i = 0; i < (size_t) numTriggers; ++i)
+    for (const auto target : triggerTargets)
     {
+        const auto i = (size_t) target;
         const auto requests = triggerRequests[i].load();
 
         if (requests == triggerRequestsDone[i])
@@ -674,9 +679,8 @@ void SynthProcessor::randomizeAsTriggered()
         // A switch triggered more than once since last time ends up as each crossing leaves it, on or off.
         const auto times = requests - triggerRequestsDone[i];
         triggerRequestsDone[i] = requests;
-        const auto target = firstTrigger + (int) i;
 
-        if (modulation::describe (target).kind == modulation::Kind::harmonicSwitch)
+        if (modulation::describe (target).kind != modulation::Kind::randomize)
             for (int time = 0; time < (times % 2 == 0 ? 0 : 1); ++time)
                 carryOutTrigger (target);
         else
@@ -691,6 +695,11 @@ void SynthProcessor::carryOutTrigger (int target)
     if (info.kind == modulation::Kind::harmonicSwitch)
     {
         toggleHarmonic (info.oscillator, info.harmonic);
+    }
+    else if (info.kind == modulation::Kind::filterOn)
+    {
+        if (auto* parameter = parameters.getParameter (modulation::getKey (target)))
+            parameter->setValueNotifyingHost (parameter->getValue() >= 0.5f ? 0.0f : 1.0f);
     }
     else if (info.kind == modulation::Kind::randomize)
     {
@@ -788,12 +797,12 @@ void SynthProcessor::setTargetPosition (int target, float position)
     position = juce::jlimit (0.0f, 1.0f, position);
     const auto info = modulation::describe (target);
 
-    // Randomizing, and a harmonic's switch, are triggered by the controller crossing its threshold, either way.
+    // Randomizing, and a filter's or harmonic's switch, are triggered by the controller crossing its threshold, either way.
     if (modulation::isTrigger (target))
     {
         const auto threshold = getMidiThreshold (target);
 
-        if (controllerTriggerCrossings[(size_t) (target - firstTrigger)].update (position, modulation::getThresholdValue (-1, threshold),
+        if (controllerTriggerCrossings[(size_t) target].update (position, modulation::getThresholdValue (-1, threshold),
                                                                                 threshold))
             carryOutTrigger (target);
 

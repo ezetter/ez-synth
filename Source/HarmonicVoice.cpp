@@ -320,7 +320,8 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             return range.convertFrom0to1 (modulate (target, range.convertTo0to1 (value)));
         };
 
-        targets.filters[(size_t) i] = { modulate (filterOnTarget (i), filter.on ? 1.0f : 0.0f) >= 0.5f,
+        // Its switch is triggered, switching it for every voice, rather than moved here.
+        targets.filters[(size_t) i] = { filter.on,
                                         filter.type,
                                         FilterStage::positionToCutoff (modulate (filterCutoffTarget (i),
                                                                                  FilterStage::cutoffToPosition (filter.cutoff))),

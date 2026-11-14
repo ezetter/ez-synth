@@ -157,7 +157,7 @@ namespace modulation
     bool isTrigger (int target)
     {
         const auto kind = describe (target).kind;
-        return kind == Kind::randomize || kind == Kind::harmonicSwitch;
+        return kind == Kind::randomize || kind == Kind::harmonicSwitch || kind == Kind::filterOn;
     }
 
     juce::String describeTrigger (int target)
@@ -167,6 +167,9 @@ namespace modulation
 
         if (info.kind == Kind::harmonicSwitch)
             return "switches " + oscillator + " harmonic " + juce::String (info.harmonic) + " on or off";
+
+        if (info.kind == Kind::filterOn)
+            return "switches " + getName (target).upToFirstOccurrenceOf (" switch", false, false) + " on or off";
 
         return "randomizes " + oscillator + "'s harmonics";
     }
