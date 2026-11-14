@@ -9,8 +9,8 @@
 /** The controls the LFOs, envelopes and key velocity can move, and how each moves one. */
 namespace modulation
 {
-    inline constexpr int numLfos = 3;
-    inline constexpr int numEnvelopes = 3;
+    inline constexpr int numLfos = 8;
+    inline constexpr int numEnvelopes = 8;
     inline constexpr int numOscillators = 3;
 
     /** What moves controls: the LFOs, then the envelopes, numbered in that order. */

@@ -2141,7 +2141,7 @@ namespace
         // Each LFO's rate is a control too, which only the mod wheel can move.
         const auto rate = modulation::lfoRateTarget (0);
         check (modulation::getName (modulation::lfoRateTarget (2)) == "LFO 3 rate" && modulation::getKey (rate) == SynthProcessor::lfoPeriodId (0)
-                 && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (2) == modulation::randomizeTarget (0) - 1,
+                 && modulation::findTarget ("lfo2Period") == modulation::lfoRateTarget (1) && modulation::lfoRateTarget (SynthProcessor::numLfos - 1) == modulation::randomizeTarget (0) - 1,
                "each LFO's rate is a control the mod wheel can move");
 
         // Other LFOs can move an LFO's rate too, but never so that an LFO moves its own, even through others.
@@ -3504,6 +3504,137 @@ namespace
             check (loaded.getMidiLearnTarget() == modulation::volumeTarget, "the modulation editor's Learn button starts learning");
             editor.reset();
             check (! loaded.getMidiLearnTarget().has_value(), "...and closing the editor stops");
+        }
+
+        // What moves a control is chosen from a menu: None, then the 8 LFOs, then the 8 envelopes, under headings.
+        {
+            SynthProcessor picked;
+            ModulationEditor editor (picked, modulation::filterCutoffTarget (0));
+            auto& picker = editor.getSourcePicker();
+            juce::StringArray texts;
+
+            for (const auto& entry : picker.getEntries())
+                texts.add (entry.text);
+
+            check (texts.joinIntoString (",") == "None,LFOs,LFO 1,LFO 2,LFO 3,LFO 4,LFO 5,LFO 6,LFO 7,LFO 8,"
+                                                 "Envelopes,Env 1,Env 2,Env 3,Env 4,Env 5,Env 6,Env 7,Env 8"
+                     && picker.getSelectedId() == 0,
+                   "the modulation editor's menu lists None, the 8 LFOs and the 8 envelopes, None chosen to start with");
+
+            picker.choose (6);
+            check (picked.getAssignment (modulation::filterCutoffTarget (0)).source == 5, "choosing LFO 6 has it move the control");
+            picker.choose (modulation::envelopeSource (7) + 1);
+            check (picked.getAssignment (modulation::filterCutoffTarget (0)).source == modulation::envelopeSource (7),
+                   "...and choosing Env 8, that");
+            picker.choose (0);
+            check (! picked.getAssignment (modulation::filterCutoffTarget (0)).isActive(), "...and None, nothing");
+
+            ModulationEditor rateEditor (picked, modulation::lfoRateTarget (6));
+            check (! rateEditor.getSourcePicker().isItemEnabled (7) && rateEditor.getSourcePicker().isItemEnabled (8),
+                   "an LFO can't be chosen to move its own rate");
+            rateEditor.getSourcePicker().choose (7);
+            check (! picked.getAssignment (modulation::lfoRateTarget (6)).isActive(), "...even from the menu");
+        }
+    }
+
+    /** There are 8 LFOs and 8 envelopes. The window shows 3 of each at a time, each row scrolling sideways to the
+        others, settling with whole cards in the same places.
+    */
+    void testEightLfosAndEnvelopes()
+    {
+        std::cout << "Eight LFOs and envelopes" << std::endl;
+
+        check (SynthProcessor::numLfos == 8 && SynthProcessor::numEnvelopes == 8, "there are 8 LFOs and 8 envelopes");
+
+        // The last LFO and the last envelope each move what they're given.
+        {
+            SynthProcessor synth;
+            synth.prepareToPlay (sampleRate, blockSize);
+            synth.restartLfos();
+            setParameter (synth, SynthProcessor::levelId (0), 0.0f);
+            setEnvelope (synth, 7, { 1.0f, 0.0f, 1.0f, 0.0f });
+            synth.setAssignment (modulation::oscillatorLevelTarget (0), { modulation::envelopeSource (7), 1.0f, false });
+            const auto swelling = playNotes (synth, { { 0.0, 69 } }, 1.5);
+            check (loudness (swelling, 0.0, 0.1) < 0.1 * loudness (swelling, 1.2, 1.4), "Env 8 swells a note in");
+
+            synth.setAssignment (modulation::oscillatorLevelTarget (0), {});
+            setParameter (synth, SynthProcessor::levelId (0), 0.5f);
+            setLfo (synth, 7, 1.0f, false, waveform::Preset::square);
+            synth.setAssignment (modulation::oscillatorLevelTarget (0), { 7, 1.0f, false });
+            synth.restartLfos();
+            const auto pulsing = playNotes (synth, { { 0.0, 69 } }, 1.0);
+            const auto first = loudness (pulsing, 0.1, 0.4), second = loudness (pulsing, 0.6, 0.9);
+            check (synth.isLfoOn (7) && std::max (first, second) > 5.0 * std::min (first, second), "LFO 8 pulses a note");
+        }
+
+        // A save from before there were 8 has the new ones as they start: off, with their starting waves.
+        {
+            SynthProcessor synth;
+            synth.setLfoShape (3, waveform::makePreset (waveform::Preset::sine), waveform::Preset::sine);
+            setParameter (synth, SynthProcessor::lfoOnId (6), 1.0f);
+            juce::MemoryBlock saved;
+            synth.getStateInformation (saved);
+            auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), (int) saved.getSize());
+
+            for (int i = 3; i < 8; ++i)
+            {
+                const auto number = juce::String (i + 1);
+
+                for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+                {
+                    const auto* next = child->getNextElement();
+                    const auto id = child->getStringAttribute ("id");
+
+                    if (id.startsWith ("lfo" + number) || id.startsWith ("env" + number) || child->getIntAttribute ("lfo", -1) == i)
+                        xml->removeChildElement (child, true);
+
+                    child = const_cast<juce::XmlElement*> (next);
+                }
+            }
+
+            juce::AudioProcessor::copyXmlToBinary (*xml, saved);
+            SynthProcessor older;
+            setParameter (older, SynthProcessor::lfoOnId (6), 1.0f);
+            older.setLfoShape (3, waveform::makePreset (waveform::Preset::triangle), waveform::Preset::triangle);
+            older.setStateInformation (saved.getData(), (int) saved.getSize());
+            check (! older.isLfoOn (6) && older.getLfoPreset (3) == waveform::Preset::square
+                     && isNear (older.getEnvelopeSettings (7).release, 4.0, 1.0e-3),
+                   "an older save loads with LFOs and envelopes 4 to 8 as they start");
+        }
+
+        // In the window, 3 LFOs and 3 envelopes show at a time, as wide as the oscillators' cards.
+        {
+            SynthProcessor synth;
+            synth.editedSource = SynthProcessor::numOscillators + 7;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            const auto& lfos = synthEditor.getLfoStrip();
+            const auto& envelopes = synthEditor.getEnvelopeStrip();
+
+            check (lfos.getNumCards() == 8 && lfos.getNumShown() == 3 && envelopes.getNumCards() == 8 && envelopes.getNumShown() == 3,
+                   "the window shows 3 of the 8 LFOs, and 3 of the 8 envelopes, at a time");
+
+            OscillatorCard* oscillatorCard = nullptr;
+            std::function<void (juce::Component&)> find = [&] (juce::Component& c)
+            {
+                if (auto* found = dynamic_cast<OscillatorCard*> (&c); found != nullptr && oscillatorCard == nullptr)
+                    oscillatorCard = found;
+
+                for (auto* child : c.getChildren())
+                    find (*child);
+            };
+            find (*editor);
+            check (oscillatorCard != nullptr && std::abs (lfos.getCardWidth() - oscillatorCard->getWidth()) <= 1,
+                   "...each LFO's card as wide as an oscillator's");
+
+            check (lfos.getFirstShown() == 5, "the window opens with the LFO being edited in sight");
+            synthEditor.scrollToLfo (0);
+            check (lfos.getFirstShown() == 0, "...and scrolls back to show the first");
+            synthEditor.scrollToEnvelope (4);
+            check (envelopes.getFirstShown() == 2, "the envelopes scroll to show one out of sight");
+            synthEditor.scrollToEnvelope (3);
+            check (envelopes.getFirstShown() == 2, "...and not for one already shown");
+            synth.editorBeingDeleted (editor.get());
         }
     }
 
@@ -5007,6 +5138,7 @@ int main (int argc, char* argv[])
     testGlide();
     testMidiInputs();
     testMidiLearn();
+    testEightLfosAndEnvelopes();
     testHarmonicSwitches();
     testModulationOverview();
     testPresets();

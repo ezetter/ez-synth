@@ -262,3 +262,18 @@ void SynthLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
                            .withCentre ({ liveOn ? track.getRight() - radius : track.getX() + radius, track.getCentreY() }));
     }
 }
+
+void SynthLookAndFeel::drawScrollbar (juce::Graphics& g, juce::ScrollBar&, int x, int y, int width, int height,
+                                      bool isScrollbarVertical, int thumbStartPosition, int thumbSize, bool isMouseOver,
+                                      bool isMouseDown)
+{
+    const auto track = juce::Rectangle<int> (x, y, width, height).toFloat();
+    const auto radius = (isScrollbarVertical ? track.getWidth() : track.getHeight()) / 2.0f;
+    g.setColour (colours::outline.withAlpha (0.6f));
+    g.fillRoundedRectangle (track, radius);
+
+    const auto thumb = isScrollbarVertical ? track.withY ((float) thumbStartPosition).withHeight ((float) thumbSize)
+                                           : track.withX ((float) thumbStartPosition).withWidth ((float) thumbSize);
+    g.setColour (isMouseDown ? colours::text.withAlpha (0.7f) : isMouseOver ? colours::dimText : colours::gridLineStrong.brighter (0.4f));
+    g.fillRoundedRectangle (thumb, radius);
+}

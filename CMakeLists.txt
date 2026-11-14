@@ -44,7 +44,9 @@ set_property(TARGET EZSynth_Standalone EZSynth_VST3 EZSynth_AU APPEND
 
 target_sources(EZSynth
     PRIVATE
+        Source/CardStrip.cpp
         Source/ChoiceButtons.cpp
+        Source/Dropdown.cpp
         Source/Envelope.cpp
         Source/EnvelopePanel.cpp
         Source/FilterPanel.cpp

@@ -68,4 +68,8 @@ public:
     /** Draws toggle buttons as on/off switches. */
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&,
                            bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+
+    /** Draws scroll bars as a faint track with a rounded thumb, brighter under the mouse. */
+    void drawScrollbar (juce::Graphics&, juce::ScrollBar&, int x, int y, int width, int height, bool isScrollbarVertical,
+                        int thumbStartPosition, int thumbSize, bool isMouseOver, bool isMouseDown) override;
 };

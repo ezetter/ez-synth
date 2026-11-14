@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CardStrip.h"
 #include "EnvelopePanel.h"
 #include "FilterPanel.h"
 #include "HarmonicSelector.h"
@@ -41,6 +42,12 @@ public:
     void showModulation();
 
     void showModulationEditor (juce::Component& control) override;
+
+    /** Scrolls the LFOs' cards or the envelopes' panels, if need be, so one shows. */
+    void scrollToLfo (int lfo)             { lfoStrip.scrollToShow (lfo); }
+    void scrollToEnvelope (int envelope)   { envelopeStrip.scrollToShow (envelope); }
+    const CardStrip& getLfoStrip() const noexcept        { return lfoStrip; }
+    const CardStrip& getEnvelopeStrip() const noexcept   { return envelopeStrip; }
 
     /** Shows the screen listing everything that moves a control, or is linked to one, over the synth, or hides it. */
     void showModulationOverview (bool);
@@ -89,6 +96,9 @@ private:
 
     std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> oscillatorCards;
     std::array<std::unique_ptr<LfoCard>, SynthProcessor::numLfos> lfoCards;
+
+    /** The LFOs' cards and the envelopes' panels, three of each shown at a time, scrolling sideways to the others. */
+    CardStrip lfoStrip { 3 }, envelopeStrip { 3 };
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
     TuneSlider tuneSlider;

@@ -20,18 +20,25 @@ namespace
 
     /** The waves and periods the LFOs start with. */
     constexpr std::array<waveform::Preset, SynthProcessor::numLfos> startingLfoPresets {
-        waveform::Preset::sine, waveform::Preset::triangle, waveform::Preset::sawtooth
+        waveform::Preset::sine, waveform::Preset::triangle, waveform::Preset::sawtooth, waveform::Preset::square,
+        waveform::Preset::sine, waveform::Preset::triangle, waveform::Preset::sawtooth, waveform::Preset::square
     };
 
-    constexpr std::array<float, SynthProcessor::numLfos> startingPeriods { 1.0f, 2.0f, 4.0f };
+    constexpr std::array<float, SynthProcessor::numLfos> startingPeriods { 1.0f, 2.0f, 4.0f, 0.5f, 8.0f, 0.25f, 3.0f, 6.0f };
 
-    /** The envelopes start as three common shapes: a note that swells a little and settles, a pluck that dies
-        away, and a slow swell.
+    /** The envelopes start as common shapes: a note that swells a little and settles, a pluck that dies away, a slow
+        swell, a short blip, a gentle swell that holds, a long fade, a quick rise that falls to half, and a slow
+        rise with a long tail.
     */
     constexpr std::array<EnvelopeSettings, SynthProcessor::numEnvelopes> startingEnvelopes { {
         { 0.01f, 0.3f, 0.7f, 0.5f },
         { 0.0f, 0.8f, 0.0f, 0.3f },
-        { 2.0f, 1.0f, 1.0f, 2.0f }
+        { 2.0f, 1.0f, 1.0f, 2.0f },
+        { 0.0f, 0.15f, 0.0f, 0.1f },
+        { 0.5f, 0.5f, 0.8f, 1.0f },
+        { 0.0f, 3.0f, 0.0f, 3.0f },
+        { 0.05f, 0.6f, 0.5f, 0.8f },
+        { 1.0f, 2.0f, 0.6f, 4.0f }
     } };
 
     juce::AudioParameterFloatAttributes asPercentage()
@@ -1822,6 +1829,10 @@ void SynthProcessor::loadState (juce::ValueTree state)
     // in tune. A silent harmonic's phase, which isn't saved, goes back to 0, so nothing from the sound before
     // lingers.
     drawings = {};
+
+    // A save from before there were 8 LFOs gives those it hasn't the waves they start with.
+    for (int i = 0; i < numLfos; ++i)
+        setLfoShape (i, waveform::makePreset (startingLfoPresets[(size_t) i]), startingLfoPresets[(size_t) i]);
 
     for (auto& oscillator : oscillators)
     {

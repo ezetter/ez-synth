@@ -3,7 +3,7 @@
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
 whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
-each note, through two filters, each a low pass, mid pass, high pass or notch. Three LFOs, each with a drawn wave of its own, three
+each note, through two filters, each a low pass, mid pass, high pass or notch. Eight LFOs, each with a drawn wave of its own, eight
 envelopes, which run with each key pressed, and how hard each key is played can move almost any control.
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
@@ -194,6 +194,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### LFOs
 
+- **There are eight LFOs**, LFO 1 to LFO 8. Three of their cards show at a time, beside the oscillators'
+  and the same size. Scroll sideways over them, or drag the thin scroll bar under them, to see the others; once
+  you stop, the row settles with a whole card in each place. The window opens with the LFO being edited in
+  sight. LFOs 4 to 8 start off, each with a wave and rate of its own, ready to switch on, and projects and
+  presets saved when there were three load with them that way, sounding as they did.
 - **An LFO is an oscillator mostly too slow to hear**, whose wave moves controls instead. Its card has a switch,
   a **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 100 Hz,
   fast enough to roughen a sound or growl, and **Loop** and **Once**, which is a menu. Even at 100 Hz an LFO swings the volume,
@@ -244,7 +249,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### Envelopes
 
-- **The three envelopes**, Env 1 to Env 3, sit between the volume and the filters. Each runs separately for
+- **The eight envelopes**, Env 1 to Env 8, sit between the volume and the filters, three at a time. Scroll
+  sideways over them, or drag the thin scroll bar under them, to see the others; they settle with a whole
+  envelope in each place, as the LFOs' cards do. Each runs separately for
   every key pressed, with the usual four stages:
   - **Attack**, 0 to 20 seconds: how long it takes to rise from nothing to its peak.
   - **Decay**, 0 to 20 seconds: how long it then takes to fall to the sustain level.
@@ -281,7 +288,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   on **Mod wheel** to have a MIDI controller's mod wheel move it. Each part has its own **range**, the top
   part a **phase** and **polarity** too, and the mod wheel a **polarity**. All three can move the same
   control at once, their movements adding up.
-  - **Moved by** None, LFO 1 to 3, or Env 1 to 3. A control can be moved by one of these at a time, as well
+  - **Moved by** chooses from a menu: None, LFO 1 to 8, or Env 1 to 8, the LFOs and envelopes each under a
+    heading. An LFO can't be chosen to move its own rate. A control can be moved by one of these at a time, as well
     as by velocity and the mod wheel.
   - **Range** is how far the control moves, from one end of the source to the other, as a share of its
     travel. An LFO's wave swings the control either side of where it's set: at 0 the control is where you
@@ -574,6 +582,8 @@ save pictures of the window showing several waves.
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
+| `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards and the envelopes |
+| `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/TuneSlider.*` | The tune slider, with its intervals marked, and the zoom slider above it |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |

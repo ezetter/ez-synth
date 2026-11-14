@@ -9,12 +9,36 @@ ModulationEditor::Section::Section (juce::StringArray choices, bool withPhase, b
 {
 }
 
+std::vector<Dropdown::Entry> ModulationEditor::makeSourceEntries()
+{
+    std::vector<Dropdown::Entry> entries { { 0, "None" }, { 0, "LFOs", true } };
+
+    for (int lfo = 0; lfo < modulation::numLfos; ++lfo)
+        entries.push_back ({ lfo + 1, modulation::getSourceName (lfo) });
+
+    entries.push_back ({ 0, "Envelopes", true });
+
+    for (int envelope = 0; envelope < modulation::numEnvelopes; ++envelope)
+        entries.push_back ({ modulation::envelopeSource (envelope) + 1, modulation::getSourceName (modulation::envelopeSource (envelope)) });
+
+    return entries;
+}
+
 ModulationEditor::ModulationEditor (SynthProcessor& processor, int targetToEdit)
     : synthProcessor (processor),
       target (targetToEdit)
 {
     setUp (source);
     setUp (velocity);
+
+    // What moves the control is chosen from a menu, in place of buttons, there being so many LFOs and envelopes.
+    source.choice.setVisible (false);
+    sourcePicker.setTitle ("Moved by");
+    sourcePicker.onChange = [this] (int) { apply(); };
+    sourcePicker.setMouseClickGrabsKeyboardFocus (false);
+    sourcePicker.setWantsKeyboardFocus (false);
+    addAndMakeVisible (sourcePicker);
+
     setUp (modWheel);
 
     show (source, synthProcessor.getAssignment (target));
@@ -164,12 +188,15 @@ void ModulationEditor::show (Section& section, const modulation::Assignment& ass
 {
     const auto isVelocity = &section == &velocity;
     const auto isSwitched = &section != &source;
-    section.choice.setChosen (isSwitched ? (assignment.isActive() ? 1 : 0) : assignment.source + 1);
+    if (isSwitched)
+        section.choice.setChosen (assignment.isActive() ? 1 : 0);
+    else
+        sourcePicker.setSelectedId (assignment.source + 1);
 
     // An LFO that would end up moving its own rate can't be chosen.
     if (! isSwitched)
         for (int lfo = 0; lfo < modulation::numLfos; ++lfo)
-            section.choice.setButtonEnabled (lfo + 1, ! synthProcessor.wouldMakeLoop (target, lfo));
+            sourcePicker.setItemEnabled (lfo + 1, ! synthProcessor.wouldMakeLoop (target, lfo));
 
     // A range it hasn't been given yet is the usual one to start from. A trigger's slider sets its threshold, from
     // the midline to start with.
@@ -217,7 +244,7 @@ void ModulationEditor::apply()
         return assignment;
     };
 
-    synthProcessor.setAssignment (target, withSlider ({ source.choice.getChosen() - 1, (float) source.range.getValue(),
+    synthProcessor.setAssignment (target, withSlider ({ sourcePicker.getSelectedId() - 1, (float) source.range.getValue(),
                                                         source.polarity.getChosen() == 1, (float) (source.phase.getValue() / 360.0) },
                                                       source, synthProcessor.getAssignment (target)));
 
@@ -367,7 +394,10 @@ void ModulationEditor::layOut (Section& section, juce::Rectangle<int>& area)
 
     auto row = area.removeFromTop (26);
     section.choiceCaption = row.removeFromLeft (captionWidth);
-    section.choice.setBounds (&section != &source ? row.removeFromLeft (120) : row);
+    if (&section == &source)
+        sourcePicker.setBounds (row.removeFromLeft (180));
+    else
+        section.choice.setBounds (row.removeFromLeft (120));
     area.removeFromTop (8);
 
     row = area.removeFromTop (22);

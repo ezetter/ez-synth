@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ChoiceButtons.h"
+#include "Dropdown.h"
 #include "SynthProcessor.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -35,6 +36,7 @@ private:
 
         const bool hasPhase, hasPolarity;
 
+        /** Whether it's on, for velocity and the mod wheel. */
         ChoiceButtons choice;
         juce::Slider range;
         juce::Slider phase;   // in degrees
@@ -66,7 +68,19 @@ private:
     SynthProcessor& synthProcessor;
     const int target;
 
-    Section source { { "None", "LFO 1", "LFO 2", "LFO 3", "Env 1", "Env 2", "Env 3" }, true, true };
+    Section source { {}, true, true };
+
+    /** Which LFO or envelope moves the control, if any, chosen from a menu: None, then the LFOs, then the envelopes.
+        Each choice's number is its source's, from 0, plus 1, so None is 0.
+    */
+    Dropdown sourcePicker { makeSourceEntries() };
+    static std::vector<Dropdown::Entry> makeSourceEntries();
+
+public:
+    /** The menu of what moves the control. */
+    Dropdown& getSourcePicker() noexcept   { return sourcePicker; }
+
+private:
 
     /** Velocity always moves a control down for softer notes, so it has no polarity, nor any phase. */
     Section velocity { { "Off", "On" }, false, false };

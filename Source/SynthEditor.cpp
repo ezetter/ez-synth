@@ -32,8 +32,10 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         auto& card = lfoCards[i];
         card = std::make_unique<LfoCard> ((int) i, p.parameters);
         card->onSelect = [this, i] { editSource (SynthProcessor::numOscillators + (int) i); };
-        addAndMakeVisible (*card);
+        lfoStrip.addCard (*card);
     }
+
+    addAndMakeVisible (lfoStrip);
 
     grid.onDraw = [this] (const waveform::Shape& shape) { setEditedWave (shape, std::nullopt); };
     grid.onDrawingChange = [this] (const waveform::Drawing& drawing)
@@ -123,8 +125,10 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     for (size_t i = 0; i < envelopePanels.size(); ++i)
     {
         envelopePanels[i] = std::make_unique<EnvelopePanel> (p, (int) i);
-        addAndMakeVisible (*envelopePanels[i]);
+        envelopeStrip.addCard (*envelopePanels[i]);
     }
+
+    addAndMakeVisible (envelopeStrip);
 
     addAndMakeVisible (filterPanel);
     addAndMakeVisible (presetBar);
@@ -277,21 +281,24 @@ void SynthEditor::resized()
     sidePanel = area.removeFromRight (juce::jlimit (400, 460, area.getWidth() * 3 / 10));
     area.removeFromRight (14);
 
-    // The oscillators, then the LFOs, with a wider gap between the two.
+    // The oscillators, then the LFOs, with a wider gap between the two. Three LFOs show at a time, the row of them
+    // scrolling sideways to the others, with its scroll bar in the gap under the cards.
     constexpr auto cardGap = 8;
     constexpr auto groupGap = 18;
-    auto cardRow = area.removeFromTop (108);
-    const auto cardWidth = (cardRow.getWidth() - groupGap - cardGap * (SynthProcessor::numSources - 2)) / SynthProcessor::numSources;
+    constexpr auto cardsShown = SynthProcessor::numOscillators + 3;
+    constexpr auto underCards = 14;
+    auto cardRow = area.removeFromTop (108 + underCards);
+    const auto cardWidth = (cardRow.getWidth() - groupGap - cardGap * (cardsShown - 2)) / cardsShown;
 
-    for (int i = 0; i < SynthProcessor::numSources; ++i)
+    for (auto& card : oscillatorCards)
     {
-        SourceCard& card = SynthProcessor::isLfo (i) ? static_cast<SourceCard&> (*lfoCards[(size_t) (i - SynthProcessor::numOscillators)])
-                                                     : *oscillatorCards[(size_t) i];
-        card.setBounds (cardRow.removeFromLeft (cardWidth));
-        cardRow.removeFromLeft (i == SynthProcessor::numOscillators - 1 ? groupGap : cardGap);
+        card->setBounds (cardRow.removeFromLeft (cardWidth).withHeight (108));
+        cardRow.removeFromLeft (cardGap);
     }
 
-    area.removeFromTop (14);
+    cardRow.removeFromLeft (groupGap - cardGap);
+    lfoStrip.setGaps (cardGap, underCards);
+    lfoStrip.setBounds (cardRow);
 
     // Under the grid, the volume, the envelopes and the filters.
     constexpr auto controlGap = 10;
@@ -301,13 +308,10 @@ void SynthEditor::resized()
     filterPanel.setBounds (controls.removeFromRight (juce::jlimit (280, 380, controls.getWidth() / 3)));
     controls.removeFromRight (controlGap);
 
-    const auto envelopeWidth = (controls.getWidth() - controlGap * (SynthProcessor::numEnvelopes - 1)) / SynthProcessor::numEnvelopes;
-
-    for (auto& panel : envelopePanels)
-    {
-        panel->setBounds (controls.removeFromLeft (envelopeWidth));
-        controls.removeFromLeft (controlGap);
-    }
+    // Three envelopes show at a time, scrolling sideways to the others, with the scroll bar in the gap under them.
+    constexpr auto underEnvelopes = 12;
+    envelopeStrip.setGaps (controlGap, underEnvelopes);
+    envelopeStrip.setBounds (controls.withHeight (controls.getHeight() + underEnvelopes));
 
     auto volume = volumePanel.reduced (10, 10);
     volumeCaption = volume.removeFromTop (16);
@@ -424,6 +428,10 @@ void SynthEditor::refresh()
     const auto lfo = edited - SynthProcessor::numOscillators;
 
     const auto changed = now != shown;
+
+    // The LFO being edited is always in sight, such as when the window opens on it.
+    if (editingLfo && now.editedSource != shown.editedSource)
+        lfoStrip.scrollToShow (lfo);
 
     if (changed)
     {
