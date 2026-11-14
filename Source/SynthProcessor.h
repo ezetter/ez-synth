@@ -641,7 +641,7 @@ private:
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
 
-    // The controls that are triggered rather than moved: the filters' switches, each oscillator's randomizing, and
+    // The controls that are triggered rather than moved: the oscillators' and filters' switches, each oscillator's randomizing, and
     // each of its harmonics' switches.
     std::vector<int> triggerTargets;
 
@@ -654,7 +654,7 @@ private:
     std::array<int, numOscillators> randomizeCounts {};
     juce::Random randomizer;
 
-    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches a filter or harmonic on or off. */
+    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches an oscillator, filter or harmonic on or off. */
     void carryOutTrigger (int target);
 
     // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the

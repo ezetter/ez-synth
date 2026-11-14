@@ -114,7 +114,7 @@ namespace modulation
     bool isParameter (int target);
 
 
-    /** Whether a target sets how loud the sound is: the volume, or an oscillator's switch or level. A note goes on
+    /** Whether a target sets how loud the sound is: the volume, or an oscillator's level. A note goes on
         sounding until an envelope moving one of these has finished.
     */
     bool isLoudness (int target);
@@ -199,7 +199,7 @@ namespace modulation
     float keepInTravel (int target, float position);
 
     /** Whether a target is triggered when its source crosses its threshold, rather than moved along a travel:
-        randomizing an oscillator's harmonics, or switching a filter or a harmonic on or off.
+        randomizing an oscillator's harmonics, or switching an oscillator, a filter or a harmonic on or off.
     */
     bool isTrigger (int target);
 

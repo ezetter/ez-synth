@@ -157,7 +157,7 @@ namespace modulation
     bool isTrigger (int target)
     {
         const auto kind = describe (target).kind;
-        return kind == Kind::randomize || kind == Kind::harmonicSwitch || kind == Kind::filterOn;
+        return kind == Kind::randomize || kind == Kind::harmonicSwitch || kind == Kind::filterOn || kind == Kind::oscillatorOn;
     }
 
     juce::String describeTrigger (int target)
@@ -168,7 +168,7 @@ namespace modulation
         if (info.kind == Kind::harmonicSwitch)
             return "switches " + oscillator + " harmonic " + juce::String (info.harmonic) + " on or off";
 
-        if (info.kind == Kind::filterOn)
+        if (info.kind == Kind::filterOn || info.kind == Kind::oscillatorOn)
             return "switches " + getName (target).upToFirstOccurrenceOf (" switch", false, false) + " on or off";
 
         return "randomizes " + oscillator + "'s harmonics";
@@ -221,7 +221,7 @@ namespace modulation
     bool isLoudness (int target)
     {
         const auto kind = describe (target).kind;
-        return kind == Kind::volume || kind == Kind::oscillatorOn || kind == Kind::oscillatorLevel;
+        return kind == Kind::volume || kind == Kind::oscillatorLevel;
     }
 
     const juce::NormalisableRange<float>& amplitudeRange()

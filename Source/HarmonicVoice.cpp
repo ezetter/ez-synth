@@ -256,10 +256,11 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                                                                     tuning::getModulationScale (oscillator.tuneReach)))
                                   + (float) (getGlidingPitch (i) - noteNumber);
 
-        if (modulate (oscillatorOnTarget (i), oscillator.on ? 1.0f : 0.0f) < 0.5f)
+        // Its switch is triggered, switching it for every voice, rather than moved here.
+        if (! oscillator.on)
             continue;
 
-        const auto shaped = hasEnvelope (volumeTarget) || hasEnvelope (oscillatorOnTarget (i)) || hasEnvelope (oscillatorLevelTarget (i));
+        const auto shaped = hasEnvelope (volumeTarget) || hasEnvelope (oscillatorLevelTarget (i));
         const auto oscillatorLevel = modulate (oscillatorLevelTarget (i), oscillator.level) * (shaped ? 1.0f : keyUpFade);
         const auto numHarmonics = positionToHarmonics (modulate (oscillatorHarmonicsTarget (i),
                                                                  harmonicsToPosition (oscillator.numHarmonics)));

@@ -264,8 +264,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   way. The same goes for every control: a filter's cutoff closes, a harmonic fades away, and an
   oscillator's level fades out. An oscillator's tune is the one exception, as the bottom of its travel is an
   octave down: its release brings it back into tune instead.
-- **An envelope on the loudness sets how long a note lasts.** While an envelope moves the volume, or an
-  oscillator's switch or level, a note goes on sounding until that envelope's release is over, however long.
+- **An envelope on the loudness sets how long a note lasts.** While an envelope moves the volume or an
+  oscillator's level, a note goes on sounding until that envelope's release is over, however long.
   Otherwise a note fades over a quarter of a second once its key is let go. With an envelope on one
   oscillator's level, the others, which no envelope shapes, fade over that quarter of a second too, rather
   than playing on until the envelope's release ends. An envelope on anything else, such as a filter's
@@ -296,9 +296,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
     it was left. It's MIDI controller 1, which most keyboards' mod wheels send, so in a DAW the wheel can be
     recorded and drawn like any other MIDI. To open a filter with the wheel, for instance, set its cutoff
     low and give it the mod wheel with a range of 60% or so.
-  - **A filter's switch** is triggered, as **Randomize** and the harmonics' switches are, rather than moved:
-    each time its LFO, envelope, velocity or mod wheel crosses its **Threshold**, either way, it switches the
-    filter in if it's out, and out if it's in, for every note. A square LFO at 50% switches it every half
+  - **An oscillator's or a filter's switch** is triggered, as **Randomize** and the harmonics' switches are,
+    rather than moved: each time its LFO, envelope, velocity or mod wheel crosses its **Threshold**, either
+    way, it switches the oscillator or filter on if it's off, and off if it's on, for every note. A square LFO at 50% switches it every half
     period.
   - **An LFO's rate** can be moved too: right-click the **Rate** dial on its card. Another LFO, an envelope,
     velocity and the mod wheel can each move it, faster as they rise, or slower if **Inverted**. The dial runs
@@ -357,7 +357,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   is, such as *CC 74*; click **Learn** again before moving anything to cancel, or **Forget** to unlink it.
 - **Almost anything can be linked**: every control that an LFO can move, from the volume and the filters to
   each harmonic's amplitude, tune and phase. A synced LFO's rate dial steps through its cycles a beat.
-  Linked to **Randomize**, or a filter's or a harmonic's switch, a knob triggers it each time it's turned past its
+  Linked to **Randomize**, or an oscillator's, a filter's or a harmonic's switch, a knob triggers it each time it's turned past its
   **Threshold**, either way. The threshold's slider is under the MIDI CC row. It starts at 100%, where only
   turning the knob right up counts, and at 0% only turning it right down does. It's kept with the link.
 - **See what's linked** in the **Modulation** overview, which lists every control linked to a MIDI

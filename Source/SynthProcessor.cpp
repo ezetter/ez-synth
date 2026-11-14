@@ -696,7 +696,7 @@ void SynthProcessor::carryOutTrigger (int target)
     {
         toggleHarmonic (info.oscillator, info.harmonic);
     }
-    else if (info.kind == modulation::Kind::filterOn)
+    else if (info.kind == modulation::Kind::filterOn || info.kind == modulation::Kind::oscillatorOn)
     {
         if (auto* parameter = parameters.getParameter (modulation::getKey (target)))
             parameter->setValueNotifyingHost (parameter->getValue() >= 0.5f ? 0.0f : 1.0f);
@@ -797,7 +797,7 @@ void SynthProcessor::setTargetPosition (int target, float position)
     position = juce::jlimit (0.0f, 1.0f, position);
     const auto info = modulation::describe (target);
 
-    // Randomizing, and a filter's or harmonic's switch, are triggered by the controller crossing its threshold, either way.
+    // Randomizing, and an oscillator's, filter's or harmonic's switch, are triggered by the controller crossing its threshold, either way.
     if (modulation::isTrigger (target))
     {
         const auto threshold = getMidiThreshold (target);

@@ -1089,12 +1089,8 @@ namespace
         synth.setAssignment (modulation::filterCutoffTarget (0), {});
         setFilter (synth, SynthProcessor::filterIds (0), false, 1000.0f);
 
-        setParameter (synth, SynthProcessor::levelId (0), 0.0f);
-        setParameter (synth, SynthProcessor::onId (1), 0.0f);
+        // An oscillator's switch is triggered rather than moved: given to an LFO, it's saved like any other.
         synth.setAssignment (modulation::oscillatorOnTarget (1), { 1, 1.0f, false });
-        signal = play (synth, 69, 0.95, 1.3);
-        check (loudness (signal, 0.1, 0.4) > 0.01 && loudness (signal, 0.6, 0.9) < 1.0e-4,
-               "an LFO on an oscillator's switch switches it on and off");
 
         // Saving and loading the LFOs and what they move.
         waveform::Shape drawn {};
@@ -3709,41 +3705,53 @@ namespace
             countRandomizing (evenly, {}, 2.1);
             check (evenly.isHarmonicPlayed (0, 2), "...and back on at each crossing after, four in 2.1 seconds");
 
-            // A filter's switch is triggered the same way, switching it at each crossing rather than following the LFO.
+            // An oscillator's or a filter's switch is triggered the same way, switching it at each crossing rather
+            // than following the LFO.
+            for (const auto switchTarget : { modulation::oscillatorOnTarget (1), modulation::filterOnTarget (0) })
             {
-                const auto filterSwitch = modulation::filterOnTarget (0);
-                const auto filterOn = [] (SynthProcessor& s)
+                const auto name = modulation::getName (switchTarget).upToFirstOccurrenceOf (" switch", false, false);
+                const auto isOn = [switchTarget] (SynthProcessor& s)
                 {
-                    return s.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() >= 0.5f;
+                    return s.parameters.getRawParameterValue (modulation::getKey (switchTarget))->load() >= 0.5f;
                 };
 
-                check (modulation::isTrigger (filterSwitch) && modulation::describeTrigger (filterSwitch) == "switches Filter 1 on or off",
-                       "a filter's switch is a control that's triggered");
+                check (modulation::isTrigger (switchTarget) && modulation::describeTrigger (switchTarget) == "switches " + name + " on or off",
+                       name + "'s switch is a control that's triggered");
 
-                SynthProcessor filtered;
-                setLfo (filtered, 0, 1.0f, false, waveform::Preset::square);
-                filtered.setAssignment (filterSwitch, { 0, 1.0f, false, 0.0f, 0.5f });
-                const auto wasOn = filterOn (filtered);
-                countRandomizing (filtered, {}, 1.6);
-                const auto afterThree = filterOn (filtered);
+                SynthProcessor switched;
+                setLfo (switched, 0, 1.0f, false, waveform::Preset::square);
+                switched.setAssignment (switchTarget, { 0, 1.0f, false, 0.0f, 0.5f });
+                const auto wasOn = isOn (switched);
+                countRandomizing (switched, {}, 1.6);
+                const auto afterThree = isOn (switched);
 
-                SynthProcessor filteredEvenly;
-                setLfo (filteredEvenly, 0, 1.0f, false, waveform::Preset::square);
-                filteredEvenly.setAssignment (filterSwitch, { 0, 1.0f, false, 0.0f, 0.5f });
-                countRandomizing (filteredEvenly, {}, 2.1);
-                check (afterThree != wasOn && filterOn (filteredEvenly) == wasOn,
-                       "an LFO switches a filter each time it crosses its threshold: three times in 1.6 seconds, four in 2.1");
+                SynthProcessor switchedEvenly;
+                setLfo (switchedEvenly, 0, 1.0f, false, waveform::Preset::square);
+                switchedEvenly.setAssignment (switchTarget, { 0, 1.0f, false, 0.0f, 0.5f });
+                countRandomizing (switchedEvenly, {}, 2.1);
+                check (afterThree != wasOn && isOn (switchedEvenly) == wasOn,
+                       "an LFO switches " + name + " each time it crosses its threshold: three times in 1.6 seconds, four in 2.1");
 
                 // A MIDI knob, at the threshold MIDI links start with, switches it only when it's turned right up.
-                filtered.setAssignment (filterSwitch, {});
-                filtered.setMidiController (filterSwitch, 40);
-                const auto before = filterOn (filtered);
-                moveControllers (filtered, { { 40, 10 } });
-                moveControllers (filtered, { { 40, 100 } });
-                const auto partWay = filterOn (filtered);
-                moveControllers (filtered, { { 40, 127 } });
-                check (partWay == before && filterOn (filtered) != before,
-                       "a MIDI controller switches a filter when it's turned right up, not part way");
+                switched.setAssignment (switchTarget, {});
+                switched.setMidiController (switchTarget, 40);
+                const auto before = isOn (switched);
+                moveControllers (switched, { { 40, 10 } });
+                moveControllers (switched, { { 40, 100 } });
+                const auto partWay = isOn (switched);
+                moveControllers (switched, { { 40, 127 } });
+                check (partWay == before && isOn (switched) != before,
+                       "a MIDI controller switches " + name + " when it's turned right up, not part way");
+            }
+
+            // Switched off by its trigger, an oscillator isn't heard.
+            {
+                SynthProcessor quiet;
+                setPreset (quiet, 0, waveform::Preset::sine);
+                setParameter (quiet, SynthProcessor::onId (0), 0.0f);
+                setParameter (quiet, SynthProcessor::onId (1), 0.0f);
+                setParameter (quiet, SynthProcessor::onId (2), 0.0f);
+                check (loudness (play (quiet, 69, 0.4, 0.6), 0.1, 0.35) < 1.0e-6, "an oscillator switched off isn't heard");
             }
 
             // MIDI learn: a knob turned past halfway switches it.
