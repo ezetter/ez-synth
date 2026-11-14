@@ -195,8 +195,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### LFOs
 
 - **There are eight LFOs**, LFO 1 to LFO 8. Three of their cards show at a time, beside the oscillators'
-  and the same size. Scroll sideways over them, or drag the thin scroll bar under them, to see the others; once
-  you stop, the row settles with a whole card in each place. The window opens with the LFO being edited in
+  and the same size. Swipe sideways over them with two fingers on a trackpad, turn a mouse wheel, or drag the
+  thin scroll bar under them, to see the others. A swipe moves the row with your fingers, even over a dial, and
+  once it and its glide have finished, the row eases to a whole card in each place; a mouse wheel's click moves
+  it a card at a time. The window opens with the LFO being edited in
   sight. LFOs 4 to 8 start off, each with a wave and rate of its own, ready to switch on, and projects and
   presets saved when there were three load with them that way, sounding as they did.
 - **An LFO is an oscillator mostly too slow to hear**, whose wave moves controls instead. Its card has a switch,
@@ -250,8 +252,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ### Envelopes
 
 - **The eight envelopes**, Env 1 to Env 8, sit between the volume and the filters, three at a time. Scroll
-  sideways over them, or drag the thin scroll bar under them, to see the others; they settle with a whole
-  envelope in each place, as the LFOs' cards do. Each runs separately for
+  sideways over them, or drag the thin scroll bar under them, to see the others; they move and settle as the
+  LFOs' cards do. Each runs separately for
   every key pressed, with the usual four stages:
   - **Attack**, 0 to 20 seconds: how long it takes to rise from nothing to its peak.
   - **Decay**, 0 to 20 seconds: how long it then takes to fall to the sustain level.

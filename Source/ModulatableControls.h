@@ -60,6 +60,9 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
+    /** A dial leaves a mostly sideways swipe to what it's in, such as a row of cards that scrolls sideways. */
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+
 private:
     bool alternateClick = false;
     double valueOnMouseDown = 0.0;

@@ -152,3 +152,11 @@ void ModulatableTextButton::mouseUp (const juce::MouseEvent& e)
     if (! alternateClick)
         TextButton::mouseUp (e);
 }
+
+void ModulatableSlider::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+    if (isRotary() && std::abs (wheel.deltaX) > std::abs (wheel.deltaY))
+        juce::Component::mouseWheelMove (e, wheel);
+    else
+        juce::Slider::mouseWheelMove (e, wheel);
+}

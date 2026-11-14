@@ -3634,6 +3634,75 @@ namespace
             check (envelopes.getFirstShown() == 2, "the envelopes scroll to show one out of sight");
             synthEditor.scrollToEnvelope (3);
             check (envelopes.getFirstShown() == 2, "...and not for one already shown");
+
+            // A trackpad's swipe moves the row with the fingers, a little at a time, without snapping as it goes,
+            // and once it's over the row settles on the nearest whole card.
+            synthEditor.scrollToLfo (0);
+            auto& strip = const_cast<CardStrip&> (lfos);
+            juce::MouseWheelDetails swipe {};
+            swipe.deltaX = -0.04f;
+            swipe.isSmooth = true;
+            auto steady = true;
+
+            for (int i = 0; i < 12; ++i)
+            {
+                const auto before = strip.getScrollPosition();
+                strip.scrollByWheel (swipe);
+                steady = steady && strip.getScrollPosition() > before;
+            }
+
+            const auto swiped = strip.getScrollPosition();
+            check (steady && swiped % (strip.getCardWidth() + 8) != 0 && strip.isSettling(),
+                   "a swipe moves the LFOs' row steadily along with it, between cards");
+
+            strip.settleNow();
+            check (strip.getScrollPosition() == strip.getFirstShown() * (strip.getCardWidth() + 8) && strip.getFirstShown() > 0
+                     && ! strip.isSettling(),
+                   "...and once it's over, the row settles on a whole card");
+
+            // An up-and-down swipe moves it too, there being nothing up and down to scroll, and it stops at the ends.
+            swipe.deltaX = 0.0f;
+            swipe.deltaY = -5.0f;
+            strip.scrollByWheel (swipe);
+            strip.settleNow();
+            check (strip.getFirstShown() == 5, "a long swipe stops at the last LFOs");
+
+            // A mouse wheel's click moves a card at a time.
+            juce::MouseWheelDetails click {};
+            click.deltaY = 0.1f;
+            strip.scrollByWheel (click);
+            strip.settleNow();
+            check (strip.getFirstShown() == 4, "a mouse wheel's click moves the row back a card");
+
+            // A sideways swipe over a card's dial scrolls the row, rather than turning the dial.
+            ModulatableSlider* dial = nullptr;
+            std::function<void (juce::Component&)> findDial = [&] (juce::Component& c)
+            {
+                if (auto* found = dynamic_cast<ModulatableSlider*> (&c); found != nullptr && dial == nullptr && c.findParentComponentOfClass<LfoCard>() != nullptr)
+                    dial = found;
+
+                for (auto* child : c.getChildren())
+                    findDial (*child);
+            };
+            findDial (*editor);
+
+            if (dial != nullptr)
+            {
+                const auto value = dial->getValue();
+                const auto at = strip.getScrollPosition();
+                const juce::MouseEvent event (juce::Desktop::getInstance().getMainMouseSource(), {}, {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                              dial, dial, juce::Time::getCurrentTime(), {}, juce::Time::getCurrentTime(), 1, false);
+                swipe.deltaX = 0.05f;
+                swipe.deltaY = 0.0f;
+                dial->mouseWheelMove (event, swipe);
+                check (juce::exactlyEqual (dial->getValue(), value) && strip.getScrollPosition() < at,
+                       "a sideways swipe over an LFO's dial scrolls the row, and leaves the dial");
+            }
+            else
+            {
+                check (false, "an LFO's dial is shown");
+            }
+
             synth.editorBeingDeleted (editor.get());
         }
     }
