@@ -489,6 +489,11 @@ samples of one instrument, one for each part of the keyboard.
 - **Each note plays its key's pitch set** from start to end, even if you change pitch sets while it sounds.
   Looping LFOs run in each pitch set at its own rates. Triggers, such as randomizing on an LFO's crossing,
   follow only the active pitch set.
+- **The moving displays follow the keys you play.** Where the LFOs and envelopes are, the waves the LFOs play,
+  where controls are moved to, and the harmonics as played show the pitch set of the newest note still sounding,
+  whichever is active, so playing a key of another pitch set shows how it plays. With nothing sounding they
+  show the active one. A control another pitch set has set differently shows where that pitch set has it, as
+  a moved control does.
 - The pitch sets are saved with the sound, in presets and a host's project, and undo covers them. A sound
   with only the default saves no pitch sets, so presets from before them load as they always did.
 

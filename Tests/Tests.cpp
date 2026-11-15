@@ -4073,6 +4073,75 @@ namespace
             check (described.getActivePitchSet() == 3, "...and writing it out leaves the active pitch set active");
         }
 
+        // The moving displays show the pitch set of the keys being played, the newest note's when they're in several,
+        // and the active one's once nothing's sounding.
+        {
+            SynthProcessor shown;
+            setPreset (shown, 0, waveform::Preset::sine);
+            shown.prepareToPlay (sampleRate, blockSize);
+            const auto octave = shown.addPitchSet ({ 60, 71 });
+            shown.setActivePitchSet (octave);
+            setPreset (shown, 0, waveform::Preset::square);
+            setNumHarmonics (shown, 0, 5);
+            setParameter (shown, SynthProcessor::tuneId (0), 12.0f);
+
+            // An LFO on the octave's volume only.
+            setParameter (shown, SynthProcessor::lfoOnId (0), 1.0f);
+            shown.setAssignment (modulation::volumeTarget, { 0, 0.5f });
+            shown.setActivePitchSet (0);
+
+            const auto run = [&shown] (std::initializer_list<int> on, std::initializer_list<int> off)
+            {
+                juce::MidiBuffer midi;
+
+                for (const auto note : off)
+                    midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+
+                for (const auto note : on)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+
+                for (int block = 0; block < 4; ++block)
+                {
+                    juce::AudioBuffer<float> buffer (2, blockSize);
+                    shown.processBlock (buffer, midi);
+                    midi.clear();
+                }
+            };
+
+            const auto hasThird = [&shown]
+            {
+                const auto wave = shown.getLiveWave (0);
+                return wave.moved && std::any_of (wave.harmonics.begin(), wave.harmonics.end(),
+                                                  [] (const waveform::Partial& p) { return p.harmonic == 3 && p.amplitude > 0.3f; });
+            };
+
+            check (shown.getShownPitchSet() == 0 && ! shown.getLiveWave (0).moved && ! shown.getLivePosition (modulation::volumeTarget).has_value(),
+                   "with nothing playing, the displays show the active pitch set as it's set");
+
+            run ({ 64 }, {});
+            check (shown.getShownPitchSet() == octave && hasThird() && shown.getLivePosition (modulation::volumeTarget).has_value()
+                     && shown.getLivePosition (modulation::oscillatorTuneTarget (0)).has_value(),
+                   "playing a key of another pitch set shows its harmonics, its tune and its LFO moving its volume");
+
+            run ({ 48 }, {});
+            check (shown.getShownPitchSet() == 0 && ! hasThird(), "...and a newer key of the default's shows the default's");
+
+            run ({}, { 48 });
+            run ({}, {});
+
+            for (int i = 0; i < 40; ++i)
+                run ({}, {});
+
+            check (shown.getShownPitchSet() == octave, "...back to the other's while only its key still sounds");
+
+            run ({}, { 64 });
+
+            for (int i = 0; i < 40; ++i)
+                run ({}, {});
+
+            check (shown.getShownPitchSet() == 0 && ! shown.getLiveWave (0).moved, "...and the active one's once nothing's sounding");
+        }
+
         // In the window, a new pitch set's range is two keys pressed, and the button names the active one.
         {
             SynthProcessor windowed;

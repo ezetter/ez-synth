@@ -486,6 +486,12 @@ public:
     /** Goes up whenever a pitch set is added, taken away, given a range or made active. */
     int getPitchSetVersion() const noexcept   { return pitchSetVersion; }
 
+    /** The pitch set the moving displays show: the newest note's still sounding, or the active one if none is. Where the
+        LFOs and envelopes are, the waves LFOs play, where controls are moved to and the harmonics as played are all
+        that pitch set's, so playing keys of one pitch set shows how it plays, whichever is active.
+    */
+    int getShownPitchSet() const;
+
     /** Goes up with every key pressed, from anywhere, so the window can take the keys pressed to set a range. */
     int getNoteOnCount() const noexcept   { return noteOnCount.load(); }
 
@@ -768,6 +774,19 @@ private:
 
     /** Copies every parameter, as the host has it, into the active pitch set's slot. */
     void copyParametersToSlot();
+
+    // The slot of the pitch set the moving displays show, which the audio thread sets after each block, and its
+    // parameters, waves and modulation, as the message thread reads them for the displays.
+    std::atomic<int> shownSlot { 0 };
+    size_t getShownSlot() const noexcept   { return (size_t) shownSlot.load(); }
+    const Shared& getShownShared() const noexcept   { return shared[getShownSlot()]; }
+    const ParameterSet& getShownParameters() const noexcept   { return slotParameters[getShownSlot()]; }
+    bool isShownActive() const noexcept   { return shownSlot.load() == activeSlot.load(); }
+    int getShownLfoMode (int lfo) const noexcept;
+    bool isShownLfoRandom (int lfo) const noexcept;
+
+    /** Where a control is set in the pitch set shown, from 0 to 1 along its travel. */
+    float getShownPosition (int target) const;
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
 

@@ -600,8 +600,9 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         if (slotUsed[(size_t) slot])
             updatePatch (slot);
 
-    const auto& patch = activePatch();
-    const auto shownSlot = (size_t) activeSlot.load();
+    // The LFOs are shown as the pitch set shown plays them: the newest note's, as of the last block, or the active one.
+    const auto shown = getShownSlot();
+    const auto& patch = patches.sets[shown];
 
     // How far through its periods an LFO that starts with each key is, from the last key pressed.
     for (size_t i = 0; i < periodsSinceLastNote.size(); ++i)
@@ -637,7 +638,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
         const auto& lfo = patch.lfos[i];
-        lfoCyclesShown[i] = lfoCycles[shownSlot][i];
+        lfoCyclesShown[i] = lfoCycles[shown][i];
 
         // An LFO whose rate each note moves for itself is shown as the newest note plays it.
         if (patch.isLfoRateMovedByNote (i) && noteSounding)
@@ -650,7 +651,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
         else if (! lfo.fromKey)
         {
-            lfoProgress[i] = lfoPhases[shownSlot][i];
+            lfoProgress[i] = lfoPhases[shown][i];
         }
         else if (lastNoteOnSample >= 0)
         {
@@ -930,7 +931,12 @@ void SynthProcessor::shareNewestNote()
     noteSounding = newest != nullptr;
 
     if (newest == nullptr)
+    {
+        shownSlot = activeSlot.load();
         return;
+    }
+
+    shownSlot = (int) (&newest->getPatch() - patches.sets.data());
 
     newestVelocity = newest->getVelocity();
 
@@ -1334,8 +1340,9 @@ int SynthProcessor::getLfoTimes (int lfo) const noexcept
 
 bool SynthProcessor::isLfoOnLastTime (int lfo) const noexcept
 {
-    const auto times = getLfoTimes (lfo);
-    return isLfoFromKey (lfo) && times > 0 && getLfoProgress (lfo).value_or (0.0) >= (double) (times - 1);
+    const auto mode = getShownLfoMode (lfo);
+    const auto times = modulation::getLfoTimes (mode);
+    return mode != modulation::lfoLoops && times > 0 && getLfoProgress (lfo).value_or (0.0) >= (double) (times - 1);
 }
 
 std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
@@ -1344,18 +1351,42 @@ std::optional<double> SynthProcessor::getLfoProgress (int lfo) const noexcept
     return progress >= 0.0 ? std::optional (progress) : std::nullopt;
 }
 
+int SynthProcessor::getShownPitchSet() const
+{
+    for (size_t i = 0; i < pitchSets.size(); ++i)
+        if (pitchSets[i].slot == shownSlot.load())
+            return (int) i;
+
+    return activePitchSet;
+}
+
+int SynthProcessor::getShownLfoMode (int lfo) const noexcept
+{
+    return juce::jlimit (0, modulation::lfoForever, juce::roundToInt (getShownParameters().lfos[(size_t) lfo].mode->load()));
+}
+
+bool SynthProcessor::isShownLfoRandom (int lfo) const noexcept
+{
+    return getShownParameters().lfos[(size_t) lfo].random->load() >= 0.5f;
+}
+
 float SynthProcessor::getLfoValue (int lfo, float phase) const
 {
+    // As the pitch set shown plays it.
     const auto progress = getLfoProgress (lfo).value_or (0.0) - phase;
+    const auto mode = getShownLfoMode (lfo);
+    const auto fromKey = mode != modulation::lfoLoops;
+    const auto times = modulation::getLfoTimes (mode);
+    const auto& shown = getShownShared();
 
-    if (! isLfoRandom (lfo))
-        return modulation::lfoValue (getLfoShape (lfo), progress, isLfoFromKey (lfo), getLfoTimes (lfo));
+    if (! isShownLfoRandom (lfo))
+        return modulation::lfoValue (shown.lfoShapes[(size_t) lfo], progress, fromKey, times);
 
     const auto random = getRandomCycle (lfo);
-    const auto& drawing = getDrawing (numOscillators + lfo);
+    const auto& drawing = shown.lfoDrawings[(size_t) lfo];
 
-    if (isLfoFromKey (lfo))
-        return randomwave::fromKeyValueAt (random.seed, progress, drawing, getLfoTimes (lfo));
+    if (fromKey)
+        return randomwave::fromKeyValueAt (random.seed, progress, drawing, times);
 
     return randomwave::valueAt (random.seed, (double) random.cycle + progress, drawing);
 }
@@ -1367,10 +1398,10 @@ bool SynthProcessor::isLfoRandom (int lfo) const noexcept
 
 SynthProcessor::RandomCycle SynthProcessor::getRandomCycle (int lfo) const noexcept
 {
-    if (isLfoFromKey (lfo))
+    if (const auto mode = getShownLfoMode (lfo); mode != modulation::lfoLoops)
     {
         // The cycle the newest note is in, staying on the last once an LFO that plays a number of times has finished.
-        const auto times = getLfoTimes (lfo);
+        const auto times = modulation::getLfoTimes (mode);
         auto cycle = (std::int64_t) std::floor (std::max (0.0, getLfoProgress (lfo).value_or (0.0)));
 
         if (times > 0)
@@ -1384,20 +1415,23 @@ SynthProcessor::RandomCycle SynthProcessor::getRandomCycle (int lfo) const noexc
 
 waveform::Shape SynthProcessor::getPlayedLfoShape (int lfo) const
 {
-    if (! isLfoRandom (lfo))
-        return getLfoShape (lfo);
+    // As the pitch set shown plays it.
+    const auto& shown = getShownShared();
+
+    if (! isShownLfoRandom (lfo))
+        return shown.lfoShapes[(size_t) lfo];
 
     const auto random = getRandomCycle (lfo);
-    return randomwave::getCycle (random.seed, random.cycle, getDrawing (numOscillators + lfo));
+    return randomwave::getCycle (random.seed, random.cycle, shown.lfoDrawings[(size_t) lfo]);
 }
 
 std::optional<float> SynthProcessor::getPlayedLfoEnd (int lfo) const
 {
-    if (! isLfoRandom (lfo) || isLfoOnLastTime (lfo))
+    if (! isShownLfoRandom (lfo) || isLfoOnLastTime (lfo))
         return std::nullopt;
 
     const auto random = getRandomCycle (lfo);
-    return randomwave::valueAt (random.seed, (double) random.cycle + 1.0, getDrawing (numOscillators + lfo));
+    return randomwave::valueAt (random.seed, (double) random.cycle + 1.0, getShownShared().lfoDrawings[(size_t) lfo]);
 }
 
 void SynthProcessor::setDrawing (int source, const waveform::Drawing& drawing)
@@ -1517,7 +1551,7 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
         return std::nullopt;
     }
 
-    if (isLfoOn (source) && getLfoProgress (source).has_value())
+    if (getShownParameters().lfos[(size_t) source].on->load() >= 0.5f && getLfoProgress (source).has_value())
         return getLfoValue (source, phase);
 
     return std::nullopt;
@@ -1525,21 +1559,26 @@ std::optional<float> SynthProcessor::getSourceValue (int source, float phase) co
 
 std::optional<float> SynthProcessor::getLivePosition (int target) const
 {
+    // As the pitch set shown plays it, which may not be the active one.
+    const auto& shown = getShownShared();
+    const auto& settings = getShownParameters();
+
     // A synced LFO's rate is the tempo's, which nothing moves, and randomizing is triggered, not moved.
-    if (const auto info = modulation::describe (target); (info.kind == modulation::Kind::lfoRate && isLfoSynced (info.lfo))
+    if (const auto info = modulation::describe (target); (info.kind == modulation::Kind::lfoRate && settings.lfos[(size_t) info.lfo].sync->load() >= 0.5f)
                                                            || modulation::isTrigger (target))
         return std::nullopt;
 
     // Moved as the voices move it (HarmonicVoice::getTargets): by velocity and the mod wheel, then by the LFO or envelope,
-    // each across less of an oscillator's tune when its slider's zoomed in.
-    auto position = getPosition (target);
-    auto moved = false;
+    // each across less of an oscillator's tune when its slider's zoomed in. Where another pitch set than the active
+    // one is shown, a control set differently there counts as moved, to where that pitch set has it.
+    auto position = getShownPosition (target);
+    auto moved = ! isShownActive() && std::abs (position - getPosition (target)) > 1.0e-4f;
     const auto info = modulation::describe (target);
     const auto scale = info.kind == modulation::Kind::oscillatorTune
-                           ? tuning::getModulationScale (tuning::zoomToReach (parameters.getRawParameterValue (tuneZoomId (info.oscillator))->load()))
+                           ? tuning::getModulationScale (tuning::zoomToReach (settings.oscillators[(size_t) info.oscillator].tuneZoom->load()))
                            : 1.0f;
 
-    if (const auto& byVelocity = velocityAssignments[(size_t) target]; byVelocity.isActive())
+    if (const auto& byVelocity = shown.velocityAssignments[(size_t) target]; byVelocity.isActive())
     {
         if (const auto velocity = getSourceValue (modulation::velocitySource))
         {
@@ -1548,13 +1587,13 @@ std::optional<float> SynthProcessor::getLivePosition (int target) const
         }
     }
 
-    if (const auto& byModWheel = modWheelAssignments[(size_t) target]; byModWheel.isActive())
+    if (const auto& byModWheel = shown.modWheelAssignments[(size_t) target]; byModWheel.isActive())
     {
         position += scale * byModWheel.offset (modWheelShown.load());
         moved = true;
     }
 
-    if (const auto& assignment = assignments[(size_t) target]; assignment.isActive())
+    if (const auto& assignment = shown.assignments[(size_t) target]; assignment.isActive())
     {
         if (modulation::isEnvelope (assignment.source))
         {
@@ -1584,9 +1623,13 @@ bool SynthProcessor::LiveWave::operator== (const LiveWave& other) const noexcept
 
 SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
 {
-    // Moved as the voices move them (HarmonicVoice::getTargets).
+    // Moved as the voices move them (HarmonicVoice::getTargets), in the pitch set shown. Another pitch set than the
+    // active one counts as moved, as its harmonics aren't the ones the window shows set.
+    const auto& shown = getShownShared();
+    const auto o = (size_t) oscillator;
     LiveWave wave;
-    auto numHarmonics = getNumHarmonics (oscillator);
+    wave.moved = ! isShownActive();
+    auto numHarmonics = juce::roundToInt (getShownParameters().oscillators[o].numHarmonics->load());
 
     if (const auto moved = getLivePosition (modulation::oscillatorHarmonicsTarget (oscillator)))
     {
@@ -1594,17 +1637,19 @@ SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
         wave.moved = true;
     }
 
-    const auto& harmonics = getDecomposition (oscillator).harmonics;
-    const waveform::HarmonicSet switches (oscillators[(size_t) oscillator].switches);
+    const auto& harmonics = shown.decompositions[o].harmonics;
+    const auto& switches = shown.switches[o];
 
     for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
     {
         if (! switches.plays (harmonic, numHarmonics))
             continue;
 
-        auto partial = harmonics[(size_t) harmonic - 1];
-        partial.tune = getHarmonicTune (oscillator, harmonic);
-        partial.phase = getHarmonicPhase (oscillator, harmonic);
+        const auto k = (size_t) harmonic - 1;
+        auto partial = harmonics[k];
+        partial.tune = harmonic > 1 ? shown.tunes[o][k] : 0.0f;
+        const auto phase = partial.amplitude > 0.0f ? partial.phase : shown.phases[o][k];
+        partial.phase = phase - juce::MathConstants<float>::twoPi * std::floor (phase / juce::MathConstants<float>::twoPi);
 
         if (const auto moved = getLivePosition (modulation::harmonicPhaseTarget (oscillator, harmonic)))
         {
@@ -1631,6 +1676,38 @@ SynthProcessor::LiveWave SynthProcessor::getLiveWave (int oscillator) const
     }
 
     return wave;
+}
+
+float SynthProcessor::getShownPosition (int target) const
+{
+    const auto slot = getShownSlot();
+
+    if (modulation::isParameter (target))
+    {
+        const auto index = (size_t) parameterIndices.at (modulation::getKey (target));
+        return allParameters[index]->convertTo0to1 (slotValues[slot][index].load());
+    }
+
+    if (modulation::isTrigger (target))
+        return 0.0f;
+
+    const auto info = modulation::describe (target);
+    const auto& shown = shared[slot];
+    const auto o = (size_t) info.oscillator;
+    const auto k = (size_t) info.harmonic - 1;
+
+    if (info.kind == modulation::Kind::harmonicTune)
+        return shown.tunes[o][k] / (2.0f * waveform::furthestTune) + 0.5f;
+
+    if (info.kind == modulation::Kind::harmonicPhase)
+    {
+        const auto& harmonic = shown.decompositions[o].harmonics[k];
+        const auto phase = harmonic.amplitude > 0.0f ? harmonic.phase : shown.phases[o][k];
+        const auto turn = juce::MathConstants<float>::twoPi;
+        return (phase - turn * std::floor (phase / turn)) / turn;
+    }
+
+    return modulation::amplitudeRange().convertTo0to1 (shown.decompositions[o].harmonics[k].amplitude);
 }
 
 float SynthProcessor::getPosition (int target) const
