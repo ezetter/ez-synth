@@ -487,13 +487,16 @@ samples of one instrument, one for each part of the keyboard.
   Once there are pitch sets besides the default, the header's button is named after the active one, in its
   colour, and the keys it plays are marked along their foot on the keyboard.
 - **Each note plays its key's pitch set** from start to end, even if you change pitch sets while it sounds.
-  Looping LFOs run in each pitch set at its own rates. Triggers, such as randomizing on an LFO's crossing,
-  follow only the active pitch set.
+  Looping LFOs run in each pitch set at its own rates.
 - **The moving displays follow the keys you play.** Where the LFOs and envelopes are, the waves the LFOs play,
   where controls are moved to, and the harmonics as played show the pitch set of the newest note still sounding,
   whichever is active, so playing a key of another pitch set shows how it plays. With nothing sounding they
   show the active one. A control another pitch set has set differently shows where that pitch set has it, as
   a moved control does.
+- **Triggers follow the keys you play too.** An LFO, envelope, velocity or the mod wheel crossing a threshold
+  randomizes, or switches on or off, in the pitch set of the newest note still sounding, changing that pitch
+  set's sound even while another is active; it's there when you make it active. A MIDI controller linked to a
+  triggered control acts on the active pitch set, as it does on any control.
 - The pitch sets are saved with the sound, in presets and a host's project, and undo covers them. A sound
   with only the default saves no pitch sets, so presets from before them load as they always did.
 

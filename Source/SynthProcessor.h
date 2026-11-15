@@ -701,6 +701,19 @@ private:
     void updatePatch (int slot);
 
     std::array<Oscillator, numOscillators> oscillators;
+
+    /** Each pitch set's oscillators, by slot, kept while another pitch set is active, so triggers can change them. */
+    std::vector<std::array<Oscillator, numOscillators>> slotOscillators = std::vector<std::array<Oscillator, numOscillators>> ((size_t) maxPitchSets);
+
+    /** Sets an oscillator's wave, remembering the phase of each harmonic it has, and gives it random harmonics. */
+    static void applyShape (Oscillator&, const waveform::Shape&, std::optional<waveform::Preset>);
+    static void randomizeOscillator (Oscillator&, juce::Random&);
+
+    /** Puts an oscillator's wave, and its harmonics' tunes and switches, into its WAVE in a saved sound. */
+    static void writeOscillator (juce::ValueTree& wave, const Oscillator&);
+
+    /** Hands a slot's oscillators to the audio thread, leaving the rest of what it shares as it is. */
+    void shareOscillators (size_t slot, const std::array<Oscillator, numOscillators>&);
     std::array<Lfo, numLfos> lfos;
     modulation::Assignments assignments, velocityAssignments, modWheelAssignments;
     int shapeVersion = 0;
@@ -803,8 +816,15 @@ private:
     std::array<int, numOscillators> randomizeCounts {};
     juce::Random randomizer;
 
-    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches an oscillator, filter or harmonic on or off. */
-    void carryOutTrigger (int target);
+    /** Does what a trigger does: randomizes an oscillator's harmonics, or switches an oscillator, filter or harmonic on
+        or off, in the pitch set of the slot given, which asked for it: the active one's controls, or another's sound
+        as it's kept.
+    */
+    void carryOutTrigger (int target, int slot);
+
+    // The slot of the pitch set whose modulation last asked for each trigger, and whose triggers are being watched.
+    std::array<std::atomic<int>, modulation::numTargets> triggerSlots {};
+    int watchedSlot = 0;
 
     // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the
     // first moved while a control's being learned; the message thread links and sets the controls.

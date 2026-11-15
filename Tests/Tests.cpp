@@ -4079,13 +4079,13 @@ namespace
             SynthProcessor shown;
             setPreset (shown, 0, waveform::Preset::sine);
             shown.prepareToPlay (sampleRate, blockSize);
-            const auto octave = shown.addPitchSet ({ 60, 71 });
-            shown.setActivePitchSet (octave);
+            const auto octaveSet = shown.addPitchSet ({ 60, 71 });
+            shown.setActivePitchSet (octaveSet);
             setPreset (shown, 0, waveform::Preset::square);
             setNumHarmonics (shown, 0, 5);
             setParameter (shown, SynthProcessor::tuneId (0), 12.0f);
 
-            // An LFO on the octave's volume only.
+            // An LFO on the octaveSet's volume only.
             setParameter (shown, SynthProcessor::lfoOnId (0), 1.0f);
             shown.setAssignment (modulation::volumeTarget, { 0, 0.5f });
             shown.setActivePitchSet (0);
@@ -4119,7 +4119,7 @@ namespace
                    "with nothing playing, the displays show the active pitch set as it's set");
 
             run ({ 64 }, {});
-            check (shown.getShownPitchSet() == octave && hasThird() && shown.getLivePosition (modulation::volumeTarget).has_value()
+            check (shown.getShownPitchSet() == octaveSet && hasThird() && shown.getLivePosition (modulation::volumeTarget).has_value()
                      && shown.getLivePosition (modulation::oscillatorTuneTarget (0)).has_value(),
                    "playing a key of another pitch set shows its harmonics, its tune and its LFO moving its volume");
 
@@ -4132,7 +4132,7 @@ namespace
             for (int i = 0; i < 40; ++i)
                 run ({}, {});
 
-            check (shown.getShownPitchSet() == octave, "...back to the other's while only its key still sounds");
+            check (shown.getShownPitchSet() == octaveSet, "...back to the other's while only its key still sounds");
 
             run ({}, { 64 });
 
@@ -4140,6 +4140,49 @@ namespace
                 run ({}, {});
 
             check (shown.getShownPitchSet() == 0 && ! shown.getLiveWave (0).moved, "...and the active one's once nothing's sounding");
+        }
+
+        // Triggers follow the pitch set played too: an envelope in one pitch set switching on its filter and
+        // randomizing its oscillator does so in that pitch set, though another's active, and leaves the others alone.
+        {
+            SynthProcessor triggered;
+            setPreset (triggered, 0, waveform::Preset::sine);
+            triggered.prepareToPlay (sampleRate, blockSize);
+            const auto octaveSet = triggered.addPitchSet ({ 60, 71 });
+            triggered.setActivePitchSet (octaveSet);
+            triggered.setAssignment (modulation::filterOnTarget (0), { modulation::numLfos, 1.0f, false, 0.0f, 0.5f });
+            triggered.setAssignment (modulation::randomizeTarget (0), { modulation::numLfos, 1.0f, false, 0.0f, 0.5f });
+            triggered.setActivePitchSet (0);
+
+            const auto playKey = [&triggered] (int note)
+            {
+                juce::MidiBuffer midi;
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+
+                for (int block = 0; block < 20; ++block)
+                {
+                    juce::AudioBuffer<float> buffer (2, blockSize);
+                    triggered.processBlock (buffer, midi);
+                    midi.clear();
+                }
+
+                triggered.randomizeAsTriggered();
+            };
+
+            const auto filterOn = [&triggered] { return triggered.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() >= 0.5f; };
+
+            playKey (48);
+            check (triggered.getRandomizeCount (0) == 0 && ! filterOn(), "a key of the default, whose modulation triggers nothing, triggers nothing");
+
+            playKey (64);
+            check (triggered.getRandomizeCount (0) == 1 && ! filterOn() && triggered.getPreset (0) == waveform::Preset::sine
+                     && triggered.getActivePitchSet() == 0,
+                   "a key of another pitch set triggers its modulation, leaving the active default as it was");
+
+            // What it changed is there when it's made active.
+            triggered.setActivePitchSet (octaveSet);
+            check (filterOn() && ! triggered.getPreset (0).has_value(),
+                   "...and made active, that pitch set has its filter switched on and its oscillator randomized");
         }
 
         // In the window, a new pitch set's range is two keys pressed, and the button names the active one.

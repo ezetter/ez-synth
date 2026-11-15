@@ -674,8 +674,19 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     // that only touches a threshold near its end, at its lowest or highest, is caught there.
     constexpr auto lookInterval = HarmonicVoice::controlInterval;
 
-    // Only the active pitch set's modulation triggers.
-    const auto& patch = activePatch();
+    // The pitch set shown triggers: the newest note's still sounding, or the active one. Moving to another starts
+    // watching afresh, so a change of pitch set isn't taken for a crossing.
+    const auto slot = (int) getShownSlot();
+    const auto& patch = patches.sets[(size_t) slot];
+
+    // An envelope starts from rest, at 0, as the newest note's did, so its attack still crosses.
+    const auto fresh = slot != watchedSlot;
+
+    if (fresh)
+    {
+        triggerCrossings = {};
+        watchedSlot = slot;
+    }
 
     for (const auto triggerTarget : triggerTargets)
     {
@@ -688,9 +699,13 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         auto& crossings = triggerCrossings[target];
         auto triggered = false;
 
-        const auto watch = [this, &patch, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
+        const auto watch = [this, &patch, &triggered, fresh, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
         {
             const auto threshold = modulation::getThresholdValue (assignment.source, assignment.threshold);
+
+            if (fresh && assignment.isActive() && modulation::isEnvelope (assignment.source))
+                crossing.update (0.0f, threshold, assignment.threshold);
+
             const auto isLfo = assignment.isActive() && assignment.source < numLfos;
             const auto looks = isLfo ? std::max (1, (numSamples + lookInterval - 1) / lookInterval) : 1;
 
@@ -708,13 +723,16 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         watch (crossings[2], patch.modWheelAssignments[target]);
 
         if (triggered)
+        {
+            triggerSlots[target] = slot;
             ++triggerRequests[target];
+        }
     }
 }
 
 std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase, double periodsEarlier) const
 {
-    const auto& patch = activePatch();
+    const auto& patch = patches.sets[getShownSlot()];
 
     // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
     if (source == modulation::velocitySource)
@@ -765,17 +783,74 @@ void SynthProcessor::randomizeAsTriggered()
         const auto times = requests - triggerRequestsDone[i];
         triggerRequestsDone[i] = requests;
 
+        const auto slot = triggerSlots[i].load();
+
         if (modulation::describe (target).kind != modulation::Kind::randomize)
             for (int time = 0; time < (times % 2 == 0 ? 0 : 1); ++time)
-                carryOutTrigger (target);
+                carryOutTrigger (target, slot);
         else
-            carryOutTrigger (target);
+            carryOutTrigger (target, slot);
     }
 }
 
-void SynthProcessor::carryOutTrigger (int target)
+void SynthProcessor::carryOutTrigger (int target, int slot)
 {
     const auto info = modulation::describe (target);
+    const auto pitchSet = std::find_if (pitchSets.begin(), pitchSets.end(), [slot] (const PitchSet& each) { return each.slot == slot; });
+
+    // A pitch set taken away since it asked does nothing.
+    if (pitchSet == pitchSets.end())
+        return;
+
+    // Another pitch set than the active one has its sound changed as it's kept: its oscillators, its copy of the
+    // parameters and its saved sound, for when it's made active.
+    if (slot != activeSlot.load())
+    {
+        const auto s = (size_t) slot;
+        auto& sound = pitchSet->sound;
+
+        if (info.kind == modulation::Kind::filterOn || info.kind == modulation::Kind::oscillatorOn)
+        {
+            const auto key = modulation::getKey (target);
+            const auto index = (size_t) parameterIndices.at (key);
+            const auto value = slotValues[s][index].load() >= 0.5f ? 0.0f : 1.0f;
+            slotValues[s][index] = value;
+
+            if (auto parameter = sound.getChildWithProperty ("id", key); parameter.isValid())
+                parameter.setProperty ("value", value, nullptr);
+        }
+        else
+        {
+            auto& oscillator = slotOscillators[s][(size_t) info.oscillator];
+
+            if (info.kind == modulation::Kind::harmonicSwitch)
+            {
+                using Switch = waveform::HarmonicSwitch;
+                const auto numHarmonics = juce::roundToInt (slotParameters[s].oscillators[(size_t) info.oscillator].numHarmonics->load());
+                auto& state = oscillator.switches[(size_t) info.harmonic - 1];
+
+                if (waveform::HarmonicSet (oscillator.switches).plays (info.harmonic, numHarmonics))
+                    state = Switch::off;
+                else
+                    state = info.harmonic <= numHarmonics ? Switch::follows : Switch::on;
+            }
+            else if (info.kind == modulation::Kind::randomize)
+            {
+                randomizeOscillator (oscillator, randomizer);
+                ++randomizeCounts[(size_t) info.oscillator];
+            }
+
+            shareOscillators (s, slotOscillators[s]);
+
+            for (auto wave : sound)
+                if (wave.hasType ("WAVE") && wave.hasProperty ("oscillator") && (int) wave["oscillator"] == info.oscillator)
+                    writeOscillator (wave, oscillator);
+        }
+
+        markEdited();
+        ++shapeVersion;
+        return;
+    }
 
     if (info.kind == modulation::Kind::harmonicSwitch)
     {
@@ -889,7 +964,7 @@ void SynthProcessor::setTargetPosition (int target, float position)
 
         if (controllerTriggerCrossings[(size_t) target].update (position, modulation::getThresholdValue (-1, threshold),
                                                                                 threshold))
-            carryOutTrigger (target);
+            carryOutTrigger (target, activeSlot.load());
 
         return;
     }
@@ -1114,9 +1189,8 @@ void SynthProcessor::setShape (int oscillator, const waveform::Shape& newShape, 
     replaceShape (oscillator, newShape, fromPreset);
 }
 
-void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+void SynthProcessor::applyShape (Oscillator& changed, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
 {
-    auto& changed = oscillators[(size_t) oscillator];
     changed.shape = newShape;
     changed.preset = fromPreset;
     changed.decomposition = waveform::decompose (newShape);
@@ -1124,7 +1198,11 @@ void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newSha
     for (const auto& harmonic : changed.decomposition.harmonics)
         if (harmonic.amplitude > 0.0f)
             changed.phases[(size_t) harmonic.harmonic - 1] = harmonic.phase;
+}
 
+void SynthProcessor::replaceShape (int oscillator, const waveform::Shape& newShape, std::optional<waveform::Preset> fromPreset)
+{
+    applyShape (oscillators[(size_t) oscillator], newShape, fromPreset);
     share();
     ++shapeVersion;
 }
@@ -1242,7 +1320,13 @@ void SynthProcessor::cycleHarmonicSwitch (int oscillator, int harmonic)
 void SynthProcessor::randomizeHarmonics (int oscillator, juce::Random& random)
 {
     markEdited();
+    randomizeOscillator (oscillators[(size_t) oscillator], random);
+    share();
+    ++shapeVersion;
+}
 
+void SynthProcessor::randomizeOscillator (Oscillator& oscillator, juce::Random& random)
+{
     std::array<float, waveform::maxHarmonics> amplitudes {}, phases {};
 
     for (size_t i = 0; i < amplitudes.size(); ++i)
@@ -1267,11 +1351,10 @@ void SynthProcessor::randomizeHarmonics (int oscillator, juce::Random& random)
     if (peak > 1.0f)
         shape = build (1.0f / peak);
 
-    replaceShape (oscillator, shape, std::nullopt);
+    applyShape (oscillator, shape, std::nullopt);
 
     // Harmonics too weak to keep come back in at their new phases when they're raised.
-    std::copy (phases.begin(), phases.end(), oscillators[(size_t) oscillator].phases.begin());
-    share();
+    std::copy (phases.begin(), phases.end(), oscillator.phases.begin());
 }
 
 //==============================================================================
@@ -1732,20 +1815,70 @@ float SynthProcessor::getPosition (int target) const
     return modulation::amplitudeRange().convertTo0to1 (harmonic.amplitude);
 }
 
+namespace
+{
+    template <typename Shared, typename Oscillators>
+    void shareOscillatorsInto (Shared& sharing, const Oscillators& oscillators)
+    {
+        for (size_t i = 0; i < oscillators.size(); ++i)
+        {
+            sharing.decompositions[i] = oscillators[i].decomposition;
+            sharing.phases[i] = oscillators[i].phases;
+            sharing.tunes[i] = oscillators[i].tunes;
+            sharing.switches[i] = waveform::HarmonicSet (oscillators[i].switches);
+            sharing.peaks[i] = waveform::getPeaks (oscillators[i].decomposition, sharing.switches[i]);
+        }
+    }
+}
+
+void SynthProcessor::shareOscillators (size_t slot, const std::array<Oscillator, numOscillators>& from)
+{
+    const juce::SpinLock::ScopedLockType lock (sharedLocks[slot]);
+    shareOscillatorsInto (shared[slot], from);
+    ++sharedVersions[slot];
+}
+
+void SynthProcessor::writeOscillator (juce::ValueTree& wave, const Oscillator& oscillator)
+{
+    wave.setProperty ("points", juce::MemoryBlock (oscillator.shape.data(), sizeof (oscillator.shape)).toBase64Encoding(), nullptr);
+    wave.setProperty ("preset", oscillator.preset.has_value() ? waveform::getName (*oscillator.preset) : juce::String(), nullptr);
+
+    // How far each harmonic from the 2nd up is tuned, saved only if any is.
+    const auto& tunes = oscillator.tunes;
+    wave.removeProperty ("tunes", nullptr);
+
+    if (std::any_of (tunes.begin(), tunes.end(), [] (float tune) { return ! juce::exactlyEqual (tune, 0.0f); }))
+    {
+        juce::StringArray tuneTexts;
+
+        for (size_t k = 1; k < tunes.size(); ++k)
+            tuneTexts.add (juce::String (tunes[k]));
+
+        wave.setProperty ("tunes", tuneTexts.joinIntoString (" "), nullptr);
+    }
+
+    // Which harmonics are switched off or on, from the 1st up, saved only if any is: 0 follows the number of
+    // harmonics, 1 is off and 2 on.
+    const auto& switches = oscillator.switches;
+    wave.removeProperty ("switches", nullptr);
+
+    if (std::any_of (switches.begin(), switches.end(), [] (waveform::HarmonicSwitch each) { return each != waveform::HarmonicSwitch::follows; }))
+    {
+        juce::String switchTexts;
+
+        for (const auto each : switches)
+            switchTexts << juce::String ((int) each);
+
+        wave.setProperty ("switches", switchTexts, nullptr);
+    }
+}
+
 void SynthProcessor::share()
 {
     const auto slot = (size_t) activeSlot.load();
     const juce::SpinLock::ScopedLockType lock (sharedLocks[slot]);
     auto& sharing = shared[slot];
-
-    for (size_t i = 0; i < (size_t) numOscillators; ++i)
-    {
-        sharing.decompositions[i] = oscillators[i].decomposition;
-        sharing.phases[i] = oscillators[i].phases;
-        sharing.tunes[i] = oscillators[i].tunes;
-        sharing.switches[i] = waveform::HarmonicSet (oscillators[i].switches);
-        sharing.peaks[i] = waveform::getPeaks (oscillators[i].decomposition, sharing.switches[i]);
-    }
+    shareOscillatorsInto (sharing, oscillators);
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
@@ -1876,33 +2009,7 @@ juce::ValueTree SynthProcessor::createSoundState()
     for (int i = 0; i < numOscillators; ++i)
     {
         auto wave = addWave ("oscillator", i, oscillators[(size_t) i].shape, oscillators[(size_t) i].preset, drawings[(size_t) i]);
-
-        // How far each harmonic from the 2nd up is tuned, saved only if any is.
-        const auto& tunes = oscillators[(size_t) i].tunes;
-
-        if (std::any_of (tunes.begin(), tunes.end(), [] (float tune) { return ! juce::exactlyEqual (tune, 0.0f); }))
-        {
-            juce::StringArray tuneTexts;
-
-            for (size_t k = 1; k < tunes.size(); ++k)
-                tuneTexts.add (juce::String (tunes[k]));
-
-            wave.setProperty ("tunes", tuneTexts.joinIntoString (" "), nullptr);
-        }
-
-        // Which harmonics are switched off or on, from the 1st up, saved only if any is: 0 follows the number of
-        // harmonics, 1 is off and 2 on.
-        const auto& switches = oscillators[(size_t) i].switches;
-
-        if (std::any_of (switches.begin(), switches.end(), [] (waveform::HarmonicSwitch each) { return each != waveform::HarmonicSwitch::follows; }))
-        {
-            juce::String switchTexts;
-
-            for (const auto each : switches)
-                switchTexts << juce::String ((int) each);
-
-            wave.setProperty ("switches", switchTexts, nullptr);
-        }
+        writeOscillator (wave, oscillators[(size_t) i]);
     }
 
     for (int i = 0; i < numLfos; ++i)
@@ -2037,6 +2144,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
         activeSlot = pitchSets[i].slot;
         loadSoundState (sounds[i].isValid() ? sounds[i].createCopy() : initState.createCopy());
         pitchSets[i].sound = createSoundState();
+        slotOscillators[(size_t) pitchSets[i].slot] = oscillators;
     }
 
     activePitchSet = active;
@@ -2281,6 +2389,7 @@ void SynthProcessor::activate (int index)
     // The sound has only moved from one pitch set to another, so it's no more edited than it was.
     const auto edited = presetEdited.load();
     pitchSets[(size_t) activePitchSet].sound = createSoundState();
+    slotOscillators[(size_t) activeSlot.load()] = oscillators;
     activePitchSet = index;
     activeSlot = pitchSets[(size_t) index].slot;
     loadSoundState (pitchSets[(size_t) index].sound.createCopy());
@@ -2327,6 +2436,7 @@ int SynthProcessor::addPitchSet (KeyRange range)
                                 juce::jlimit (0, 127, std::max (range.lowest, range.highest)) };
     pitchSet.slot = slot;
     pitchSet.sound = createSoundState();
+    slotOscillators[to] = oscillators;
     pitchSets.push_back (pitchSet);
     sortPitchSets();
     updateKeyMap();
