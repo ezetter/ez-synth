@@ -73,7 +73,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   changing how many, leaves the wave as it is until you draw on it. Each oscillator and LFO keeps its own
   way of drawing and number of steps, which are saved with the sound, so the Step Filter preset's LFO opens
   in its 8 steps.
-- **Start from a preset.** Sine, Sawtooth, Square or Triangle replace the wave. Draw over one to change it.
+- **Start from a preset.** Sine, Sawtooth, Square or Triangle, above the grid beside the Draw buttons,
+  replace the wave; the one the wave is stays lit, and none is once you've drawn over it.
 - **Pick how many harmonics to play**, 1 to 16, with the slider under *Harmonics* (3 to start with;
   double-click it to go back to 3). The number's shown beside it. The oscillator plays its wave's harmonics
   from the 1st up to that number, and each oscillator has its own number. Harmonics the wave doesn't have
@@ -358,8 +359,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### Modulation overview
 
-- **See everything that moves a control** on one screen: click **Modulation** in the header, beside
-  **Save**, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
+- **See everything that moves a control** on one screen: click **Modulation** in the header, to the
+  right, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
   left of its window. It lists every link, grouped by
   what it comes from: each LFO and envelope, velocity, the mod wheel, and the MIDI controllers learned.
   Each row names the control and says what's done to it, such as *±20% of its travel, inverted, 90°

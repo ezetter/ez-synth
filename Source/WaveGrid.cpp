@@ -23,6 +23,14 @@ WaveGrid::WaveGrid()
     drawMode.onChoose = [this] (int index) { changeDrawing ({ index == 1, drawing.numSteps }); };
     addAndMakeVisible (drawMode);
 
+    presetButtons.setTitle ("Preset waves");
+    presetButtons.onChoose = [this] (int index)
+    {
+        if (onPresetChosen != nullptr)
+            onPresetChosen (waveform::allPresets[(size_t) index]);
+    };
+    addAndMakeVisible (presetButtons);
+
     stepCount.setTitle ("Number of steps");
     stepCount.onChange = [this] (int numSteps) { changeDrawing ({ drawing.stepped, numSteps }); };
     addAndMakeVisible (stepCount);
@@ -211,9 +219,22 @@ void WaveGrid::resized()
     header.removeFromRight (8);
     drawMode.setBounds (header.removeFromRight (132).withSizeKeepingCentre (132, 22));
 
-    // An LFO's random switch is to the left of the drawing's caption.
+    // The preset waves to the left of the drawing's caption, then an LFO's random switch.
     header.removeFromRight (64);
+    presetButtons.setBounds (header.removeFromRight (288).withSizeKeepingCentre (288, 22));
+    header.removeFromRight (10);
     randomSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
+}
+
+void WaveGrid::setPreset (std::optional<waveform::Preset> preset)
+{
+    auto index = -1;
+
+    for (size_t i = 0; i < waveform::allPresets.size(); ++i)
+        if (preset == waveform::allPresets[i])
+            index = (int) i;
+
+    presetButtons.setChosen (index);
 }
 
 juce::Rectangle<float> WaveGrid::getPlotArea() const
@@ -350,13 +371,23 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     const auto header = getHeaderArea();
     const auto name = (lfoPeriod.has_value() ? "LFO " : "OSC ") + juce::String (sourceNumber);
 
+    // The caption, in full if it fits before the controls, or just the source's name.
+    const auto controlsLeft = (float) (randomSwitch.isVisible() ? randomSwitch.getX() : presetButtons.getX());
+    const auto movedShown = movedPartials.has_value() && ! lfoPeriod.has_value();
+    const auto fullCaption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH");
+    const auto fits = [&] (const juce::String& text)
+    {
+        return juce::GlyphArrangement::getStringWidth (fonts::caption(), text + (movedShown ? "  " + dot + "  AS PLAYED" : juce::String()))
+               <= controlsLeft - header.getX() - 16.0f;
+    };
+    const auto caption = fits (fullCaption) ? fullCaption : name;
+
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
-    const auto caption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH");
     g.drawText (caption, header, juce::Justification::centredLeft);
 
     // Says when the harmonics are shown where something has moved them, in the colour of anything moving controls.
-    if (movedPartials.has_value() && ! lfoPeriod.has_value())
+    if (movedShown)
     {
         const auto captionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  ");
         g.setColour (colours::modulation);
@@ -369,8 +400,6 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     g.drawText ("DRAW", header.withRight (drawControls.getX() - 10.0f), juce::Justification::centredRight);
 
     // Between the caption and the controls, a hint for drawing, or that the source is off: the longest that fits.
-    const auto drawCaptionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), "DRAW");
-    const auto controlsLeft = randomSwitch.isVisible() ? (float) randomSwitch.getX() : drawControls.getX() - 10.0f - drawCaptionWidth;
     const auto hintArea = header.withRight (controlsLeft - 20.0f)
                                 .withTrimmedLeft (juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f);
     const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");

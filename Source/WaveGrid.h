@@ -44,6 +44,12 @@ public:
     /** Called when the user switches an LFO's random wave on or off. */
     std::function<void (bool)> onRandomChange;
 
+    /** Shows which preset the wave is, if it's one, on the buttons in the header, without calling onPresetChosen. */
+    void setPreset (std::optional<waveform::Preset>);
+
+    /** Called when the user clicks a preset's button, to set the wave to it, even if it's the one shown. */
+    std::function<void (waveform::Preset)> onPresetChosen;
+
     /** Sets the wave to show. A wave that repeats ends where it began, unless it's given an end, such as a random
         wave's, which runs on into its next cycle.
     */
@@ -132,6 +138,9 @@ private:
     int hoveredStep = -1;
     bool random = false;
     ChoiceButtons drawMode { { "Smooth", "Steps" } };
+
+    /** The preset waves, in the header, none of them chosen for a wave that's been drawn. */
+    ChoiceButtons presetButtons { [] { juce::StringArray names; for (const auto preset : waveform::allPresets) names.add (waveform::getName (preset)); return names; }() };
     NumberStepper stepCount { waveform::fewestSteps, waveform::mostSteps };
     Switch randomSwitch { "Random" };
 

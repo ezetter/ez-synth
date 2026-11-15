@@ -101,16 +101,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     };
     addChildComponent (randomizeButton);
 
-    for (size_t i = 0; i < presetButtons.size(); ++i)
-    {
-        const auto preset = waveform::allPresets[i];
-        auto& button = presetButtons[i];
-        button.setButtonText (waveform::getName (preset));
-        button.setMouseClickGrabsKeyboardFocus (false);
-        button.setWantsKeyboardFocus (false);
-        button.onClick = [this, preset] { setEditedWave (waveform::makePreset (preset), preset); };
-        addAndMakeVisible (button);
-    }
+    grid.onPresetChosen = [this] (waveform::Preset preset) { setEditedWave (waveform::makePreset (preset), preset); };
 
     const auto& volumeParameter = *p.parameters.getParameter (SynthProcessor::volumeId);
     volumeKnob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
@@ -270,23 +261,16 @@ void SynthEditor::resized()
     titleArea = header.removeFromLeft (250);
     noteArea = header.removeFromRight (220);
 
-    auto presets = header.withSizeKeepingCentre (header.getWidth(), 34);
-
-    for (auto& button : presetButtons)
-    {
-        button.setBounds (presets.removeFromLeft (88));
-        presets.removeFromLeft (8);
-    }
-
-    // The sound's preset sits between the waves and the note being played, with the modulation overview's
-    // button after it.
-    presets.removeFromLeft (12);
-    presets.removeFromRight (12);
-    modulationButton.setBounds (presets.removeFromRight (108));
-    presets.removeFromRight (8);
-    pitchSetButton.setBounds (presets.removeFromRight (124));
-    presets.removeFromRight (8);
-    presetBar.setBounds (presets.withWidth (juce::jmin (presets.getWidth(), 420)).withX (presets.getRight() - juce::jmin (presets.getWidth(), 420)));
+    // The sound's preset after the title, and the buttons for the pitch sets' and modulation's screens before the
+    // note being played.
+    auto row = header.withSizeKeepingCentre (header.getWidth(), 34);
+    row.removeFromRight (24);
+    modulationButton.setBounds (row.removeFromRight (116));
+    row.removeFromRight (10);
+    pitchSetButton.setBounds (row.removeFromRight (132));
+    row.removeFromRight (32);
+    row.removeFromLeft (8);
+    presetBar.setBounds (row.withWidth (juce::jmin (row.getWidth(), 560)));
 
     area.removeFromTop (12);
 
@@ -480,8 +464,7 @@ void SynthEditor::refresh()
         const auto preset = editingLfo ? (synthProcessor.isLfoRandom (lfo) ? std::nullopt : synthProcessor.getLfoPreset (lfo))
                                        : synthProcessor.getPreset (edited);
 
-        for (size_t i = 0; i < presetButtons.size(); ++i)
-            presetButtons[i].setToggleState (preset == waveform::allPresets[i], juce::dontSendNotification);
+        grid.setPreset (preset);
 
         grid.setDrawing (synthProcessor.getDrawing (edited));
         harmonicSelector.setVisible (! editingLfo);

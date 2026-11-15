@@ -125,7 +125,6 @@ private:
     /** Gives the oscillator shown random harmonics, every one's amplitude and phase. */
     ModulatableTextButton randomizeButton { "Randomize" };
     juce::Random buttonRandom;
-    std::array<juce::TextButton, waveform::allPresets.size()> presetButtons;
     PresetBar presetBar;
     ModulatableSlider volumeKnob;
     juce::AudioProcessorValueTreeState::SliderAttachment volumeAttachment;

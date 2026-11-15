@@ -1533,9 +1533,10 @@ namespace
             app.editedSource = SynthProcessor::numOscillators + 1;
             std::unique_ptr<juce::AudioProcessorEditor> editor (app.createEditorAndMakeActive());
 
+            // The preset waves' buttons are in the grid's header.
             for (auto* child : editor->getChildren())
-                if (auto* button = dynamic_cast<juce::TextButton*> (child); button != nullptr && button->getButtonText() == "Square")
-                    button->onClick();
+                if (auto* waveGrid = dynamic_cast<WaveGrid*> (child); waveGrid != nullptr && waveGrid->onPresetChosen != nullptr)
+                    waveGrid->onPresetChosen (waveform::Preset::square);
 
             check (! app.isLfoRandom (1) && app.getLfoPreset (1) == waveform::Preset::square,
                    "choosing a wave for an LFO playing a random one plays that wave instead");
