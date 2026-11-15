@@ -674,19 +674,9 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     // that only touches a threshold near its end, at its lowest or highest, is caught there.
     constexpr auto lookInterval = HarmonicVoice::controlInterval;
 
-    // The pitch set shown triggers: the newest note's still sounding, or the active one. Moving to another starts
-    // watching afresh, so a change of pitch set isn't taken for a crossing.
-    const auto slot = (int) getShownSlot();
-    const auto& patch = patches.sets[(size_t) slot];
-
-    // An envelope starts from rest, at 0, as the newest note's did, so its attack still crosses.
-    const auto fresh = slot != watchedSlot;
-
-    if (fresh)
-    {
-        triggerCrossings = {};
-        watchedSlot = slot;
-    }
+    // Only the default pitch set's modulation triggers, the same whichever key is played, or none, with the newest
+    // note's envelopes and velocity.
+    const auto& patch = patches.sets[(size_t) defaultSlot];
 
     for (const auto triggerTarget : triggerTargets)
     {
@@ -699,12 +689,9 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         auto& crossings = triggerCrossings[target];
         auto triggered = false;
 
-        const auto watch = [this, &patch, &triggered, fresh, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
+        const auto watch = [this, &patch, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
         {
             const auto threshold = modulation::getThresholdValue (assignment.source, assignment.threshold);
-
-            if (fresh && assignment.isActive() && modulation::isEnvelope (assignment.source))
-                crossing.update (0.0f, threshold, assignment.threshold);
 
             const auto isLfo = assignment.isActive() && assignment.source < numLfos;
             const auto looks = isLfo ? std::max (1, (numSamples + lookInterval - 1) / lookInterval) : 1;
@@ -712,7 +699,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
             for (int look = looks - 1; look >= 0; --look)
             {
                 const auto periodsEarlier = isLfo ? (double) (look * lookInterval) / patch.getLfoPeriodSamples ((size_t) assignment.source) : 0.0;
-                const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase, periodsEarlier)
+                const auto value = assignment.isActive() ? getSourceValueNow (assignment.source, assignment.phase, periodsEarlier, numSamples)
                                                          : std::nullopt;
                 triggered = crossing.update (value, threshold, assignment.threshold) || triggered;
             }
@@ -723,16 +710,14 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         watch (crossings[2], patch.modWheelAssignments[target]);
 
         if (triggered)
-        {
-            triggerSlots[target] = slot;
             ++triggerRequests[target];
-        }
     }
 }
 
-std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase, double periodsEarlier) const
+std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase, double periodsEarlier, int numSamples) const
 {
-    const auto& patch = patches.sets[getShownSlot()];
+    // The default pitch set's LFOs, as it runs them.
+    const auto& patch = patches.sets[(size_t) defaultSlot];
 
     // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
     if (source == modulation::velocitySource)
@@ -749,13 +734,19 @@ std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase
         return std::nullopt;
 
     const auto& lfo = patch.lfos[(size_t) source];
-    const auto progress = lfoProgress[(size_t) source].load();
 
-    if (progress < 0.0)
+    // One that starts with each key counts from the last key pressed, and has nothing before the first; a looping
+    // one is where the default pitch set's has got to, at the end of the block.
+    if (lfo.fromKey && lastNoteOnSample < 0)
         return std::nullopt;
 
+    const auto i = (size_t) source;
+    const auto blockEnd = samplesPlayed + numSamples;
+
     // Before the LFO started, as the synth started playing or the key was pressed, there's nothing to look at.
-    const auto sinceStart = (lfo.fromKey ? progress : (double) lfoCyclesShown[(size_t) source].load() + progress) - periodsEarlier;
+    const auto sinceStart = (lfo.fromKey ? (double) (blockEnd - lastNoteOnSample) / patch.getLfoPeriodSamples (i)
+                                         : (double) lfoCycles[(size_t) defaultSlot][i] + lfoPhases[(size_t) defaultSlot][i])
+                          - periodsEarlier;
 
     if (sinceStart < 0.0)
         return std::nullopt;
@@ -783,13 +774,12 @@ void SynthProcessor::randomizeAsTriggered()
         const auto times = requests - triggerRequestsDone[i];
         triggerRequestsDone[i] = requests;
 
-        const auto slot = triggerSlots[i].load();
-
+        // Carried out in the default pitch set, whose modulation triggered it.
         if (modulation::describe (target).kind != modulation::Kind::randomize)
             for (int time = 0; time < (times % 2 == 0 ? 0 : 1); ++time)
-                carryOutTrigger (target, slot);
+                carryOutTrigger (target, defaultSlot);
         else
-            carryOutTrigger (target, slot);
+            carryOutTrigger (target, defaultSlot);
     }
 }
 

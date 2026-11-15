@@ -676,11 +676,11 @@ private:
     */
     void watchRandomizeTriggers (int numSamples);
 
-    /** A source's value at the end of the block, on the audio thread: an LFO's from where it's got to, shifted
-        back by the phase given, or as it was the periods given earlier in the block, the newest note's envelope, if
-        a note's sounding, and the last note's velocity.
+    /** A source's value at the end of the block, on the audio thread, for triggers: the default pitch set's LFO
+        from where it's got to, shifted back by the phase given, or as it was the periods given earlier in the block,
+        the newest note's envelope, if a note's sounding, and the last note's velocity.
     */
-    std::optional<float> getSourceValueNow (int source, double phase, double periodsEarlier = 0.0) const;
+    std::optional<float> getSourceValueNow (int source, double phase, double periodsEarlier, int numSamples) const;
 
     void timerCallback() override;
 
@@ -822,9 +822,8 @@ private:
     */
     void carryOutTrigger (int target, int slot);
 
-    // The slot of the pitch set whose modulation last asked for each trigger, and whose triggers are being watched.
-    std::array<std::atomic<int>, modulation::numTargets> triggerSlots {};
-    int watchedSlot = 0;
+    /** The default pitch set's slot, which it always has, whose modulation alone triggers. */
+    static constexpr int defaultSlot = 0;
 
     // MIDI learn. The audio thread keeps where each controller was last put and counts its moves, and notes the
     // first moved while a control's being learned; the message thread links and sets the controls.

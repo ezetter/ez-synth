@@ -4142,25 +4142,33 @@ namespace
             check (shown.getShownPitchSet() == 0 && ! shown.getLiveWave (0).moved, "...and the active one's once nothing's sounding");
         }
 
-        // Triggers follow the pitch set played too: an envelope in one pitch set switching on its filter and
-        // randomizing its oscillator does so in that pitch set, though another's active, and leaves the others alone.
+        // Only the default pitch set's modulation triggers, the same whichever key is played, and in the default,
+        // whichever pitch set is active: another's modulation of a trigger does nothing.
         {
             SynthProcessor triggered;
             setPreset (triggered, 0, waveform::Preset::sine);
             triggered.prepareToPlay (sampleRate, blockSize);
             const auto octaveSet = triggered.addPitchSet ({ 60, 71 });
-            triggered.setActivePitchSet (octaveSet);
-            triggered.setAssignment (modulation::filterOnTarget (0), { modulation::numLfos, 1.0f, false, 0.0f, 0.5f });
-            triggered.setAssignment (modulation::randomizeTarget (0), { modulation::numLfos, 1.0f, false, 0.0f, 0.5f });
-            triggered.setActivePitchSet (0);
+            const auto envelope = modulation::numLfos;
 
+            // The default's envelope randomizes its oscillator; the octave's would switch its filter on.
+            triggered.setAssignment (modulation::randomizeTarget (0), { envelope, 1.0f, false, 0.0f, 0.5f });
+            triggered.setActivePitchSet (octaveSet);
+            triggered.setAssignment (modulation::filterOnTarget (0), { envelope, 1.0f, false, 0.0f, 0.5f });
+
+            // The synth runs before the key, as it does between notes, so the envelope is seen at rest first.
             const auto playKey = [&triggered] (int note)
             {
                 juce::MidiBuffer midi;
-                midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
 
-                for (int block = 0; block < 20; ++block)
+                for (int block = 0; block < 60; ++block)
                 {
+                    if (block == 4)
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+
+                    if (block == 24)
+                        midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+
                     juce::AudioBuffer<float> buffer (2, blockSize);
                     triggered.processBlock (buffer, midi);
                     midi.clear();
@@ -4171,18 +4179,16 @@ namespace
 
             const auto filterOn = [&triggered] { return triggered.parameters.getRawParameterValue (SynthProcessor::filterIds (0).on)->load() >= 0.5f; };
 
-            playKey (48);
-            check (triggered.getRandomizeCount (0) == 0 && ! filterOn(), "a key of the default, whose modulation triggers nothing, triggers nothing");
-
             playKey (64);
-            check (triggered.getRandomizeCount (0) == 1 && ! filterOn() && triggered.getPreset (0) == waveform::Preset::sine
-                     && triggered.getActivePitchSet() == 0,
-                   "a key of another pitch set triggers its modulation, leaving the active default as it was");
+            check (! filterOn() && triggered.getPreset (0) == waveform::Preset::sine,
+                   "a key of another pitch set, active, doesn't trigger its own modulation, nor is its sound changed");
+            check (triggered.getRandomizeCount (0) == 1, "...but triggers the default's, as the note's envelope crosses its threshold");
 
-            // What it changed is there when it's made active.
-            triggered.setActivePitchSet (octaveSet);
-            check (filterOn() && ! triggered.getPreset (0).has_value(),
-                   "...and made active, that pitch set has its filter switched on and its oscillator randomized");
+            triggered.setActivePitchSet (0);
+            check (! triggered.getPreset (0).has_value(), "...randomizing the default's oscillator, though it wasn't active");
+
+            playKey (48);
+            check (triggered.getRandomizeCount (0) == 2, "a key of the default triggers the default's the same way");
         }
 
         // In the window, a new pitch set's range is two keys pressed, and the button names the active one.
