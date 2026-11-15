@@ -234,8 +234,10 @@ void TuneSlider::paint (juce::Graphics& g)
     }
 
     // A tick at each semitone: a longer, bright one at the note itself, and longer, numbered ones at the intervals
-    // marked, above the note and below it. The interval the tune is on is picked out.
+    // marked, above the note and below it. The interval the tune is on is picked out. Zoomed out too far for every
+    // interval's number to fit, only the 5ths and octaves are numbered.
     g.setFont (fonts::body (11.5f));
+    const auto numberedAll = pixelsPerSemitone >= 14.0f;
 
     for (auto semitone = (int) std::ceil (window.low); semitone <= (int) std::floor (window.high); ++semitone)
     {
@@ -257,8 +259,9 @@ void TuneSlider::paint (juce::Graphics& g)
         {
             g.setColour (whole == semitone ? colours::accent : colours::dimText);
             g.fillRect (juce::Rectangle<float> (1.0f, 6.0f).withPosition (x - 0.5f, ticksTop));
-            g.drawText (juce::String (marked->number), juce::Rectangle<float> (20.0f, 10.0f).withCentre ({ x, ticksTop + 11.0f }),
-                        juce::Justification::centred);
+            if (numberedAll || marked->number == 5 || marked->number == 8 || marked->number == 12 || marked->number == 15)
+                g.drawText (juce::String (marked->number), juce::Rectangle<float> (20.0f, 10.0f).withCentre ({ x, ticksTop + 11.0f }),
+                            juce::Justification::centred);
         }
     }
 }

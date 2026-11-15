@@ -42,9 +42,12 @@ namespace tuning
 
     juce::String getIntervalName (int semitones)
     {
-        static const std::array<const char*, 13> names { "unison", "minor 2nd", "major 2nd", "minor 3rd", "major 3rd",
+        static const std::array<const char*, 25> names { "unison", "minor 2nd", "major 2nd", "minor 3rd", "major 3rd",
                                                          "perfect 4th", "tritone", "perfect 5th", "minor 6th", "major 6th",
-                                                         "minor 7th", "major 7th", "octave" };
+                                                         "minor 7th", "major 7th", "octave", "minor 9th", "major 9th",
+                                                         "minor 10th", "major 10th", "perfect 11th", "octave and a tritone",
+                                                         "perfect 12th", "minor 13th", "major 13th", "minor 14th",
+                                                         "major 14th", "two octaves" };
 
         const juce::String name (names[(size_t) juce::jlimit (0, (int) names.size() - 1, std::abs (semitones))]);
         return semitones < 0 ? name + " below" : name;
@@ -58,6 +61,12 @@ namespace tuning
     float zoomToReach (float zoom)
     {
         return widestReach * std::pow (narrowestReach / widestReach, juce::jlimit (0.0f, 1.0f, zoom));
+    }
+
+    float updateOldZoom (float zoom)
+    {
+        const auto reach = oldWidestReach * std::pow (narrowestReach / oldWidestReach, juce::jlimit (0.0f, 1.0f, zoom));
+        return std::log (widestReach / reach) / std::log (widestReach / narrowestReach);
     }
 
     juce::String reachToText (float reach)

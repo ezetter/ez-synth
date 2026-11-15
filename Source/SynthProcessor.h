@@ -215,7 +215,7 @@ public:
     /** How many harmonics the oscillator plays its wave with, from the 1st up. */
     int getNumHarmonics (int oscillator) const noexcept;
 
-    /** How many semitones away from the note the oscillator plays, from an octave down to an octave up. */
+    /** How many semitones away from the note the oscillator plays, from two octaves down to two octaves up. */
     float getTune (int oscillator) const noexcept;
 
     //==============================================================================

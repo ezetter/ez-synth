@@ -23,8 +23,10 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         auto& card = oscillatorCards[i];
         card = std::make_unique<OscillatorCard> ((int) i, p.parameters);
         card->onSelect = [this, i] { editSource ((int) i); };
-        addAndMakeVisible (*card);
+        oscillatorStrip.addCard (*card);
     }
+
+    addAndMakeVisible (oscillatorStrip);
 
     for (size_t i = 0; i < lfoCards.size(); ++i)
     {
@@ -286,22 +288,16 @@ void SynthEditor::resized()
     sidePanel = area.removeFromRight (juce::jlimit (400, 460, area.getWidth() * 3 / 10));
     area.removeFromRight (14);
 
-    // The oscillators, then the LFOs, with a wider gap between the two. Three LFOs show at a time, the row of them
+    // The oscillators, then the LFOs, with a wider gap between the two. Three of each show at a time, each row
     // scrolling sideways to the others, with its scroll bar in the gap under the cards.
     constexpr auto cardGap = 8;
     constexpr auto groupGap = 18;
-    constexpr auto cardsShown = SynthProcessor::numOscillators + 3;
     constexpr auto underCards = 14;
     auto cardRow = area.removeFromTop (108 + underCards);
-    const auto cardWidth = (cardRow.getWidth() - groupGap - cardGap * (cardsShown - 2)) / cardsShown;
-
-    for (auto& card : oscillatorCards)
-    {
-        card->setBounds (cardRow.removeFromLeft (cardWidth).withHeight (108));
-        cardRow.removeFromLeft (cardGap);
-    }
-
-    cardRow.removeFromLeft (groupGap - cardGap);
+    const auto stripWidth = (cardRow.getWidth() - groupGap) / 2;
+    oscillatorStrip.setGaps (cardGap, underCards);
+    oscillatorStrip.setBounds (cardRow.removeFromLeft (stripWidth));
+    cardRow.removeFromLeft (groupGap);
     lfoStrip.setGaps (cardGap, underCards);
     lfoStrip.setBounds (cardRow);
 
@@ -437,9 +433,14 @@ void SynthEditor::refresh()
 
     const auto changed = now != shown;
 
-    // The LFO being edited is always in sight, such as when the window opens on it.
-    if (editingLfo && now.editedSource != shown.editedSource)
-        lfoStrip.scrollToShow (lfo);
+    // The oscillator or LFO being edited is always in sight, such as when the window opens on it.
+    if (now.editedSource != shown.editedSource)
+    {
+        if (editingLfo)
+            lfoStrip.scrollToShow (lfo);
+        else
+            oscillatorStrip.scrollToShow (edited);
+    }
 
     if (changed)
     {

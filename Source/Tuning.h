@@ -5,14 +5,14 @@
 #include <array>
 #include <optional>
 
-/** Tuning an oscillator away from the note played, by anything up to an octave below or above it. */
+/** Tuning an oscillator away from the note played, by anything up to two octaves below or above it. */
 namespace tuning
 {
     /** The furthest an oscillator can be tuned down and up, in semitones. */
-    inline constexpr float lowest = -12.0f;
-    inline constexpr float highest = 12.0f;
+    inline constexpr float lowest = -24.0f;
+    inline constexpr float highest = 24.0f;
 
-    /** Where a tuning lies along the tune slider's travel, from 0 an octave down to 1 an octave up, as LFOs,
+    /** Where a tuning lies along the tune slider's travel, from 0 two octaves down to 1 two octaves up, as LFOs,
         envelopes and velocity move it.
     */
     float toPosition (float semitones);
@@ -26,9 +26,10 @@ namespace tuning
     };
 
     /** The intervals marked along the tune slider, above the note and below it: the major 2nd, 3rd, 6th and 7th,
-        the perfect 4th and 5th, and the octave.
+        the perfect 4th and 5th, and the octave, and an octave further, the 9th to the 15th, two octaves.
     */
-    inline constexpr std::array<Interval, 7> markedIntervals { { { 2, 2 }, { 3, 4 }, { 4, 5 }, { 5, 7 }, { 6, 9 }, { 7, 11 }, { 8, 12 } } };
+    inline constexpr std::array<Interval, 14> markedIntervals { { { 2, 2 }, { 3, 4 }, { 4, 5 }, { 5, 7 }, { 6, 9 }, { 7, 11 }, { 8, 12 },
+                                                                  { 9, 14 }, { 10, 16 }, { 11, 17 }, { 12, 19 }, { 13, 21 }, { 14, 23 }, { 15, 24 } } };
 
     /** A tuning moved to the nearest whole number of semitones, if it's within the given distance of it. */
     double snap (double semitones, double distance);
@@ -46,10 +47,16 @@ namespace tuning
     double toRatio (double semitones);
 
     //==============================================================================
-    /** How much of the tune slider's scale is shown: from an octave either side of the note, zoomed right out, to
-        a semitone either side, zoomed right in.
+    /** How much of the tune slider's scale is shown: from two octaves either side of the note, zoomed right out,
+        to a semitone either side, zoomed right in.
     */
-    inline constexpr float widestReach = 12.0f;
+    inline constexpr float widestReach = 24.0f;
+
+    /** How far either side the scale reached, zoomed right out, before oscillators could be tuned two octaves away.
+        A zoom saved then is moved to where it reaches as far as it did, so modulation moves the tune as it did.
+    */
+    inline constexpr float oldWidestReach = 12.0f;
+    float updateOldZoom (float zoom);
     inline constexpr float narrowestReach = 1.0f;
 
     /** How far either side of its middle the scale reaches when zoomed in by this much, from 0, all the way out, to
@@ -60,7 +67,7 @@ namespace tuning
     /** How far either side the scale reaches, such as "±12 st" or "±3.5 st". */
     juce::String reachToText (float reach);
 
-    /** How much less than across the whole two octaves LFOs, envelopes, velocity and the mod wheel move a tune, when
+    /** How much less than across the whole four octaves LFOs, envelopes, velocity and the mod wheel move a tune, when
         its slider's zoomed in to reach this far either side: at their full range, they move it across the part shown.
     */
     inline float getModulationScale (float reach)   { return reach / widestReach; }
@@ -75,7 +82,7 @@ namespace tuning
     };
 
     /** The part of the scale to show, reaching as far as given either side of the whole semitone nearest a tuning,
-        but kept within the octave either way. Zoomed in from the note itself, it's the note's semitone either side.
+        but kept within the two octaves either way. Zoomed in from the note itself, it's the note's semitone either side.
     */
     Window getWindow (float semitones, float reach);
 }

@@ -1718,7 +1718,7 @@ namespace
                      && isNear (applyEnvelope (cutoff, byEnvelope, 0.3f, halfReleased), 0.25, 1.0e-5),
                    "halfway through the release, a control has come halfway down from where it was at key up to the bottom");
             check (isNear (applyEnvelope (tune, byEnvelope, tuning::toPosition (7.0f), halfReleased),
-                           tuning::toPosition (0.5f * (7.0f + 0.4f * 0.5f * 24.0f)), 1.0e-5),
+                           tuning::toPosition (0.5f * (7.0f + 0.4f * 0.5f * 48.0f)), 1.0e-5),
                    "an oscillator's tune comes back into tune as the release runs, rather than an octave down");
         }
 
@@ -2924,8 +2924,8 @@ namespace
                "an envelope's release brings a phase back round to rest the shorter way");
 
         check (modulation::getName (modulation::harmonicPhaseTarget (0, 1)) == "Osc 1 harmonic 1 phase"
-                 && modulation::findTarget ("osc3Harmonic16Phase") == modulation::harmonicPhaseTarget (2, 16)
-                 && modulation::harmonicPhaseTarget (2, 16) == modulation::lfoRateTarget (0) - 1,
+                 && modulation::findTarget ("osc6Harmonic16Phase") == modulation::harmonicPhaseTarget (5, 16)
+                 && modulation::harmonicPhaseTarget (5, 16) == modulation::lfoRateTarget (0) - 1,
                "every harmonic's phase, the fundamental's too, is a control of its own");
 
         // The dials: one beside every harmonic, the fundamental too.
@@ -3012,10 +3012,12 @@ namespace
                             {
                                 const auto name = tuning::getIntervalName (interval.semitones);
                                 const auto suffix = interval.number == 2 ? "nd" : interval.number == 3 ? "rd" : "th";
-                                return (interval.number == 8 ? name == "octave" : name.endsWith (juce::String (interval.number) + suffix))
+                                return (interval.number == 8    ? name == "octave"
+                                        : interval.number == 15 ? name == "two octaves"
+                                                                : name.endsWith (juce::String (interval.number) + suffix))
                                     && ! name.startsWith ("minor");
                             }),
-               "the slider marks the major and perfect intervals from the 2nd to the octave");
+               "the slider marks the major and perfect intervals from the 2nd to the 15th, two octaves");
 
         // Zooming in on the tune slider's scale.
         const auto isWindow = [] (float tune, float reach, float low, float high)
@@ -3024,12 +3026,19 @@ namespace
             return juce::exactlyEqual (window.low, low) && juce::exactlyEqual (window.high, high);
         };
 
-        check (isNear (tuning::zoomToReach (0.0f), 12.0, 1.0e-6) && isNear (tuning::zoomToReach (1.0f), 1.0, 1.0e-6)
-                 && isNear (tuning::zoomToReach (0.5f), std::sqrt (12.0), 1.0e-4),
-               "zooming in goes from an octave either side to a semitone either side, by the same factor each step");
+        check (isNear (tuning::zoomToReach (0.0f), 24.0, 1.0e-6) && isNear (tuning::zoomToReach (1.0f), 1.0, 1.0e-6)
+                 && isNear (tuning::zoomToReach (0.5f), std::sqrt (24.0), 1.0e-4),
+               "zooming in goes from two octaves either side to a semitone either side, by the same factor each step");
         check (isWindow (0.0f, 1.0f, -1.0f, 1.0f) && isWindow (0.3f, 1.0f, -1.0f, 1.0f) && isWindow (7.0f, 1.0f, 6.0f, 8.0f)
-                 && isWindow (11.8f, 2.0f, 8.0f, 12.0f) && isWindow (-12.0f, 3.0f, -12.0f, -6.0f) && isWindow (5.0f, 12.0f, -12.0f, 12.0f),
-               "zoomed in, the scale shows the part around the whole semitone nearest the tune, within the octave either way");
+                 && isWindow (23.8f, 2.0f, 20.0f, 24.0f) && isWindow (-24.0f, 3.0f, -24.0f, -18.0f) && isWindow (5.0f, 12.0f, -7.0f, 17.0f)
+                 && isWindow (5.0f, 24.0f, -24.0f, 24.0f),
+               "zoomed in, the scale shows the part around the whole semitone nearest the tune, within the two octaves either way");
+
+        // A zoom saved when the slider reached an octave either side reaches as far now as it did then.
+        check (isNear (tuning::zoomToReach (tuning::updateOldZoom (0.0f)), 12.0, 1.0e-4)
+                 && isNear (tuning::zoomToReach (tuning::updateOldZoom (0.5f)), std::sqrt (12.0), 1.0e-4)
+                 && isNear (tuning::updateOldZoom (1.0f), 1.0, 1.0e-6),
+               "an old zoom is moved to where it reaches as far as it did");
 
         SynthProcessor synth;
         check (juce::exactlyEqual (synth.getTune (0), 0.0f) && juce::exactlyEqual (synth.getTune (2), 0.0f),
@@ -3051,7 +3060,9 @@ namespace
 
         for (const auto& [tune, name] : { std::pair (7.0f, "up a 5th"), std::pair (12.0f, "up an octave"),
                                           std::pair (0.5f, "up a quarter tone"), std::pair (-7.0f, "down a 5th"),
-                                          std::pair (-12.0f, "down an octave"), std::pair (-0.5f, "down a quarter tone") })
+                                          std::pair (-12.0f, "down an octave"), std::pair (-0.5f, "down a quarter tone"),
+                                          std::pair (24.0f, "up two octaves"), std::pair (-24.0f, "down two octaves"),
+                                          std::pair (19.0f, "up an octave and a 5th") })
         {
             const auto signal = playTuned (tune);
             const auto tuned = 440.0 * std::pow (2.0, tune / 12.0);
@@ -3081,7 +3092,7 @@ namespace
         setParameter (synth, SynthProcessor::onId (0), 1.0f);
         setParameter (synth, SynthProcessor::tuneId (1), 0.0f);
         setEnvelope (synth, 0, { 0.0f, 0.0f, 1.0f, 0.1f });
-        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 7.0f / 24.0f, false });
+        synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 7.0f / 48.0f, false });
         auto signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
         check (isNear (amplitudeAt (signal, 440.0 * std::pow (2.0, 7.0 / 12.0)) / amplitudeAt (signal, 440.0), 1.0, 0.03),
                "an envelope on an oscillator's tune moves its pitch");
@@ -3094,18 +3105,18 @@ namespace
         check (amplitudeAt (signal, 440.0 * std::pow (2.0, 2.0 / 12.0)) > 0.9 * amplitudeAt (signal, 440.0),
                "zoomed right in, a full range moves the tune across the 2 semitones the slider shows");
 
-        // Zoomed in partway, to 3.46 semitones either side, half the range moves it by 3.46 semitones. Zooming out
-        // again brings back the whole two octaves, so half the range moves it an octave.
+        // Zoomed in partway, to 4.9 semitones either side, half the range moves it by 4.9 semitones. Zooming out
+        // again brings back the whole four octaves, so half the range moves it two octaves.
         synth.setAssignment (modulation::oscillatorTuneTarget (1), { modulation::envelopeSource (0), 0.5f, false });
         setParameter (synth, SynthProcessor::tuneZoomId (1), 0.5f);
         signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
-        check (amplitudeAt (signal, 440.0 * std::pow (2.0, std::sqrt (12.0) / 12.0)) > 0.9 * amplitudeAt (signal, 440.0),
+        check (amplitudeAt (signal, 440.0 * std::pow (2.0, std::sqrt (24.0) / 12.0)) > 0.9 * amplitudeAt (signal, 440.0),
                "zoomed in partway, modulation moves the tune by as much less as the slider shows");
 
         setParameter (synth, SynthProcessor::tuneZoomId (1), 0.0f);
         signal = slice (play (synth, 69, 0.5, 0.8), 0.1, 0.5);
-        check (amplitudeAt (signal, 880.0) > 0.9 * amplitudeAt (signal, 440.0),
-               "zoomed out, modulation moves the tune across the whole two octaves, as before");
+        check (amplitudeAt (signal, 1760.0) > 0.9 * amplitudeAt (signal, 440.0),
+               "zoomed out, modulation moves the tune across the whole four octaves");
 
         // The window shows the tune as modulation moves it, by as much as it sounds: the mod wheel at the top moves
         // the tune, zoomed right in, up by its range times the 2 semitones shown.
@@ -3193,7 +3204,7 @@ namespace
                 return juce::exactlyEqual (tuneSlider.getWindow().low, from) && juce::exactlyEqual (tuneSlider.getWindow().high, to);
             };
 
-            check (shows (-12.0f, 12.0f), "the tune slider starts zoomed right out, an octave either side");
+            check (shows (-24.0f, 24.0f), "the tune slider starts zoomed right out, two octaves either side");
 
             setParameter (zoomed, SynthProcessor::tuneId (0), 7.0f);
             tuneSlider.setZoom (1.0f);
@@ -3205,7 +3216,7 @@ namespace
                    "a tune set from elsewhere, beyond the part shown, moves the scale to it without changing it");
 
             tuneSlider.setZoom (0.0f);
-            check (shows (-12.0f, 12.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5), "zooming out shows the whole range again");
+            check (shows (-24.0f, 24.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5), "zooming out shows the whole range again");
 
             // The zoom is the oscillator's own control, saved with the sound: setting it from elsewhere, as undoing
             // or loading a sound does, zooms the slider.
@@ -3217,7 +3228,7 @@ namespace
 
             setParameter (zoomed, SynthProcessor::tuneZoomId (1), 0.0f);
             tuneSlider.setOscillator (zoomed.parameters, 1);
-            check (shows (-12.0f, 12.0f), "each oscillator has a zoom of its own");
+            check (shows (-24.0f, 24.0f), "each oscillator has a zoom of its own");
         }
 
         // Saving and loading.
@@ -3740,6 +3751,139 @@ namespace
                 check (false, "an LFO's dial is shown");
             }
 
+            synth.editorBeingDeleted (editor.get());
+        }
+    }
+
+    void testSixOscillators()
+    {
+        std::cout << "Six oscillators" << std::endl;
+
+        check (SynthProcessor::numOscillators == 6, "there are 6 oscillators");
+
+        // Each plays alongside the others, and the last ones start off, with waves of their own.
+        {
+            SynthProcessor synth;
+            auto othersOff = true;
+
+            for (int i = 1; i < SynthProcessor::numOscillators; ++i)
+                othersOff = othersOff && ! synth.isOn (i);
+
+            check (othersOff && synth.getPreset (3) == waveform::Preset::triangle && synth.getPreset (5) == waveform::Preset::sawtooth,
+                   "oscillators 2 to 6 start off, 4 to 6 with a triangle, a sine and a sawtooth");
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                setPreset (synth, i, waveform::Preset::sine);
+
+            const auto fundamental = [&synth] { return amplitudeAt (slice (play (synth, 69, 0.5, 0.8), 0.1, 0.45), 440.0); };
+            const auto one = fundamental();
+
+            for (int i = 1; i < SynthProcessor::numOscillators; ++i)
+                setParameter (synth, SynthProcessor::onId (i), 1.0f);
+
+            check (isNear (fundamental() / one, 6.0, 0.02), "all 6 oscillators at full level play 6 times as loud as one");
+
+            // Oscillator 6, two octaves up, with its 2nd harmonic tuned a quarter of the way to its 3rd, plays the
+            // note's 9th harmonic: 2.25 times 4 times the note.
+            for (int i = 1; i < 5; ++i)
+                setParameter (synth, SynthProcessor::onId (i), 0.0f);
+
+            setPreset (synth, 5, waveform::Preset::sawtooth);
+            setNumHarmonics (synth, 5, 2);
+            synth.setHarmonicAmplitude (5, 1, 0.0f);
+            synth.setHarmonicTune (5, 2, 0.25f);
+            setParameter (synth, SynthProcessor::tuneId (5), 24.0f);
+            const auto ninth = slice (play (synth, 45, 0.5, 0.8), 0.1, 0.45);   // A2, 110 Hz
+            check (amplitudeAt (ninth, 990.0) > 0.2 * amplitudeAt (ninth, 110.0) && amplitudeAt (ninth, 880.0) < 1.0e-3 * amplitudeAt (ninth, 110.0),
+                   "an oscillator two octaves up, its harmonic tuned a quarter of the way, plays the note's 9th harmonic");
+        }
+
+        // A save from before there were 6 has the new ones as they start, and its tunes' zooms reach as far as they
+        // did, when the slider reached an octave either side.
+        {
+            SynthProcessor synth;
+            setParameter (synth, SynthProcessor::tuneZoomId (0), 0.5f);
+            juce::MemoryBlock saved;
+            synth.getStateInformation (saved);
+            auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), (int) saved.getSize());
+            xml->removeAttribute ("tuneReach");
+
+            for (int i = 3; i < 6; ++i)
+            {
+                const auto prefix = "osc" + juce::String (i + 1);
+
+                for (auto* child = xml->getFirstChildElement(); child != nullptr;)
+                {
+                    const auto* next = child->getNextElement();
+
+                    if (child->getStringAttribute ("id").startsWith (prefix) || (child->hasTagName ("WAVE") && child->getIntAttribute ("oscillator", -1) == i))
+                        xml->removeChildElement (child, true);
+
+                    child = const_cast<juce::XmlElement*> (next);
+                }
+            }
+
+            juce::AudioProcessor::copyXmlToBinary (*xml, saved);
+            SynthProcessor older;
+            setParameter (older, SynthProcessor::onId (4), 1.0f);
+            older.setShape (4, waveform::makePreset (waveform::Preset::square), waveform::Preset::square);
+            older.setStateInformation (saved.getData(), (int) saved.getSize());
+
+            const auto reach = [&older] (int i)
+            {
+                return tuning::zoomToReach (older.parameters.getRawParameterValue (SynthProcessor::tuneZoomId (i))->load());
+            };
+
+            check (! older.isOn (4) && older.getPreset (4) == waveform::Preset::sine,
+                   "an older save loads with oscillators 4 to 6 as they start");
+            check (isNear (reach (0), std::sqrt (12.0), 1.0e-3) && isNear (reach (1), 12.0, 1.0e-3) && isNear (reach (4), 24.0, 1.0e-3),
+                   "an older save's tunes reach as far as they did, and the new oscillators' reach two octaves either side");
+
+            // Saved again, it loads as it is.
+            older.getStateInformation (saved);
+            SynthProcessor again;
+            again.setStateInformation (saved.getData(), (int) saved.getSize());
+            check (isNear (tuning::zoomToReach (again.parameters.getRawParameterValue (SynthProcessor::tuneZoomId (0))->load()), std::sqrt (12.0), 1.0e-3),
+                   "...and saved again, loads as it is");
+        }
+
+        // A sound description from before tunes reached two octaves has its zooms moved the same way.
+        {
+            SynthProcessor synth;
+            const auto zoomReach = [&synth] (int i)
+            {
+                return tuning::zoomToReach (synth.parameters.getRawParameterValue (SynthProcessor::tuneZoomId (i))->load());
+            };
+
+            sound::load (synth, R"({ "format": "EZ Synth sound", "version": 1, "parameters": { "osc1TuneZoom": 0.5 } })");
+            check (isNear (zoomReach (0), std::sqrt (12.0), 1.0e-3) && isNear (zoomReach (1), 12.0, 1.0e-3),
+                   "a version 1 sound description's tune zooms reach as far as they did");
+
+            sound::load (synth, R"({ "format": "EZ Synth sound", "version": 2, "parameters": { "osc1TuneZoom": 0.5, "osc6On": true, "osc6Tune": -24 },
+                                     "oscillators": [ {}, {}, {}, {}, {}, { "wave": "Square" } ] })");
+            check (isNear (zoomReach (0), std::sqrt (24.0), 1.0e-3) && isNear (zoomReach (1), 24.0, 1.0e-3)
+                     && synth.isOn (5) && isNear (synth.getTune (5), -24.0, 1.0e-4) && synth.getPreset (5) == waveform::Preset::square,
+                   "a version 2 one's are as given, and it can set oscillator 6, two octaves down");
+        }
+
+        // In the window, 3 oscillators show at a time, scrolling as the LFOs do.
+        {
+            SynthProcessor synth;
+            synth.editedSource = 4;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            const auto& oscillators = synthEditor.getOscillatorStrip();
+
+            check (oscillators.getNumCards() == 6 && oscillators.getNumShown() == 3
+                     && std::abs (oscillators.getCardWidth() - synthEditor.getLfoStrip().getCardWidth()) <= 1,
+                   "the window shows 3 of the 6 oscillators at a time, their cards as wide as the LFOs'");
+            check (oscillators.getFirstShown() == 2, "the window opens with the oscillator being edited in sight");
+            synthEditor.scrollToOscillator (0);
+            check (oscillators.getFirstShown() == 0, "...and scrolls back to show the first");
+
+            synth.editedSource = 5;
+            synthEditor.refresh();
+            check (oscillators.getFirstShown() == 3, "choosing an oscillator out of sight scrolls to it");
             synth.editorBeingDeleted (editor.get());
         }
     }
@@ -4549,6 +4693,15 @@ namespace
         check (juce::exactlyEqual (synth.getHarmonicPhase (0, 8), 0.0f) && ! synth.getDrawing (0).stepped && synth.getPresetName() == "Init"
                  && ! synth.isPresetEdited(),
                "...even a silent harmonic's phase, and how each wave is drawn");
+
+        // Init loads the same each time it's chosen, its waves, LFOs' beat rates and tunes' zooms as they start.
+        setPreset (synth, 1, waveform::Preset::sine);
+        synth.loadInitPreset();
+        synth.loadInitPreset();
+        juce::MemoryBlock again;
+        synth.getStateInformation (again);
+        const auto againXml = juce::AudioProcessor::getXmlFromBinary (again.getData(), (int) again.getSize());
+        check (againXml != nullptr && againXml->isEquivalentTo (startedXml.get(), false), "choosing Init again loads it the same");
     }
 
     /** Command-Z goes back through each change made in the window, whatever it was, and Shift-Command-Z forward again;
@@ -5390,6 +5543,7 @@ int main (int argc, char* argv[])
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();
+    testSixOscillators();
     testSoundDescriptions();
     testHarmonicSwitches();
     testModulationOverview();

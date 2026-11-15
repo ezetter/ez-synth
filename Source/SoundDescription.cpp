@@ -1,5 +1,7 @@
 #include "SoundDescription.h"
 
+#include "Tuning.h"
+
 namespace sound
 {
     namespace
@@ -385,11 +387,20 @@ namespace sound
                     result.problems.add ("parameters: there's no parameter \"" + property.name.toString() + "\"");
                 }
             }
+
         }
         else if (! parameters.isVoid())
         {
             result.problems.add ("parameters should be an object, of parameter IDs and values");
         }
+
+        // Version 1 was written when the tune slider reached an octave either side, zoomed out, so its tunes' zooms,
+        // given or left as Init's, are moved to where they reach as far as they did, and modulation moves the tunes
+        // as far as it did.
+        if ((int) description.getProperty ("version", formatVersion) < 2)
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                if (auto* zoom = synth.parameters.getParameter (SynthProcessor::tuneZoomId (i)))
+                    zoom->setValueNotifyingHost (tuning::updateOldZoom (zoom->getValue()));
 
         if (const auto oscillators = description["oscillators"]; oscillators.isArray())
         {

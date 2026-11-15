@@ -2,7 +2,7 @@
 
 A synthesizer you play by drawing. Draw one wavelength of any shape on the grid, and EZ Synth breaks it down
 into the sine waves at its harmonics, shows each of them on the grid, and plays their sum at the pitch of
-whatever key you press. It has three oscillators, each with its own drawn wave, and every one that's on plays
+whatever key you press. It has six oscillators, each with its own drawn wave, and every one that's on plays
 each note, through four filters, each a low pass, mid pass, high pass or notch. Eight LFOs, each with a drawn wave of its own, eight
 envelopes, which run with each key pressed, and how hard each key is played can move almost any control.
 
@@ -10,13 +10,15 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ## Using it
 
-- **The window** has the six cards across the top, the grid under them, and the volume, envelopes and filters
+- **The window** has two rows of cards across the top, the grid under them, and the volume, envelopes and filters
   under that. Down the right, from the cards to the filters, is a tall panel with the chosen oscillator's
   harmonics, with big dials, or what the chosen LFO moves. The window can be resized, down to 1420 by 900.
-- **Choose an oscillator or LFO.** The six cards across the top are the three oscillators, then the three
-  LFOs. Click one to show its wave on the grid; its card is outlined. The presets and the drawing work on
-  whichever is shown. Only OSC 1 is on to begin with, playing a sine. The others start as a square and a
-  sawtooth, so each sounds different once switched on, and each plays its first 3 harmonics. The LFOs start
+- **Choose an oscillator or LFO.** Across the top are the oscillators' cards, then the LFOs'. Three of the
+  six oscillators show at a time: swipe sideways on the trackpad over the row, turn a mouse wheel, or drag the
+  thin scroll bar under it to see the others, as with the LFOs. Click a card to show its wave on the grid; its
+  card is outlined. The presets and the drawing work on whichever is shown. Only OSC 1 is on to begin with,
+  playing a sine. The others start as a square, a sawtooth, a triangle, a sine and a sawtooth, so the first
+  four sound different once switched on, and each plays its first 3 harmonics. The LFOs start
   switched off, until you give one something to move.
 - **Switch oscillators on and off** with the switch on each card. Every oscillator that's on plays every
   note, added together. You can still edit one that's off: its wave is drawn faintly, and the grid says it's
@@ -24,28 +26,32 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Set each oscillator's level** with the dial on its card, from 0 to 100% of its full amplitude.
   Double-click a dial to reset it to 100%.
 - **Tune an oscillator** with the **Tune** slider at the foot of the panel beside the grid, anywhere from
-  an octave below the note to an octave above. The middle of the slider, marked with a longer tick, is in
-  tune. Ticks mark each semitone, and the major and perfect intervals are numbered either way, 2 to 8: a
-  major 2nd, 3rd, 6th and 7th, a perfect 4th and 5th, and the octave. On a whole semitone the slider names
+  two octaves below the note to two octaves above. The middle of the slider, marked with a longer tick, is in
+  tune. Ticks mark each semitone, and the major and perfect intervals are marked either way, 2 to 15: a
+  major 2nd, 3rd, 6th and 7th, a perfect 4th and 5th, and the octave, then the same an octave further, the
+  9th to the 14th, and two octaves, the 15th. Zoomed out, only the 5ths and octaves (5, 8, 12 and 15) are
+  numbered, as there isn't room for every number. Tuning an oscillator an octave or two up lets its 16
+  harmonics stand in for the note's harmonics far above the 16th. On a whole semitone the slider names
   the interval, such as *+7 st · perfect 5th* or *−7 st · perfect 5th below*, and the interval's number
   lights up. Double-click it to put it back in tune. An oscillator that's tuned shows how far on its card,
   and the harmonics' frequencies beside the sliders are its own.
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
-  zoom in, from the whole two octaves down to a semitone either side, and left to zoom out; double-click it
+  zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
   to zoom right out. The figure beside it says how far either side of the middle the scale reaches. Zoomed
   in, the scale shows the part around the whole semitone nearest the tune, so from in tune it shows a
   semitone either side of the note, and from a 5th up a semitone either side of the 5th, for detuning the
   5th slightly. Faint ticks mark tenths, quarters or halves of a semitone, whichever fit. The scale stays
   put while you drag the tune, and follows the tune if it's set from elsewhere, such as by a preset. Zooming
   never changes the tune. Each oscillator has its own zoom, saved with the sound, and it also sets how far
-  modulation moves the tune (see below).
+  modulation moves the tune (see below). A sound saved when the tune reached only an octave either way loads
+  with its zooms moved to reach as far as they did, so it plays as it did.
 - **Snapping.** Dragging the tune snaps to the nearest whole semitone once you're within a few pixels of
   it, so the intervals are easy to land on exactly. As that's a few pixels however far you've zoomed in, a
   slight detune is easiest zoomed in. Hold Option while dragging to tune without snapping.
 - **Move the tune** like the other controls, with an LFO, for vibrato either side of the note, an
   envelope, to sweep the pitch with each note, velocity or the mod wheel. The zoom sets how far they can
   move it: at their full range, they move the tune across as much of the scale as the slider shows. Zoomed
-  right out, a full range spans the whole two octaves; zoomed right in, to a semitone either side, an LFO at
+  right out, a full range spans the whole four octaves; zoomed right in, to a semitone either side, an LFO at
   100% swings the tune a semitone either side of where it's set, so a range of 10% is a gentle vibrato of a
   tenth of a semitone. Zooming in or out while a sound plays rescales its modulation to match.
 - **Glide** into each note with the **Glide** row under the tune slider, separately for each oscillator.
@@ -497,7 +503,7 @@ writes it, and writing a sound out and reading it back plays the same sound.
 ```
 
 - `analyze` measures a sample: its pitch and nearest MIDI note, any vibrato, its loudness at moments after it
-  starts, the amplitudes of its first 32 harmonics at moments through the note (against the strongest, as EZ
+  starts, the amplitudes of its first 64 harmonics at moments through the note (against the strongest, as EZ
   Synth's are), how bright it is, how much of it is noise, harmonics that aren't whole multiples, and its
   strongest peaks, for inharmonic sounds such as bells.
 - `compare` plays a sound as the sample's note, for as long, measures both the same way, and shows them side by

@@ -113,13 +113,13 @@ experimental: do your best, say how close you got, and what EZ Synth couldn't ma
 
 ## How EZ Synth makes sound
 
-Each note played has its own voice. A voice adds up its three oscillators, sends the sum through four filters, one
+Each note played has its own voice. A voice adds up its six oscillators, sends the sum through four filters, one
 after another, and turns it up or down by the volume. Eight LFOs, eight envelopes, how hard the key was played
 (velocity), and a MIDI mod wheel can each move almost any control, as described below.
 
 ### Oscillators
 
-There are three, numbered 1 to 3 (`osc1`, `osc2`, `osc3` in parameter IDs). Each plays one wave, made of up to 16
+There are six, numbered 1 to 6 (`osc1` to `osc6` in parameter IDs). Each plays one wave, made of up to 16
 harmonics: sine waves at whole multiples of the note's frequency. Harmonic H of an oscillator plays
 `amplitude × sin(2π × (H + tune) × f × t + phase)`, where f is the note's frequency, raised or lowered by the
 oscillator's tune.
@@ -138,15 +138,21 @@ oscillator's tune.
 - If an oscillator's harmonics add up to a wave that peaks above 1, the whole oscillator is turned down until it
   doesn't. So only the harmonics' amplitudes against each other matter within an oscillator; set the strongest
   near 1, and balance oscillators against each other with their levels.
-- `oscNTune` moves the whole oscillator from 12 semitones down to 12 up, in fractions of a semitone too. Use it to
-  reach partials above the 16th: oscillator 2 at +12 plays twice oscillator 1's frequencies, so its harmonics 1 to
-  16 are the note's harmonics 2, 4, ... 32. Give it amplitudes only from its 9th up to add the note's even harmonics
-  from 18 to 32 without doubling oscillator 1's. Oscillator 3 at +12 with its harmonics' tunes at +0.5 plays odd
-  harmonics, as harmonic K tuned +0.5 at twice the frequency is 2K + 1 times the fundamental: its 9th to 16th give
-  the note's 19th to 33rd. (Its 1st can't be tuned, so give it no amplitude.)
+- `oscNTune` moves the whole oscillator from 24 semitones down to 24 up, in fractions of a semitone too. Use it to
+  reach partials above the 16th: an oscillator at +12 plays twice oscillator 1's frequencies, so its harmonics 1 to
+  16 are the note's harmonics 2, 4, ... 32, and one at +24 four times, so its harmonics are the note's 4, 8, ... 64.
+  Give oscillator 2 at +12 amplitudes only from its 9th up to add the note's even harmonics from 18 to 32 without
+  doubling oscillator 1's. An oscillator at +12 with its harmonics' tunes at +0.5 plays odd harmonics, as harmonic K
+  tuned +0.5 at twice the frequency is 2K + 1 times the fundamental: its 9th to 16th give the note's 19th to 33rd.
+  (Its 1st can't be tuned, so give it no amplitude.) At +24, a harmonic K tuned by +0.25, +0.5 or +0.75 is the
+  note's 4K + 1, 4K + 2 or 4K + 3, so oscillators at +24 can fill in harmonics from 33 to 64 the same way, four
+  harmonics of the note between each pair of theirs, a tune for each oscillator.
+  With six oscillators, you can also give several their own strong partials, each with its own level and its own
+  envelope, so different parts of the sound rise and fade at their own speeds, as a piano's or a bell's do.
+  An oscillator at -12 or -24 plays below the note, for a sub-octave.
   An oscillator a few cents off another makes them beat, as a piano's strings or a chorus do.
 - `oscNTuneZoom`, from 0 to 1, sets how far modulation moves that oscillator's tune: it's shown as how many
-  semitones either side its slider reaches, from 12 at 0 down to 1 at 1, as 12 × (1/12)^zoom. An LFO with a range
+  semitones either side its slider reaches, from 24 at 0 down to 1 at 1, as 24 × (1/24)^zoom. An LFO with a range
   of R swings the tune R × reach semitones either way, so at a zoom of 1 an LFO range of 0.1 is a vibrato of 10
   cents either way. An envelope with a range of R raises it by up to 2 × R × reach semitones.
 - `oscNGlide` and `oscNGlideTime` slide into each note from the one before; they don't matter for a single note.
@@ -247,7 +253,7 @@ volume.
 ```json
 {
   "format": "EZ Synth sound",
-  "version": 1,
+  "version": 2,
   "name": "Short name for the sound",
   "notes": "Anything worth saying about it, such as what it couldn't match",
   "parameters": { "parameter ID": number, true or false, or a choice's name },
@@ -255,7 +261,7 @@ volume.
     { "wave": "Sawtooth", "harmonics": [ { "harmonic": 1, "amplitude": 1.0, "phase": 0, "tune": 0, "switch": "follows" } ],
       "stepped": false, "steps": 8 },
     { ... oscillator 2 ... },
-    { ... oscillator 3 ... }
+    ... up to 6
   ],
   "lfos": [ { "wave": "Sine" }, { "points": [1, 0.5, 0.2, 0, -0.3, -1], "stepped": false }, ... up to 8 ],
   "modulation": [ { "target": "control key", "source": "LFO 1 or Env 1", "range": 0.5, "inverted": false, "phase": 0,
@@ -310,7 +316,7 @@ volume.
                  << quoted << " describe \"Grand Piano\"   # a factory preset, as a sound description\n"
                     "```\n\n"
                     "`analyze` reads WAV, AIFF, MP3 and the other formats macOS reads. Its harmonic amplitudes are linear, "
-                    "against the strongest harmonic at that moment, as EZ Synth's are; 32 harmonics are measured, where "
+                    "against the strongest harmonic at that moment, as EZ Synth's are; 64 harmonics are measured, where "
                     "they fit below 20 kHz. `compare` plays the sound as the sample's nearest MIDI note, holding the key "
                     "until the sample has faded 60 dB below its peak unless you give `--hold`, and saves what it played "
                     "beside the description, so the person can listen to both. The factory presets are Bell, Brass, "

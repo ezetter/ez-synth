@@ -12,7 +12,8 @@ namespace sound
 {
     /** The value of the description's "format" field. */
     inline constexpr auto formatName = "EZ Synth sound";
-    inline constexpr int formatVersion = 1;
+    /** Version 2 since oscillators can be tuned two octaves away, which changed what a tune's zoom means. */
+    inline constexpr int formatVersion = 2;
 
     /** What loading a description did: whether it loaded at all, and anything in it that was left out because it
         couldn't be understood, such as a parameter ID that doesn't exist, each said in a line.

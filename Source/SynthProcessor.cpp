@@ -11,11 +11,12 @@ namespace
 {
     constexpr int numVoices = 16;
 
-    /** The waves the oscillators start with, so each sounds different when it's switched on: a sine, a square and
-        a sawtooth, each with its first 3 harmonics.
+    /** The waves the oscillators start with, so the first four sound different when they're switched on: a sine, a
+        square, a sawtooth and a triangle, then a sine and a sawtooth again.
     */
     constexpr std::array<waveform::Preset, SynthProcessor::numOscillators> startingPresets {
-        waveform::Preset::sine, waveform::Preset::square, waveform::Preset::sawtooth
+        waveform::Preset::sine, waveform::Preset::square, waveform::Preset::sawtooth,
+        waveform::Preset::triangle, waveform::Preset::sine, waveform::Preset::sawtooth
     };
 
     /** The waves and periods the LFOs start with. */
@@ -1657,6 +1658,7 @@ juce::ValueTree SynthProcessor::createState()
     state.setProperty ("presetEdited", presetEdited.load(), nullptr);
     state.setProperty ("presetFactory", factoryPreset, nullptr);
     state.setProperty ("beatRates", (int) modulation::beatRates.size(), nullptr);
+    state.setProperty ("tuneReach", tuning::widestReach, nullptr);
 
     const auto addWave = [&state] (const juce::Identifier& source, int index, const waveform::Shape& shape,
                                    std::optional<waveform::Preset> preset, const waveform::Drawing& drawing)
@@ -1786,6 +1788,15 @@ void SynthProcessor::loadState (juce::ValueTree state)
         if (auto rate = state.getChildWithProperty ("id", lfoBeatRateId (i)); rate.isValid())
             rate.setProperty ("value", (double) rate["value"] + ratesAdded, nullptr);
 
+    // A save from before oscillators could be tuned two octaves away has its tunes' zooms counted from an octave
+    // either side, so each is moved to where it reaches as far as it did.
+    const auto oldReach = juce::approximatelyEqual ((float) state.getProperty ("tuneReach", tuning::oldWidestReach), tuning::oldWidestReach);
+    state.removeProperty ("tuneReach", nullptr);
+
+    for (int i = 0; i < numOscillators && oldReach; ++i)
+        if (auto zoom = state.getChildWithProperty ("id", tuneZoomId (i)); zoom.isValid())
+            zoom.setProperty ("value", tuning::updateOldZoom ((float) zoom["value"]), nullptr);
+
     std::vector<juce::ValueTree> waves, modulations;
 
     for (auto child = state.getChildWithName ("WAVE"); child.isValid(); child = state.getChildWithName ("WAVE"))
@@ -1835,6 +1846,10 @@ void SynthProcessor::loadState (juce::ValueTree state)
     // A save from before there were 8 LFOs gives those it hasn't the waves they start with.
     for (int i = 0; i < numLfos; ++i)
         setLfoShape (i, waveform::makePreset (startingLfoPresets[(size_t) i]), startingLfoPresets[(size_t) i]);
+
+    // A save from before there were 6 oscillators gives those it hasn't the waves they start with.
+    for (int i = 0; i < numOscillators; ++i)
+        setShape (i, waveform::makePreset (startingPresets[(size_t) i]), startingPresets[(size_t) i]);
 
     for (auto& oscillator : oscillators)
     {
@@ -2008,7 +2023,7 @@ bool SynthProcessor::loadPreset (const juce::File& file)
 
 void SynthProcessor::loadInitPreset()
 {
-    loadState (initState);
+    loadState (initState.createCopy());
     presetFile = juce::File();
 }
 

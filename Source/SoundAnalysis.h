@@ -13,10 +13,10 @@
 */
 namespace analysis
 {
-    /** The most harmonics measured, more than one oscillator's 16, as a second oscillator tuned an octave up can
-        play the even harmonics above them.
+    /** The most harmonics measured, more than one oscillator's 16, as other oscillators tuned an octave or two up
+        can play the harmonics above them, up to the 64th.
     */
-    inline constexpr int numHarmonics = 32;
+    inline constexpr int numHarmonics = 64;
 
     struct Audio
     {

@@ -11,7 +11,7 @@ namespace modulation
 {
     inline constexpr int numLfos = 8;
     inline constexpr int numEnvelopes = 8;
-    inline constexpr int numOscillators = 3;
+    inline constexpr int numOscillators = 6;
 
     /** What moves controls: the LFOs, then the envelopes, numbered in that order. */
     inline constexpr int numSources = numLfos + numEnvelopes;
@@ -35,13 +35,13 @@ namespace modulation
     // harmonics there can be. They're never saved: a sound saves each control by its key.
     inline constexpr int volumeTarget = 0;
     constexpr int oscillatorOnTarget (int oscillator)               { return 1 + oscillator; }
-    constexpr int oscillatorLevelTarget (int oscillator)            { return 4 + oscillator; }
-    constexpr int oscillatorHarmonicsTarget (int oscillator)        { return 7 + oscillator; }
-    constexpr int harmonicTarget (int oscillator, int harmonic)     { return 10 + oscillator * waveform::maxHarmonics + harmonic - 1; }
+    constexpr int oscillatorLevelTarget (int oscillator)            { return 1 + numOscillators + oscillator; }
+    constexpr int oscillatorHarmonicsTarget (int oscillator)        { return 1 + 2 * numOscillators + oscillator; }
+    constexpr int harmonicTarget (int oscillator, int harmonic)     { return 1 + 3 * numOscillators + oscillator * waveform::maxHarmonics + harmonic - 1; }
 
     namespace detail
     {
-        inline constexpr int afterHarmonics = 10 + numOscillators * waveform::maxHarmonics;
+        inline constexpr int afterHarmonics = 1 + 3 * numOscillators + numOscillators * waveform::maxHarmonics;
         inline constexpr int afterFilters = afterHarmonics + 6 * numFilters + numOscillators;
         inline constexpr int afterHarmonicTunes = afterFilters + numOscillators * (waveform::maxHarmonics - 1);
         inline constexpr int afterHarmonicPhases = afterHarmonicTunes + numOscillators * waveform::maxHarmonics;

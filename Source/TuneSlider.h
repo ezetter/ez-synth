@@ -6,8 +6,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** Tunes an oscillator away from the note, from an octave below it to an octave above, with the intervals from the
-    2nd to the octave marked along it either way. Dragging it snaps to whole semitones, unless Option is held.
+/** Tunes an oscillator away from the note, from two octaves below it to two octaves above, with the intervals from
+    the 2nd to the 15th, two octaves, marked along it either way. Dragging it snaps to whole semitones, unless Option is held.
 
     The zoom slider above it shows less of the scale, down to a semitone either side, so small tunings are easy to
     set. Zoomed in, it shows the part around the whole semitone nearest the tuning, which stays put while the tune is
@@ -26,7 +26,7 @@ public:
     /** Shows the tune of the given oscillator, numbered from 0, how far it's zoomed in, and its glide, and sets them. */
     void setOscillator (juce::AudioProcessorValueTreeState&, int oscillator);
 
-    /** How far it's zoomed in, from 0, an octave either side of the note, to 1, a semitone either side. */
+    /** How far it's zoomed in, from 0, two octaves either side of the note, to 1, a semitone either side. */
     void setZoom (float zoom);
     float getZoom() const;
 

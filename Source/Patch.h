@@ -25,7 +25,7 @@ struct Patch
         float tune = 0.0f;   // how many semitones away from the note it plays, below it if negative
 
         /** How far either side its tune slider's zoom reaches, in semitones, which scales how far modulation moves its
-            tune: a full range moves it across the part of the scale shown, rather than the whole two octaves.
+            tune: a full range moves it across the part of the scale shown, rather than the whole four octaves.
         */
         float tuneReach = tuning::widestReach;
 

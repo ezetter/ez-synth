@@ -43,9 +43,11 @@ public:
 
     void showModulationEditor (juce::Component& control) override;
 
-    /** Scrolls the LFOs' cards or the envelopes' panels, if need be, so one shows. */
+    /** Scrolls the oscillators' or LFOs' cards, or the envelopes' panels, if need be, so one shows. */
+    void scrollToOscillator (int oscillator)   { oscillatorStrip.scrollToShow (oscillator); }
     void scrollToLfo (int lfo)             { lfoStrip.scrollToShow (lfo); }
     void scrollToEnvelope (int envelope)   { envelopeStrip.scrollToShow (envelope); }
+    const CardStrip& getOscillatorStrip() const noexcept { return oscillatorStrip; }
     const CardStrip& getLfoStrip() const noexcept        { return lfoStrip; }
     const CardStrip& getEnvelopeStrip() const noexcept   { return envelopeStrip; }
     const CardStrip& getFilterStrip() const noexcept     { return filterStrip; }
@@ -98,8 +100,10 @@ private:
     std::array<std::unique_ptr<OscillatorCard>, SynthProcessor::numOscillators> oscillatorCards;
     std::array<std::unique_ptr<LfoCard>, SynthProcessor::numLfos> lfoCards;
 
-    /** The LFOs' cards and the envelopes' panels, three of each shown at a time, scrolling sideways to the others. */
-    CardStrip lfoStrip { 3 }, envelopeStrip { 3 };
+    /** The oscillators' and LFOs' cards and the envelopes' panels, three of each shown at a time, scrolling sideways
+        to the others.
+    */
+    CardStrip oscillatorStrip { 3 }, lfoStrip { 3 }, envelopeStrip { 3 };
 
     /** The filters, two shown at a time, scrolling sideways to the others. */
     CardStrip filterStrip { 2 };
