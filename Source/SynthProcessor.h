@@ -8,9 +8,12 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-/** The synth. Up to three oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
-    each note. Their sounds are added together, then go through a high pass and a low pass filter. Three LFOs, each
-    with a drawn wave of its own, and three envelopes, which run with each note, can move any of the controls.
+#include <map>
+
+/** The synth. Up to six oscillators each play a drawn wave, rebuilt from its first harmonics, at the pitch of
+    each note. Their sounds are added together, then go through the filters. Eight LFOs, each with a drawn wave of
+    its own, and eight envelopes, which run with each note, can move any of the controls. Every setting can be set
+    differently for ranges of keys, in pitch sets.
 */
 class SynthProcessor final : public juce::AudioProcessor,
                              private juce::AudioProcessorValueTreeState::Listener,
@@ -431,6 +434,62 @@ public:
     int getPresetVersion() const noexcept   { return presetVersion; }
 
     //==============================================================================
+    // Pitch sets: every setting of the sound, set differently for a range of keys. There's always the default pitch
+    // set, which plays every key no other's range takes in. The window shows and edits one pitch set at a time, the
+    // active one: every knob, wave and modulation is that pitch set's, and it's what the host's parameters move. Each
+    // note plays its key's pitch set as the note starts. Where ranges overlap, the narrower one plays the key.
+
+    static constexpr int maxPitchSets = ::maxPitchSets;
+
+    /** The pitch sets, the default first, then the others in order of their lowest key. */
+    int getNumPitchSets() const noexcept   { return (int) pitchSets.size(); }
+
+    /** A pitch set's range of keys, as MIDI note numbers, lowest and highest together, or nothing for the default. */
+    struct KeyRange
+    {
+        int lowest = 0, highest = 127;
+
+        bool contains (int note) const noexcept   { return note >= lowest && note <= highest; }
+        bool operator== (const KeyRange&) const = default;
+    };
+
+    std::optional<KeyRange> getPitchSetRange (int index) const;
+
+    /** What a pitch set is called: "Default", or its range, such as "C2 to B2", or "C4" for a single key. */
+    juce::String getPitchSetName (int index) const;
+    static juce::String getKeyRangeName (KeyRange);
+
+    /** The pitch set the window shows and edits. */
+    int getActivePitchSet() const noexcept   { return activePitchSet; }
+
+    /** Shows and edits another pitch set, leaving the one before as it is. */
+    void setActivePitchSet (int index);
+
+    /** Adds a pitch set for a range of keys, the lowest and highest given either way round, sounding as the active
+        one does to start with, and returns where it is among them. It doesn't become active. Returns -1 if there are
+        already as many pitch sets as there can be.
+    */
+    int addPitchSet (KeyRange);
+
+    /** Gives a pitch set other than the default another range, and returns where it is now among them. */
+    int setPitchSetRange (int index, KeyRange);
+
+    /** Takes away a pitch set other than the default. If it was active, the default becomes active. */
+    void removePitchSet (int index);
+
+    /** The pitch set that plays a key: the narrowest whose range takes it in, or the default. */
+    int getPitchSetForNote (int note) const;
+
+    /** Puts the active pitch set's sound back to Init's, leaving the pitch sets and their ranges as they are. */
+    void loadInitSound();
+
+    /** Goes up whenever a pitch set is added, taken away, given a range or made active. */
+    int getPitchSetVersion() const noexcept   { return pitchSetVersion; }
+
+    /** Goes up with every key pressed, from anywhere, so the window can take the keys pressed to set a range. */
+    int getNoteOnCount() const noexcept   { return noteOnCount.load(); }
+
+    //==============================================================================
     // Undo and redo, of the whole sound.
 
     /** Goes up with every change to the sound, from the window, a preset or the host. */
@@ -481,9 +540,40 @@ private:
     juce::AudioProcessorEditor* createEditor() override;
     void parameterChanged (const juce::String& parameterId, float newValue) override;
 
-    /** The whole sound, and the preset it came from, as saved with a host's project or in a preset file. */
+    /** The whole sound, and the preset it came from, as saved with a host's project or in a preset file: the active
+        pitch set's sound, with each other pitch set's sound in a child of its own.
+    */
     juce::ValueTree createState();
     void loadState (juce::ValueTree);
+
+    /** The active pitch set's sound: its parameters, waves and modulation. */
+    juce::ValueTree createSoundState();
+    void loadSoundState (juce::ValueTree);
+
+    /** Makes a pitch set active, its sound going into the parameters, the waves and the modulation, after keeping
+        the sound of the one active before.
+    */
+    void activate (int index);
+
+    /** Works out which pitch set plays each key, for the audio thread. */
+    void updateKeyMap();
+    void sortPitchSets();
+
+    struct PitchSet
+    {
+        std::optional<KeyRange> range;   // none for the default
+
+        /** Where its patch, parameters and shared waves are kept for the audio thread. */
+        int slot = 0;
+
+        /** Its sound, kept while another pitch set is active. */
+        juce::ValueTree sound;
+    };
+
+    std::vector<PitchSet> pitchSets;
+    int activePitchSet = 0;
+    int pitchSetVersion = 0;
+    std::atomic<int> noteOnCount { 0 };
 
     /** Loads a preset's XML under a name. Returns false, and leaves the sound alone, if it isn't a preset. */
     bool loadPresetXml (const juce::XmlElement*, const juce::String& name, bool isFactory);
@@ -596,11 +686,13 @@ private:
     /** Sets an oscillator's wave, remembering the phase of each harmonic it has. */
     void replaceShape (int oscillator, const waveform::Shape&, std::optional<waveform::Preset>);
 
-    /** Hands the waves and assignments to the audio thread. */
+    /** Hands the waves and assignments of the active pitch set to the audio thread. */
     void share();
 
-    /** On the audio thread: takes what the message thread shared, if it's changed, and reads the parameters. */
-    void updatePatch();
+    /** On the audio thread: takes what the message thread shared for a pitch set, if it's changed, and reads its
+        parameters, into its patch.
+    */
+    void updatePatch (int slot);
 
     std::array<Oscillator, numOscillators> oscillators;
     std::array<Lfo, numLfos> lfos;
@@ -626,23 +718,56 @@ private:
     int presetVersion = 0;
     juce::ValueTree initState;
 
-    // The audio thread only ever tries the lock, so it never waits.
-    juce::SpinLock sharedLock;
-    Shared shared;
-    std::atomic<int> sharedVersion { 0 };
+    // The audio thread only ever tries the lock, so it never waits. Each pitch set's slot has its own.
+    std::array<juce::SpinLock, maxPitchSets> sharedLocks;
+    std::vector<Shared> shared = std::vector<Shared> ((size_t) maxPitchSets);
+    std::array<std::atomic<int>, maxPitchSets> sharedVersions {};
 
     // The audio thread's own copies. The sample rate is kept from prepareToPlay, as not every host sets the one
     // getSampleRate() returns.
     double playingSampleRate = 44100.0;
-    Shared received;
-    int receivedVersion = -1;
-    Patch patch;
+    std::vector<Shared> received = std::vector<Shared> ((size_t) maxPitchSets);
+    std::array<int, maxPitchSets> receivedVersions {};
 
+    // Kept apart from the processor, as they're too big to keep in a processor made on the stack.
+    std::unique_ptr<Patches> patchStorage = std::make_unique<Patches>();
+    Patches& patches = *patchStorage;
+
+    /** The patch of the active pitch set, which the window shows. */
+    Patch& activePatch() noexcept               { return patches.sets[(size_t) activeSlot.load()]; }
+    const Patch& activePatch() const noexcept   { return patches.sets[(size_t) activeSlot.load()]; }
+
+    /** Every parameter, by where it's kept: the host's, or a pitch set's own copy. */
+    struct ParameterSet
+    {
+        std::array<OscillatorParameters, numOscillators> oscillators;
+        std::array<FilterParameters, modulation::numFilters> filters;
+        std::array<LfoParameters, numLfos> lfos;
+        std::array<EnvelopeParameters, numEnvelopes> envelopes;
+        std::atomic<float>* volume = nullptr;
+    };
+
+    ParameterSet makeParameterSet (const std::function<std::atomic<float>* (const juce::String&)>&);
+
+    // The parameters as the host has them, which are the active pitch set's.
     std::array<OscillatorParameters, numOscillators> oscillatorParameters;
     std::array<FilterParameters, modulation::numFilters> filterParameters;
     std::array<LfoParameters, numLfos> lfoParameters;
     std::array<EnvelopeParameters, numEnvelopes> envelopeParameters;
     std::atomic<float>* volume = nullptr;
+
+    // Each slot's own copy of every parameter, which the audio thread plays. The active pitch set's slot follows the
+    // host's parameters as they change.
+    std::vector<juce::RangedAudioParameter*> allParameters;
+    std::vector<std::atomic<float>*> liveValues;
+    std::map<juce::String, int> parameterIndices;
+    std::array<std::unique_ptr<std::atomic<float>[]>, maxPitchSets> slotValues;
+    std::array<ParameterSet, maxPitchSets> slotParameters;
+    std::array<std::atomic<bool>, maxPitchSets> slotUsed {};
+    std::atomic<int> activeSlot { 0 };
+
+    /** Copies every parameter, as the host has it, into the active pitch set's slot. */
+    void copyParametersToSlot();
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
 
@@ -689,12 +814,12 @@ private:
 
     // Where each looping LFO is, which the audio thread moves on with every block, and how far each LFO has got,
     // for the editor to show.
-    std::array<double, numLfos> lfoPhases {};
+    std::array<std::array<double, numLfos>, maxPitchSets> lfoPhases {};
 
     // How many periods each looping LFO has been through, which picks each cycle of a random wave, the seed each
     // plays its random wave from, and for the window, the cycle each is in and the newest note's seed for those
     // that run once.
-    std::array<std::int64_t, numLfos> lfoCycles {};
+    std::array<std::array<std::int64_t, numLfos>, maxPitchSets> lfoCycles {};
     std::array<std::uint32_t, numLfos> randomSeeds {};
     std::array<std::atomic<std::int64_t>, numLfos> lfoCyclesShown {};
     std::array<std::atomic<std::uint32_t>, numLfos> newestOnceSeeds {};
@@ -704,15 +829,16 @@ private:
     juce::int64 samplesPlayed = 0;
     juce::int64 lastNoteOnSample = -1;
 
-    /** A synthesiser that keeps where the mod wheel is in the patch, as each message comes, for the voices. */
+    /** A synthesiser that keeps where the mod wheel is in the patches, as each message comes, for the voices. */
     struct ModWheelSynthesiser final : public juce::Synthesiser
     {
-        explicit ModWheelSynthesiser (Patch& patchToMove) : patch (patchToMove) {}
+        explicit ModWheelSynthesiser (Patches& patchesToMove) : patches (patchesToMove) {}
 
         void handleController (int midiChannel, int controllerNumber, int controllerValue) override
         {
             if (controllerNumber == modulation::modWheelController)
-                patch.modWheel = (float) controllerValue / 127.0f;
+                for (auto& patch : patches.sets)
+                    patch.modWheel = (float) controllerValue / 127.0f;
 
             juce::Synthesiser::handleController (midiChannel, controllerNumber, controllerValue);
         }
@@ -722,14 +848,17 @@ private:
         */
         void noteOn (int midiChannel, int midiNoteNumber, float velocity) override
         {
-            patch.noteStart.legato = false;
+            Patch::NoteStart start;
 
             for (auto* voice : voices)
                 if (voice->isKeyDown() && voice->getCurrentlyPlayingNote() != midiNoteNumber)
-                    patch.noteStart.legato = true;
+                    start.legato = true;
 
-            for (size_t i = 0; i < patch.noteStart.glideFrom.size(); ++i)
-                patch.noteStart.glideFrom[i] = lastVoice != nullptr ? std::optional (lastVoice->getGlidingPitch ((int) i)) : std::nullopt;
+            for (size_t i = 0; i < start.glideFrom.size(); ++i)
+                start.glideFrom[i] = lastVoice != nullptr ? std::optional (lastVoice->getGlidingPitch ((int) i)) : std::nullopt;
+
+            for (auto& patch : patches.sets)
+                patch.noteStart = start;
 
             juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
 
@@ -740,11 +869,11 @@ private:
                     lastVoice = harmonicVoice;
         }
 
-        Patch& patch;
+        Patches& patches;
         const HarmonicVoice* lastVoice = nullptr;
     };
 
-    ModWheelSynthesiser synth { patch };
+    ModWheelSynthesiser synth { patches };
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
     std::array<waveform::Drawing, numSources> drawings;

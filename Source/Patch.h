@@ -150,3 +150,27 @@ struct Patch
     /** The volume knob follows a square law, which sounds more even over its turn than a straight line does. */
     static float volumeToGain (float volume)   { return volume * volume; }
 };
+
+/** The most pitch sets a sound can have, the default among them. */
+inline constexpr int maxPitchSets = 16;
+
+/** A patch for each pitch set, and which plays each key: every setting of the sound can be set differently for a
+    range of keys. Each note plays the patch of the pitch set its key is in as it starts, all through.
+*/
+struct Patches
+{
+    Patches()
+    {
+        for (auto& set : setForNote)
+            set = 0;
+    }
+
+    std::array<Patch, maxPitchSets> sets;
+    std::array<std::atomic<int>, 128> setForNote;
+
+    const Patch& forNote (int note) const noexcept
+    {
+        const auto set = setForNote[(size_t) juce::jlimit (0, 127, note)].load();
+        return sets[(size_t) juce::jlimit (0, maxPitchSets - 1, set)];
+    }
+};

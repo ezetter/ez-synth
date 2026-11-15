@@ -336,37 +336,42 @@ SynthProcessor::SynthProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       parameters (*this, nullptr, "EZSynth", createParameters())
 {
-    volume = parameters.getRawParameterValue (volumeId);
-
-    for (int i = 0; i < numOscillators; ++i)
-        oscillatorParameters[(size_t) i] = { parameters.getRawParameterValue (onId (i)),
-                                             parameters.getRawParameterValue (levelId (i)),
-                                             parameters.getRawParameterValue (harmonicsId (i)),
-                                             parameters.getRawParameterValue (tuneId (i)),
-                                             parameters.getRawParameterValue (tuneZoomId (i)),
-                                             parameters.getRawParameterValue (glideId (i)),
-                                             parameters.getRawParameterValue (glideTimeId (i)) };
-
-    for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
-        const auto ids = filterIds (filter);
-        filterParameters[(size_t) filter] = { parameters.getRawParameterValue (ids.on),
-                                              parameters.getRawParameterValue (ids.type),
-                                              parameters.getRawParameterValue (ids.cutoff),
-                                              parameters.getRawParameterValue (ids.resonance),
-                                              parameters.getRawParameterValue (ids.width),
-                                              parameters.getRawParameterValue (ids.q),
-                                              parameters.getRawParameterValue (ids.depth) };
+        const auto live = makeParameterSet ([this] (const juce::String& id) { return parameters.getRawParameterValue (id); });
+        oscillatorParameters = live.oscillators;
+        filterParameters = live.filters;
+        lfoParameters = live.lfos;
+        envelopeParameters = live.envelopes;
+        volume = live.volume;
     }
 
-    for (int i = 0; i < numLfos; ++i)
-        lfoParameters[(size_t) i] = { parameters.getRawParameterValue (lfoOnId (i)),
-                                      parameters.getRawParameterValue (lfoPeriodId (i)),
-                                      parameters.getRawParameterValue (lfoModeId (i)),
-                                      parameters.getRawParameterValue (lfoRandomId (i)),
-                                      parameters.getRawParameterValue (lfoSyncId (i)),
-                                      parameters.getRawParameterValue (lfoBeatRateId (i)),
-                                      parameters.getRawParameterValue (lfoStartOnPlayId (i)) };
+    // Each pitch set's slot keeps its own copy of every parameter, starting as the host's do.
+    for (auto* parameter : getParameters())
+    {
+        if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+        {
+            parameterIndices[ranged->paramID] = (int) allParameters.size();
+            allParameters.push_back (ranged);
+            liveValues.push_back (parameters.getRawParameterValue (ranged->paramID));
+        }
+    }
+
+    for (size_t slot = 0; slot < (size_t) maxPitchSets; ++slot)
+    {
+        slotValues[slot] = std::make_unique<std::atomic<float>[]> (allParameters.size());
+
+        for (size_t i = 0; i < allParameters.size(); ++i)
+            slotValues[slot][i] = liveValues[i]->load();
+
+        slotParameters[slot] = makeParameterSet ([this, slot] (const juce::String& id)
+        {
+            return &slotValues[slot][(size_t) parameterIndices.at (id)];
+        });
+    }
+
+    pitchSets.push_back ({});
+    slotUsed[0] = true;
+    receivedVersions.fill (-1);
 
     for (int target = 0; target < modulation::numTargets; ++target)
         if (modulation::isTrigger (target))
@@ -386,7 +391,7 @@ SynthProcessor::SynthProcessor()
         progress = -1.0;
 
     for (int i = 0; i < numVoices; ++i)
-        voices.push_back (dynamic_cast<HarmonicVoice*> (synth.addVoice (new HarmonicVoice (patch))));
+        voices.push_back (dynamic_cast<HarmonicVoice*> (synth.addVoice (new HarmonicVoice (patches))));
 
     synth.addSound (new HarmonicSound());
 
@@ -416,6 +421,40 @@ SynthProcessor::SynthProcessor()
     // The audio thread asks for oscillators' harmonics to be randomized, and passes on MIDI controllers moved; the
     // message thread carries them out.
     startTimerHz (60);
+}
+
+SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::function<std::atomic<float>* (const juce::String&)>& find)
+{
+    ParameterSet set;
+    set.volume = find (volumeId);
+
+    for (int i = 0; i < numOscillators; ++i)
+        set.oscillators[(size_t) i] = { find (onId (i)), find (levelId (i)), find (harmonicsId (i)), find (tuneId (i)),
+                                        find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)) };
+
+    for (int filter = 0; filter < modulation::numFilters; ++filter)
+    {
+        const auto ids = filterIds (filter);
+        set.filters[(size_t) filter] = { find (ids.on), find (ids.type), find (ids.cutoff), find (ids.resonance),
+                                         find (ids.width), find (ids.q), find (ids.depth) };
+    }
+
+    for (int i = 0; i < numLfos; ++i)
+        set.lfos[(size_t) i] = { find (lfoOnId (i)), find (lfoPeriodId (i)), find (lfoModeId (i)), find (lfoRandomId (i)),
+                                 find (lfoSyncId (i)), find (lfoBeatRateId (i)), find (lfoStartOnPlayId (i)) };
+
+    for (int i = 0; i < numEnvelopes; ++i)
+        set.envelopes[(size_t) i] = { find (attackId (i)), find (decayId (i)), find (sustainId (i)), find (releaseId (i)) };
+
+    return set;
+}
+
+void SynthProcessor::copyParametersToSlot()
+{
+    auto& values = slotValues[(size_t) activeSlot.load()];
+
+    for (size_t i = 0; i < liveValues.size(); ++i)
+        values[i] = liveValues[i]->load();
 }
 
 SynthProcessor::~SynthProcessor()
@@ -449,22 +488,34 @@ void SynthProcessor::prepareToPlay (double sampleRate, int)
 
 void SynthProcessor::restartLfos()
 {
-    lfoPhases.fill (0.0);
-    lfoCycles.fill (0);
+    lfoPhases = {};
+    lfoCycles = {};
 }
 
 void SynthProcessor::startLfosOnPlay (std::optional<double> beat)
 {
-    for (size_t i = 0; i < lfoPhases.size(); ++i)
+    // Each pitch set's LFOs, as it has them set.
+    for (size_t slot = 0; slot < (size_t) maxPitchSets; ++slot)
     {
-        if (! isLfoStartedOnPlay ((int) i))
+        if (! slotUsed[slot])
             continue;
 
-        // Synced, it lines up with the bar from wherever the host starts, as if it had run from the song's start;
-        // otherwise, or without the host's position, it starts its cycle.
-        const auto periods = isLfoSynced ((int) i) && beat.has_value() ? juce::jmax (0.0, *beat) / getLfoSyncedBeats ((int) i) : 0.0;
-        lfoCycles[i] = (std::int64_t) std::floor (periods);
-        lfoPhases[i] = periods - std::floor (periods);
+        const auto& lfoSettings = slotParameters[slot].lfos;
+
+        for (size_t i = 0; i < (size_t) numLfos; ++i)
+        {
+            if (lfoSettings[i].startOnPlay->load() < 0.5f)
+                continue;
+
+            // Synced, it lines up with the bar from wherever the host starts, as if it had run from the song's start;
+            // otherwise, or without the host's position, it starts its cycle.
+            const auto synced = lfoSettings[i].sync->load() >= 0.5f;
+            const auto rate = juce::jlimit (0, (int) modulation::beatRates.size() - 1, juce::roundToInt (lfoSettings[i].beatRate->load()));
+            const auto beatsPerCycle = 1.0 / modulation::beatRates[(size_t) rate];
+            const auto periods = synced && beat.has_value() ? juce::jmax (0.0, *beat) / beatsPerCycle : 0.0;
+            lfoCycles[slot][i] = (std::int64_t) std::floor (periods);
+            lfoPhases[slot][i] = periods - std::floor (periods);
+        }
     }
 }
 
@@ -493,6 +544,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
         if (message.isNoteOn())
         {
+            ++noteOnCount;
             lastNote = message.getNoteNumber();
             lastNoteOnSample = samplesPlayed + metadata.samplePosition;
         }
@@ -544,7 +596,12 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
 
     hostWasPlaying = hostPlaying;
 
-    updatePatch();
+    for (int slot = 0; slot < maxPitchSets; ++slot)
+        if (slotUsed[(size_t) slot])
+            updatePatch (slot);
+
+    const auto& patch = activePatch();
+    const auto shownSlot = (size_t) activeSlot.load();
 
     // How far through its periods an LFO that starts with each key is, from the last key pressed.
     for (size_t i = 0; i < periodsSinceLastNote.size(); ++i)
@@ -559,16 +616,28 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     modWheelShown = patch.modWheel;
     shareNewestNote();
 
-    for (size_t i = 0; i < lfoPhases.size(); ++i)
+    // Each pitch set's looping LFOs run on at its own rates. The mod wheel can change an LFO's rate, so it moves on
+    // by the periods it's been through at that rate.
+    for (size_t slot = 0; slot < (size_t) maxPitchSets; ++slot)
     {
-        // The mod wheel can change an LFO's rate, so it moves on by the periods it's been through at that rate.
+        if (! slotUsed[slot])
+            continue;
+
+        for (size_t i = 0; i < (size_t) numLfos; ++i)
+        {
+            auto& phase = lfoPhases[slot][i];
+            phase += numSamples / patches.sets[slot].getLfoPeriodSamples (i);
+            const auto periodsDone = std::floor (phase);
+            phase -= periodsDone;
+            lfoCycles[slot][i] += (std::int64_t) periodsDone;
+        }
+    }
+
+    // The window shows the active pitch set's LFOs.
+    for (size_t i = 0; i < (size_t) numLfos; ++i)
+    {
         const auto& lfo = patch.lfos[i];
-        const auto periodSamples = patch.getLfoPeriodSamples (i);
-        lfoPhases[i] += numSamples / periodSamples;
-        const auto periodsDone = std::floor (lfoPhases[i]);
-        lfoPhases[i] -= periodsDone;
-        lfoCycles[i] += (std::int64_t) periodsDone;
-        lfoCyclesShown[i] = lfoCycles[i];
+        lfoCyclesShown[i] = lfoCycles[shownSlot][i];
 
         // An LFO whose rate each note moves for itself is shown as the newest note plays it.
         if (patch.isLfoRateMovedByNote (i) && noteSounding)
@@ -581,7 +650,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         }
         else if (! lfo.fromKey)
         {
-            lfoProgress[i] = lfoPhases[i];
+            lfoProgress[i] = lfoPhases[shownSlot][i];
         }
         else if (lastNoteOnSample >= 0)
         {
@@ -604,6 +673,9 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
     // that only touches a threshold near its end, at its lowest or highest, is caught there.
     constexpr auto lookInterval = HarmonicVoice::controlInterval;
 
+    // Only the active pitch set's modulation triggers.
+    const auto& patch = activePatch();
+
     for (const auto triggerTarget : triggerTargets)
     {
         const auto target = (size_t) triggerTarget;
@@ -615,7 +687,7 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
         auto& crossings = triggerCrossings[target];
         auto triggered = false;
 
-        const auto watch = [this, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
+        const auto watch = [this, &patch, &triggered, numSamples] (modulation::ThresholdCrossing& crossing, const modulation::Assignment& assignment)
         {
             const auto threshold = modulation::getThresholdValue (assignment.source, assignment.threshold);
             const auto isLfo = assignment.isActive() && assignment.source < numLfos;
@@ -641,6 +713,8 @@ void SynthProcessor::watchRandomizeTriggers (int numSamples)
 
 std::optional<float> SynthProcessor::getSourceValueNow (int source, double phase, double periodsEarlier) const
 {
+    const auto& patch = activePatch();
+
     // The last note's velocity stays until the next note, even once it's faded, so one note can be compared with the next.
     if (source == modulation::velocitySource)
         return lastNote >= 0 ? std::optional (newestVelocity.load()) : std::nullopt;
@@ -871,25 +945,29 @@ void SynthProcessor::shareNewestNote()
         const auto& run = newest->getEnvelopeRun (i);
         auto& display = envelopeDisplays[(size_t) i];
         display.stage = (int) run.getStage();
-        display.progress = run.getProgress (patch.envelopes[(size_t) i]);
+        display.progress = run.getProgress (newest->getPatch().envelopes[(size_t) i]);
         display.level = run.getLevel();
         display.releaseFrom = run.getReleaseFrom();
     }
 }
 
-void SynthProcessor::updatePatch()
+void SynthProcessor::updatePatch (int slotNumber)
 {
-    if (sharedVersion.load() != receivedVersion)
+    const auto slot = (size_t) slotNumber;
+    auto& patch = patches.sets[slot];
+    auto& got = received[slot];
+
+    if (sharedVersions[slot].load() != receivedVersions[slot])
     {
         auto taken = false;
 
         {
-            const juce::SpinLock::ScopedTryLockType lock (sharedLock);
+            const juce::SpinLock::ScopedTryLockType lock (sharedLocks[slot]);
 
             if (lock.isLocked())
             {
-                received = shared;
-                receivedVersion = sharedVersion.load();
+                got = shared[slot];
+                receivedVersions[slot] = sharedVersions[slot].load();
                 taken = true;
             }
         }
@@ -899,39 +977,41 @@ void SynthProcessor::updatePatch()
             for (size_t i = 0; i < (size_t) numOscillators; ++i)
             {
                 auto& oscillator = patch.oscillators[i];
-                const auto& decomposition = received.decompositions[i];
+                const auto& decomposition = got.decompositions[i];
 
                 for (size_t k = 0; k < (size_t) waveform::maxHarmonics; ++k)
                 {
                     // A harmonic the wave hasn't got, if an LFO raises it, comes in at the phase it last had.
                     const auto& harmonic = decomposition.harmonics[k];
-                    const auto phase = harmonic.amplitude > 0.0f ? harmonic.phase : received.phases[i][k];
+                    const auto phase = harmonic.amplitude > 0.0f ? harmonic.phase : got.phases[i][k];
                     oscillator.amplitudes[k] = harmonic.amplitude;
                     oscillator.phases[k] = phase;
                     oscillator.phaseSines[k] = std::sin (phase);
                     oscillator.phaseCosines[k] = std::cos (phase);
                 }
 
-                oscillator.peaks = received.peaks[i];
-                oscillator.switches = received.switches[i];
-                oscillator.tunes = received.tunes[i];
+                oscillator.peaks = got.peaks[i];
+                oscillator.switches = got.switches[i];
+                oscillator.tunes = got.tunes[i];
             }
 
             for (size_t i = 0; i < (size_t) numLfos; ++i)
             {
-                patch.lfos[i].shape = received.lfoShapes[i];
-                patch.lfos[i].drawing = received.lfoDrawings[i];
+                patch.lfos[i].shape = got.lfoShapes[i];
+                patch.lfos[i].drawing = got.lfoDrawings[i];
             }
 
-            patch.assignments = received.assignments;
-            patch.velocityAssignments = received.velocityAssignments;
-            patch.modWheelAssignments = received.modWheelAssignments;
+            patch.assignments = got.assignments;
+            patch.velocityAssignments = got.velocityAssignments;
+            patch.modWheelAssignments = got.modWheelAssignments;
         }
     }
 
+    const auto& settings = slotParameters[slot];
+
     for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
-        const auto& source = oscillatorParameters[i];
+        const auto& source = settings.oscillators[i];
         auto& oscillator = patch.oscillators[i];
         oscillator.on = source.on->load() >= 0.5f;
         oscillator.level = source.level->load();
@@ -943,40 +1023,47 @@ void SynthProcessor::updatePatch()
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
-        patch.filters[i] = { filterParameters[i].on->load() >= 0.5f,
-                             (FilterType) juce::jlimit (0, (int) allFilterTypes.size() - 1, juce::roundToInt (filterParameters[i].type->load())),
-                             filterParameters[i].cutoff->load(), filterParameters[i].resonance->load(),
-                             filterParameters[i].width->load(), filterParameters[i].q->load(), filterParameters[i].depth->load() };
+    {
+        const auto& filter = settings.filters[i];
+        patch.filters[i] = { filter.on->load() >= 0.5f,
+                             (FilterType) juce::jlimit (0, (int) allFilterTypes.size() - 1, juce::roundToInt (filter.type->load())),
+                             filter.cutoff->load(), filter.resonance->load(), filter.width->load(), filter.q->load(),
+                             filter.depth->load() };
+    }
 
-    patch.volume = volume->load();
+    patch.volume = settings.volume->load();
 
     for (size_t i = 0; i < (size_t) numEnvelopes; ++i)
-        patch.envelopes[i] = { envelopeParameters[i].attack->load(), envelopeParameters[i].decay->load(),
-                               envelopeParameters[i].sustain->load(), envelopeParameters[i].release->load() };
+    {
+        const auto& envelope = settings.envelopes[i];
+        patch.envelopes[i] = { envelope.attack->load(), envelope.decay->load(), envelope.sustain->load(), envelope.release->load() };
+    }
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
+        const auto& source = settings.lfos[i];
         auto& lfo = patch.lfos[i];
-        lfo.on = lfoParameters[i].on->load() >= 0.5f;
-        const auto mode = getLfoMode ((int) i);
+        lfo.on = source.on->load() >= 0.5f;
+        const auto mode = juce::jlimit (0, modulation::lfoForever, juce::roundToInt (source.mode->load()));
         lfo.fromKey = mode != modulation::lfoLoops;
         lfo.times = modulation::getLfoTimes (mode);
-        lfo.synced = isLfoSynced ((int) i);
+        lfo.synced = source.sync->load() >= 0.5f;
 
         // Synced to the tempo, it runs a number of cycles a beat, carrying on from where it is as the tempo changes.
         if (lfo.synced)
         {
-            lfo.periodSeconds = (float) (getLfoSyncedBeats ((int) i) * 60.0 / playingTempo);
+            const auto rate = juce::jlimit (0, (int) modulation::beatRates.size() - 1, juce::roundToInt (source.beatRate->load()));
+            lfo.periodSeconds = (float) (60.0 / (modulation::beatRates[(size_t) rate] * playingTempo));
         }
         else
         {
-            lfo.periodSeconds = lfoParameters[i].period->load();
+            lfo.periodSeconds = source.period->load();
         }
 
         lfo.periodSamples = std::max (1.0, lfo.periodSeconds * playingSampleRate);
-        lfo.phase = lfoPhases[i];
-        lfo.cycle = lfoCycles[i];
-        lfo.random = lfoParameters[i].random->load() >= 0.5f;
+        lfo.phase = lfoPhases[slot][i];
+        lfo.cycle = lfoCycles[slot][i];
+        lfo.random = source.random->load() >= 0.5f;
         lfo.seed = randomSeeds[i];
     }
 }
@@ -1570,27 +1657,29 @@ float SynthProcessor::getPosition (int target) const
 
 void SynthProcessor::share()
 {
-    const juce::SpinLock::ScopedLockType lock (sharedLock);
+    const auto slot = (size_t) activeSlot.load();
+    const juce::SpinLock::ScopedLockType lock (sharedLocks[slot]);
+    auto& sharing = shared[slot];
 
     for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
-        shared.decompositions[i] = oscillators[i].decomposition;
-        shared.phases[i] = oscillators[i].phases;
-        shared.tunes[i] = oscillators[i].tunes;
-        shared.switches[i] = waveform::HarmonicSet (oscillators[i].switches);
-        shared.peaks[i] = waveform::getPeaks (oscillators[i].decomposition, shared.switches[i]);
+        sharing.decompositions[i] = oscillators[i].decomposition;
+        sharing.phases[i] = oscillators[i].phases;
+        sharing.tunes[i] = oscillators[i].tunes;
+        sharing.switches[i] = waveform::HarmonicSet (oscillators[i].switches);
+        sharing.peaks[i] = waveform::getPeaks (oscillators[i].decomposition, sharing.switches[i]);
     }
 
     for (size_t i = 0; i < (size_t) numLfos; ++i)
     {
-        shared.lfoShapes[i] = lfos[i].shape;
-        shared.lfoDrawings[i] = drawings[(size_t) numOscillators + i];
+        sharing.lfoShapes[i] = lfos[i].shape;
+        sharing.lfoDrawings[i] = drawings[(size_t) numOscillators + i];
     }
 
-    shared.assignments = assignments;
-    shared.velocityAssignments = velocityAssignments;
-    shared.modWheelAssignments = modWheelAssignments;
-    ++sharedVersion;
+    sharing.assignments = assignments;
+    sharing.velocityAssignments = velocityAssignments;
+    sharing.modWheelAssignments = modWheelAssignments;
+    ++sharedVersions[slot];
 }
 
 //==============================================================================
@@ -1653,10 +1742,44 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
 
 juce::ValueTree SynthProcessor::createState()
 {
-    auto state = parameters.copyState();
+    auto state = createSoundState();
     state.setProperty ("presetName", presetName, nullptr);
     state.setProperty ("presetEdited", presetEdited.load(), nullptr);
     state.setProperty ("presetFactory", factoryPreset, nullptr);
+
+    // A sound with pitch sets lists them all, in order, with the sound of each but the active one, whose sound is
+    // the state's own. A sound with only the default has no list, as before there were pitch sets.
+    if (pitchSets.size() > 1)
+    {
+        juce::ValueTree list ("PITCHSETS");
+        list.setProperty ("active", activePitchSet, nullptr);
+
+        for (size_t i = 0; i < pitchSets.size(); ++i)
+        {
+            const auto& pitchSet = pitchSets[i];
+            juce::ValueTree entry ("PITCHSET");
+
+            if (pitchSet.range.has_value())
+            {
+                entry.setProperty ("lowest", pitchSet.range->lowest, nullptr);
+                entry.setProperty ("highest", pitchSet.range->highest, nullptr);
+            }
+
+            if ((int) i != activePitchSet)
+                entry.appendChild (pitchSet.sound.createCopy(), nullptr);
+
+            list.appendChild (entry, nullptr);
+        }
+
+        state.appendChild (list, nullptr);
+    }
+
+    return state;
+}
+
+juce::ValueTree SynthProcessor::createSoundState()
+{
+    auto state = parameters.copyState();
     state.setProperty ("beatRates", (int) modulation::beatRates.size(), nullptr);
     state.setProperty ("tuneReach", tuning::widestReach, nullptr);
 
@@ -1778,6 +1901,87 @@ void SynthProcessor::loadState (juce::ValueTree state)
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
+
+    // The pitch sets, each in its own slot. A save from before there were pitch sets has only the default.
+    const auto list = state.getChildWithName ("PITCHSETS");
+    state.removeChild (list, nullptr);
+
+    std::vector<PitchSet> loaded;
+    std::vector<juce::ValueTree> sounds;
+    auto active = 0;
+
+    if (list.isValid())
+    {
+        for (const auto& entry : list)
+        {
+            if (! entry.hasType ("PITCHSET") || (int) loaded.size() >= maxPitchSets)
+                continue;
+
+            PitchSet pitchSet;
+
+            // The first is the default, which has no range; any other without one is left out.
+            if (! loaded.empty())
+            {
+                if (! entry.hasProperty ("lowest") || ! entry.hasProperty ("highest"))
+                    continue;
+
+                const auto a = juce::jlimit (0, 127, (int) entry["lowest"]);
+                const auto b = juce::jlimit (0, 127, (int) entry["highest"]);
+                pitchSet.range = KeyRange { std::min (a, b), std::max (a, b) };
+            }
+
+            if ((int) entry.getParent().indexOf (entry) == (int) list["active"])
+                active = (int) loaded.size();
+
+            pitchSet.slot = (int) loaded.size();
+            loaded.push_back (pitchSet);
+            sounds.push_back (entry.getChild (0));
+        }
+    }
+
+    if (loaded.empty())
+    {
+        loaded.push_back ({});
+        sounds.push_back ({});
+    }
+
+    // Each pitch set but the active one is loaded in turn, filling its slot, then the active one, from the state.
+    pitchSets = loaded;
+
+    for (size_t slot = 0; slot < (size_t) maxPitchSets; ++slot)
+        slotUsed[slot] = slot < pitchSets.size();
+
+    for (size_t i = 0; i < pitchSets.size(); ++i)
+    {
+        if ((int) i == active)
+            continue;
+
+        activePitchSet = (int) i;
+        activeSlot = pitchSets[i].slot;
+        loadSoundState (sounds[i].isValid() ? sounds[i].createCopy() : initState.createCopy());
+        pitchSets[i].sound = createSoundState();
+    }
+
+    activePitchSet = active;
+    activeSlot = pitchSets[(size_t) active].slot;
+    loadSoundState (state);
+    updateKeyMap();
+    ++pitchSetVersion;
+
+    // Loading changed everything, which on its own would count as editing the preset.
+    presetName = name;
+    presetEdited = edited;
+    factoryPreset = factory;
+    ++presetVersion;
+    ++changeCount;
+}
+
+void SynthProcessor::loadSoundState (juce::ValueTree state)
+{
+    state.removeProperty ("presetName", nullptr);
+    state.removeProperty ("presetEdited", nullptr);
+    state.removeProperty ("presetFactory", nullptr);
+    state.removeChild (state.getChildWithName ("PITCHSETS"), nullptr);
 
     // A save from before the slowest beat rates were added counts its LFOs' beat rates from 1/8 a beat, so each
     // moves up by as many as were added below it.
@@ -1960,14 +2164,188 @@ void SynthProcessor::loadState (juce::ValueTree state)
                                                       (bool) assignmentTree["inverted"], 0.0f, readThreshold (assignmentTree, *target) };
 
     share();
+    copyParametersToSlot();
     ++modulationVersion;
-
-    // Loading changed everything, which on its own would count as editing the preset.
-    presetName = name;
-    presetEdited = edited;
-    factoryPreset = factory;
-    ++presetVersion;
     ++changeCount;
+}
+
+//==============================================================================
+std::optional<SynthProcessor::KeyRange> SynthProcessor::getPitchSetRange (int index) const
+{
+    if (index < 0 || index >= getNumPitchSets())
+        return std::nullopt;
+
+    return pitchSets[(size_t) index].range;
+}
+
+juce::String SynthProcessor::getKeyRangeName (KeyRange range)
+{
+    const auto name = [] (int note) { return juce::MidiMessage::getMidiNoteName (note, true, true, 4); };
+
+    if (range.lowest == range.highest)
+        return name (range.lowest);
+
+    return name (range.lowest) + " to " + name (range.highest);
+}
+
+juce::String SynthProcessor::getPitchSetName (int index) const
+{
+    if (const auto range = getPitchSetRange (index))
+        return getKeyRangeName (*range);
+
+    return "Default";
+}
+
+void SynthProcessor::activate (int index)
+{
+    if (index < 0 || index >= getNumPitchSets() || index == activePitchSet)
+        return;
+
+    // The sound has only moved from one pitch set to another, so it's no more edited than it was.
+    const auto edited = presetEdited.load();
+    pitchSets[(size_t) activePitchSet].sound = createSoundState();
+    activePitchSet = index;
+    activeSlot = pitchSets[(size_t) index].slot;
+    loadSoundState (pitchSets[(size_t) index].sound.createCopy());
+    pitchSets[(size_t) index].sound = {};
+    presetEdited = edited;
+    ++pitchSetVersion;
+}
+
+void SynthProcessor::setActivePitchSet (int index)
+{
+    activate (index);
+}
+
+int SynthProcessor::addPitchSet (KeyRange range)
+{
+    if (getNumPitchSets() >= maxPitchSets)
+        return -1;
+
+    // The first slot no pitch set has.
+    auto slot = 0;
+
+    while (std::any_of (pitchSets.begin(), pitchSets.end(), [slot] (const PitchSet& each) { return each.slot == slot; }))
+        ++slot;
+
+    const auto from = (size_t) activeSlot.load();
+    const auto to = (size_t) slot;
+
+    // It starts as a copy of the active pitch set: its parameters, waves, modulation and LFOs where they are.
+    for (size_t i = 0; i < liveValues.size(); ++i)
+        slotValues[to][i] = slotValues[from][i].load();
+
+    {
+        const juce::SpinLock::ScopedLockType lock (sharedLocks[to]);
+        shared[to] = shared[from];
+        ++sharedVersions[to];
+    }
+
+    lfoPhases[to] = lfoPhases[from];
+    lfoCycles[to] = lfoCycles[from];
+    slotUsed[to] = true;
+
+    PitchSet pitchSet;
+    pitchSet.range = KeyRange { juce::jlimit (0, 127, std::min (range.lowest, range.highest)),
+                                juce::jlimit (0, 127, std::max (range.lowest, range.highest)) };
+    pitchSet.slot = slot;
+    pitchSet.sound = createSoundState();
+    pitchSets.push_back (pitchSet);
+    sortPitchSets();
+    updateKeyMap();
+    ++pitchSetVersion;
+    markEdited();
+
+    for (size_t i = 0; i < pitchSets.size(); ++i)
+        if (pitchSets[i].slot == slot)
+            return (int) i;
+
+    return -1;
+}
+
+int SynthProcessor::setPitchSetRange (int index, KeyRange range)
+{
+    if (index <= 0 || index >= getNumPitchSets())
+        return index;
+
+    const auto slot = pitchSets[(size_t) index].slot;
+    pitchSets[(size_t) index].range = KeyRange { juce::jlimit (0, 127, std::min (range.lowest, range.highest)),
+                                                 juce::jlimit (0, 127, std::max (range.lowest, range.highest)) };
+    sortPitchSets();
+    updateKeyMap();
+    ++pitchSetVersion;
+    markEdited();
+
+    for (size_t i = 0; i < pitchSets.size(); ++i)
+        if (pitchSets[i].slot == slot)
+            return (int) i;
+
+    return index;
+}
+
+void SynthProcessor::removePitchSet (int index)
+{
+    if (index <= 0 || index >= getNumPitchSets())
+        return;
+
+    if (index == activePitchSet)
+        activate (0);
+
+    const auto slot = (size_t) pitchSets[(size_t) index].slot;
+    pitchSets.erase (pitchSets.begin() + index);
+
+    if (activePitchSet > index)
+        --activePitchSet;
+
+    // No key plays its slot any more, before it's let go. Notes already playing it carry on as they were.
+    updateKeyMap();
+    slotUsed[slot] = false;
+    ++pitchSetVersion;
+    markEdited();
+}
+
+void SynthProcessor::sortPitchSets()
+{
+    const auto activeSlotNumber = pitchSets[(size_t) activePitchSet].slot;
+
+    std::stable_sort (pitchSets.begin() + 1, pitchSets.end(), [] (const PitchSet& a, const PitchSet& b)
+    {
+        return a.range->lowest != b.range->lowest ? a.range->lowest < b.range->lowest : a.range->highest < b.range->highest;
+    });
+
+    for (size_t i = 0; i < pitchSets.size(); ++i)
+        if (pitchSets[i].slot == activeSlotNumber)
+            activePitchSet = (int) i;
+}
+
+int SynthProcessor::getPitchSetForNote (int note) const
+{
+    auto best = 0;
+    auto bestWidth = 1000;
+
+    for (size_t i = 1; i < pitchSets.size(); ++i)
+    {
+        const auto& range = *pitchSets[i].range;
+
+        if (range.contains (note) && range.highest - range.lowest < bestWidth)
+        {
+            best = (int) i;
+            bestWidth = range.highest - range.lowest;
+        }
+    }
+
+    return best;
+}
+
+void SynthProcessor::updateKeyMap()
+{
+    for (int note = 0; note < 128; ++note)
+        patches.setForNote[(size_t) note] = pitchSets[(size_t) getPitchSetForNote (note)].slot;
+}
+
+void SynthProcessor::loadInitSound()
+{
+    loadSoundState (initState.createCopy());
 }
 
 //==============================================================================
@@ -2074,8 +2452,12 @@ bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::Str
     return true;
 }
 
-void SynthProcessor::parameterChanged (const juce::String&, float)
+void SynthProcessor::parameterChanged (const juce::String& parameterId, float newValue)
 {
+    // The active pitch set's slot follows the host's parameters, for the notes it plays.
+    if (const auto found = parameterIndices.find (parameterId); found != parameterIndices.end())
+        slotValues[(size_t) activeSlot.load()][(size_t) found->second] = newValue;
+
     markEdited();
 }
 

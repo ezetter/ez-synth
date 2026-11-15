@@ -3888,6 +3888,225 @@ namespace
         }
     }
 
+    /** Pitch sets: each sets every control differently for a range of keys, each key playing its pitch set's sound,
+        the narrowest whose range takes it in, or the default's. The controls set the active one. They're saved with
+        the sound, undone, and written in sound descriptions, and the window adds them from two keys pressed.
+    */
+    void testPitchSets()
+    {
+        std::cout << "Pitch sets" << std::endl;
+
+        // Where a note's energy is, an octave apart: how loud it is at a frequency, against the note's own.
+        const auto loudestAt = [] (SynthProcessor& synth, int note, double frequency)
+        {
+            const auto played = slice (play (synth, note, 0.5, 0.8), 0.1, 0.45);
+            return amplitudeAt (played, frequency) / std::max (1.0e-9, amplitudeAt (played, juce::MidiMessage::getMidiNoteInHertz (note))
+                                                                           + amplitudeAt (played, frequency));
+        };
+
+        SynthProcessor synth;
+        setPreset (synth, 0, waveform::Preset::sine);
+
+        check (synth.getNumPitchSets() == 1 && synth.getPitchSetName (0) == "Default" && ! synth.getPitchSetRange (0).has_value()
+                 && synth.getPitchSetForNote (0) == 0 && synth.getPitchSetForNote (127) == 0,
+               "a sound starts with only the default pitch set, which plays every key");
+
+        // A pitch set for C4 to B4 starts as the active one sounds, and setting it leaves the default as it was.
+        const auto octave = synth.addPitchSet ({ 71, 60 });
+        check (octave == 1 && synth.getNumPitchSets() == 2 && synth.getPitchSetRange (1) == SynthProcessor::KeyRange { 60, 71 }
+                 && synth.getPitchSetName (1) == "C4 to B4" && synth.getActivePitchSet() == 0,
+               "a pitch set added for keys pressed either way round has their range, named after them, and isn't made active");
+        check (synth.getPitchSetForNote (60) == 1 && synth.getPitchSetForNote (71) == 1 && synth.getPitchSetForNote (59) == 0
+                 && synth.getPitchSetForNote (72) == 0,
+               "...and plays the keys of its range, and the default the others");
+        check (loudestAt (synth, 69, 880.0) < 0.01, "...sounding as the default does to start with");
+
+        synth.setActivePitchSet (octave);
+        check (synth.getActivePitchSet() == 1 && synth.getPreset (0) == waveform::Preset::sine, "made active, the controls show its sound");
+        setParameter (synth, SynthProcessor::tuneId (0), 12.0f);
+
+        check (loudestAt (synth, 69, 880.0) > 0.99 && loudestAt (synth, 57, 440.0) < 0.01,
+               "a control set while a pitch set is active changes only its keys: A4 an octave up, A3 as it was");
+
+        synth.setActivePitchSet (0);
+        const auto defaultTune = synth.getTune (0);
+        synth.setActivePitchSet (1);
+        check (juce::exactlyEqual (defaultTune, 0.0f) && isNear (synth.getTune (0), 12.0, 1.0e-4),
+               "each pitch set's controls are shown as it has them when it's made active");
+
+        // A narrower range takes its keys from a wider one: A4 alone, two octaves down from the octave's.
+        const auto a4 = synth.addPitchSet ({ 69, 69 });
+        synth.setActivePitchSet (a4);
+        setParameter (synth, SynthProcessor::tuneId (0), -12.0f);
+        setPreset (synth, 0, waveform::Preset::square);
+
+        check (a4 == 2 && synth.getPitchSetName (a4) == "A4" && synth.getPitchSetForNote (69) == a4 && synth.getPitchSetForNote (68) == 1,
+               "a pitch set of one key plays that key, though a wider one takes it in too");
+        check (loudestAt (synth, 69, 220.0) > 0.9 && loudestAt (synth, 67, juce::MidiMessage::getMidiNoteInHertz (79)) > 0.99,
+               "...each key playing its own pitch set's sound");
+
+        // Another oscillator's wave and modulation follow the pitch set too.
+        check (synth.getPreset (0) == waveform::Preset::square, "a pitch set has its own waves");
+        synth.setActivePitchSet (1);
+        check (synth.getPreset (0) == waveform::Preset::sine, "...and the others keep theirs");
+
+        // A note keeps playing its pitch set's sound as the controls set another's.
+        {
+            synth.setActivePitchSet (0);
+            setParameter (synth, SynthProcessor::levelId (0), 0.0f);
+            check (loudestAt (synth, 69, 220.0) > 0.9 && amplitudeAt (slice (play (synth, 57, 0.5, 0.8), 0.1, 0.45), 220.0) < 1.0e-4,
+                   "silencing the default leaves the other pitch sets playing");
+            setParameter (synth, SynthProcessor::levelId (0), 1.0f);
+        }
+
+        // Saved and loaded, every pitch set comes back with its range and sound, and the active one is still active.
+        synth.setActivePitchSet (1);
+        juce::MemoryBlock saved;
+        synth.getStateInformation (saved);
+
+        {
+            SynthProcessor loaded;
+            loaded.setStateInformation (saved.getData(), (int) saved.getSize());
+            check (loaded.getNumPitchSets() == 3 && loaded.getPitchSetRange (1) == SynthProcessor::KeyRange { 60, 71 }
+                     && loaded.getPitchSetRange (2) == SynthProcessor::KeyRange { 69, 69 } && loaded.getActivePitchSet() == 1
+                     && isNear (loaded.getTune (0), 12.0, 1.0e-4),
+                   "saved and loaded, the pitch sets come back with their ranges, and the active one active");
+            check (loudestAt (loaded, 69, 220.0) > 0.9 && loudestAt (loaded, 67, juce::MidiMessage::getMidiNoteInHertz (79)) > 0.99
+                     && loudestAt (loaded, 57, 440.0) < 0.01,
+                   "...each playing its keys as it did");
+
+            loaded.setActivePitchSet (2);
+            check (loaded.getPreset (0) == waveform::Preset::square && isNear (loaded.getTune (0), -12.0, 1.0e-4),
+                   "...and each has its own sound to show when it's made active");
+
+            // A preset saved without pitch sets, as every sound before them, loads with only the default.
+            loaded.loadInitPreset();
+            check (loaded.getNumPitchSets() == 1 && loaded.getPitchSetForNote (69) == 0 && loudestAt (loaded, 69, 880.0) < 0.01,
+                   "Init, or a preset from before pitch sets, has only the default");
+        }
+
+        {
+            SynthProcessor plain;
+            juce::MemoryBlock plainSave;
+            plain.getStateInformation (plainSave);
+            const auto xml = juce::AudioProcessor::getXmlFromBinary (plainSave.getData(), (int) plainSave.getSize());
+            check (xml != nullptr && xml->getChildByName ("PITCHSETS") == nullptr,
+                   "a sound with only the default saves no pitch sets, as before there were any");
+        }
+
+        // Taking a pitch set away gives its keys back to the next narrowest, and the active one, if it was, to the
+        // default.
+        synth.setActivePitchSet (2);
+        synth.removePitchSet (2);
+        check (synth.getNumPitchSets() == 2 && synth.getActivePitchSet() == 0 && synth.getPitchSetForNote (69) == 1
+                 && loudestAt (synth, 69, 880.0) > 0.99,
+               "taking a pitch set away gives its keys back, and the default becomes active if it was");
+
+        synth.removePitchSet (0);
+        check (synth.getNumPitchSets() == 2, "the default can't be taken away");
+
+        // A new range moves it among the others, which stay in order of their lowest keys.
+        const auto low = synth.addPitchSet ({ 36, 47 });
+        check (low == 1 && synth.getPitchSetName (2) == "C4 to B4", "pitch sets are listed in order of their lowest keys");
+        check (synth.setPitchSetRange (low, { 84, 96 }) == 2 && synth.getPitchSetName (1) == "C4 to B4" && synth.getPitchSetForNote (40) == 0,
+               "...and given a new range, a pitch set moves to its place");
+        synth.removePitchSet (2);
+
+        // Undo takes back adding a pitch set, and the sound set in it.
+        synth.rememberForUndo();
+        const auto added = synth.addPitchSet ({ 48, 59 });
+        synth.setActivePitchSet (added);
+        setParameter (synth, SynthProcessor::tuneId (0), 7.0f);
+        synth.rememberForUndo();
+        synth.undo();
+        check (synth.getNumPitchSets() == 2 && synth.getPitchSetForNote (50) == 0, "undo takes back adding a pitch set");
+        synth.redo();
+        check (synth.getNumPitchSets() == 3 && synth.getActivePitchSet() == added && isNear (synth.getTune (0), 7.0, 1.0e-4),
+               "...and redo puts it back, with its sound");
+
+        auto full = true;
+
+        for (int i = synth.getNumPitchSets(); i < SynthProcessor::maxPitchSets; ++i)
+            full = full && synth.addPitchSet ({ i, i }) >= 0;
+
+        check (full && synth.addPitchSet ({ 100, 100 }) < 0, "there can be 16 pitch sets, the default among them, and no more");
+
+        // A sound description lists each pitch set but the default, with its keys and a sound of its own, starting
+        // from Init, and loads as it says.
+        {
+            SynthProcessor described;
+            const auto result = sound::load (described, R"({ "format": "EZ Synth sound", "version": 3, "name": "Three samples",
+                "parameters": { "osc1Tune": 0, "volume": 0.3 },
+                "oscillators": [ { "wave": "Sine" } ],
+                "pitchSets": [
+                    { "lowest": "C4", "highest": "B4", "parameters": { "osc1Tune": 12 }, "oscillators": [ { "wave": "Sine" } ] },
+                    { "lowest": 72, "highest": "F#5", "oscillators": [ { "wave": "Square" } ] },
+                    { "lowest": "Bb5", "highest": "Db6" },
+                    { "lowest": "H2", "highest": "C3" } ] })");
+
+            check (result.loaded && described.getNumPitchSets() == 4 && described.getActivePitchSet() == 0
+                     && described.getPitchSetRange (1) == SynthProcessor::KeyRange { 60, 71 }
+                     && described.getPitchSetRange (2) == SynthProcessor::KeyRange { 72, 78 }
+                     && described.getPitchSetRange (3) == SynthProcessor::KeyRange { 82, 85 }
+                     && described.getPresetName() == "Three samples",
+                   "a sound description's pitch sets load with their keys, as note names or numbers");
+            check (result.problems.size() == 1 && result.problems[0].startsWith ("pitchSets[3]"),
+                   "...and one without keys it can read is left out, and said to be");
+            check (loudestAt (described, 69, 880.0) > 0.99 && loudestAt (described, 57, 440.0) < 0.01,
+                   "...each playing its own sound");
+
+            described.setActivePitchSet (2);
+            const auto squareInSet = described.getPreset (0) == waveform::Preset::square && juce::exactlyEqual (described.getTune (0), 0.0f);
+            described.setActivePitchSet (3);
+            const auto volume = described.parameters.getRawParameterValue (SynthProcessor::volumeId)->load();
+            const auto initVolume = SynthProcessor().parameters.getRawParameterValue (SynthProcessor::volumeId)->load();
+            check (squareInSet && isNear (volume, initVolume, 1.0e-4) && ! isNear (initVolume, 0.3, 1.0e-3),
+                   "...each starting from Init, as the default does, not from the default's sound");
+
+            // Written out and loaded again, it's the same.
+            SynthProcessor copy;
+            sound::load (copy, sound::toJson (described, true));
+            check (copy.getNumPitchSets() == 4 && copy.getPitchSetRange (2) == described.getPitchSetRange (2)
+                     && loudestAt (copy, 69, 880.0) > 0.99 && loudestAt (copy, 57, 440.0) < 0.01,
+                   "a sound with pitch sets, written out and loaded again, has the same pitch sets and sound");
+            check (described.getActivePitchSet() == 3, "...and writing it out leaves the active pitch set active");
+        }
+
+        // In the window, a new pitch set's range is two keys pressed, and the button names the active one.
+        {
+            SynthProcessor windowed;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (windowed.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            check (synthEditor.getPitchSetButtonText() == "Pitch Sets", "the window's button says Pitch Sets with only the default");
+
+            synthEditor.showPitchSetScreen (true);
+            auto& screen = synthEditor.getPitchSetScreen();
+            screen.startNewPitchSet();
+            check (screen.isWaitingForKeys(), "a new pitch set waits for its keys");
+            screen.keyPlayed (59);
+            screen.keyPlayed (48);
+            synthEditor.refresh();
+
+            check (! screen.isWaitingForKeys() && windowed.getNumPitchSets() == 2 && windowed.getPitchSetRange (1) == SynthProcessor::KeyRange { 48, 59 }
+                     && windowed.getActivePitchSet() == 1 && synthEditor.getPitchSetButtonText() == "C3 to B3",
+                   "...takes the two keys pressed as its range, becomes active, and the button names it");
+
+            screen.startSettingKeys (1);
+            screen.keyPlayed (50);
+            screen.keyPlayed (50);
+            check (windowed.getPitchSetRange (1) == SynthProcessor::KeyRange { 50, 50 }, "setting its keys again, one key twice makes it that key alone");
+
+            screen.startNewPitchSet();
+            screen.keyPlayed (60);
+            screen.cancelWaiting();
+            check (windowed.getNumPitchSets() == 2, "cancelled, no pitch set is added");
+
+            synthEditor.showModulationOverview (true);
+            check (! synthEditor.isPitchSetScreenShown(), "the modulation overview takes the pitch sets' place");
+            windowed.editorBeingDeleted (editor.get());
+        }
+    }
+
     /** A sound written out as a description, as Claude writes one to match a sample, loads back as the same sound;
         a description written by hand loads as it says, and says what it couldn't understand; the analysis measures
         a note's pitch and harmonics as they are; and the prompt covers every parameter.
@@ -5291,6 +5510,26 @@ namespace
         save ("10b-modulation-overview");
         synthEditor.showModulationOverview (false);
 
+        // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
+        // added, waiting for its highest key.
+        {
+            synth.addPitchSet ({ 0, 42 });
+            synth.addPitchSet ({ 60, 64 });
+            synth.setActivePitchSet (synth.addPitchSet ({ 55, 127 }));
+            synthEditor.showPitchSetScreen (true);
+            save ("10c-pitch-sets");
+
+            synthEditor.getPitchSetScreen().startNewPitchSet();
+            synthEditor.getPitchSetScreen().keyPlayed (72);
+            save ("10d-pitch-set-keys");
+            synthEditor.getPitchSetScreen().cancelWaiting();
+            synthEditor.showPitchSetScreen (false);
+            save ("10e-pitch-set-active");
+
+            while (synth.getNumPitchSets() > 1)
+                synth.removePitchSet (1);
+        }
+
         for (const auto target : { modulation::volumeTarget, modulation::filterCutoffTarget (0), modulation::harmonicTarget (0, 2),
                                    modulation::oscillatorLevelTarget (1) })
             synth.setMidiController (target, std::nullopt);
@@ -5544,6 +5783,7 @@ int main (int argc, char* argv[])
     testMidiLearn();
     testEightLfosAndEnvelopes();
     testSixOscillators();
+    testPitchSets();
     testSoundDescriptions();
     testHarmonicSwitches();
     testModulationOverview();

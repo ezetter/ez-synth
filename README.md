@@ -465,6 +465,32 @@ WAV file. Name a factory preset, or a preset's file:
 Everything is also saved with your DAW project, including which preset the sound came from and whether it's
 been edited since. Everything except the waves and what moves what can be automated.
 
+### Pitch sets
+
+Every setting can be different for a range of keys, so a sound can brighten towards the bass, or match several
+samples of one instrument, one for each part of the keyboard.
+
+- **Open the pitch sets** with **Pitch Sets** in the header, beside **Modulation**. The screen covers the
+  window but for the keyboard. A bar across its top shows which pitch set plays each key from C1 to C8, in
+  each pitch set's colour.
+- **There's always the Default** pitch set, which plays every key no other pitch set takes in. Each other has a
+  range of keys, from its lowest to its highest. Where ranges overlap, the narrowest plays the key, so a pitch
+  set for C4 to E4 can sit inside one for G3 up.
+- **Add one** with **New Pitch Set**, then press its lowest key and its highest, on a MIDI keyboard, the
+  keyboard on screen or, in the standalone app, the computer's keys; the same key twice makes a pitch set of
+  that key alone. It starts sounding as the active pitch set does, and becomes the active one. **Set Keys**
+  gives a pitch set a new range the same way, **Delete** takes it away, and **Cancel** or Escape stops
+  waiting for keys.
+- **The active pitch set**, with the filled dot, is the one every knob, wave, harmonic, LFO, envelope and
+  modulation shows and sets, and what a host's automation moves. Click another pitch set to make it active.
+  Once there are pitch sets besides the default, the header's button is named after the active one, in its
+  colour, and the keys it plays are marked along their foot on the keyboard.
+- **Each note plays its key's pitch set** from start to end, even if you change pitch sets while it sounds.
+  Looping LFOs run in each pitch set at its own rates. Triggers, such as randomizing on an LFO's crossing,
+  follow only the active pitch set.
+- The pitch sets are saved with the sound, in presets and a host's project, and undo covers them. A sound
+  with only the default saves no pitch sets, so presets from before them load as they always did.
+
 ### Matching a sample with Claude (experimental)
 
 EZ Synth can hand Claude everything it needs to know to make a sound like a recording: a WAV, MP3 or other
@@ -484,12 +510,19 @@ as EZ Synth has no noise.
    it's listed under **From Claude**, newest first; choose it to load it. **Save** keeps it as a preset.
    If Claude shows you the JSON instead, copy it and choose **Paste a sound from Claude**.
 
+**Several samples** of one instrument, such as at C2, C3 and C4, can be matched together: give Claude all of
+them. It makes a pitch set for each, splitting the keyboard halfway between neighbouring samples' notes, and
+matches each sample in its own pitch set, keeping their sounds alike so the instrument doesn't jump between
+ranges.
+
 If part of a sound can't be understood, such as a parameter that doesn't exist, the rest still loads, and EZ
 Synth says what was left out. **Show the From Claude folder** opens the folder in Finder.
 
 **The sound description** is JSON: the parameters by ID, in their own units (hertz, seconds, or a choice's
 name), each oscillator's harmonics, each with an amplitude, phase, tune and switch, each LFO's wave as a preset
-or as points, and what moves what. Anything left out is as Init has it. `Source/SoundDescription.cpp` reads and
+or as points, and what moves what. Anything left out is as Init has it. Its sound is the default pitch set's;
+`pitchSets` lists the others, each with its `lowest` and `highest` key, as MIDI note numbers or names such as
+`"F#2"`, and a sound of its own in the same terms, also starting from Init. `Source/SoundDescription.cpp` reads and
 writes it, and writing a sound out and reading it back plays the same sound.
 
 **The sound tool**, `build/EZSynthSoundTool`, is how Claude listens. The prompt tells Claude where it is.
@@ -497,6 +530,7 @@ writes it, and writing a sound out and reading it back plays the same sound.
 ```bash
 ./build/EZSynthSoundTool analyze sample.wav
 ./build/EZSynthSoundTool compare sound.json sample.wav
+./build/EZSynthSoundTool compare sound.json sample.wav --note C2
 ./build/EZSynthSoundTool render sound.json out.wav --note 60 --hold 1 --length 2
 ./build/EZSynthSoundTool describe "Grand Piano"
 ./build/EZSynthSoundTool prompt
@@ -508,7 +542,8 @@ writes it, and writing a sound out and reading it back plays the same sound.
   strongest peaks, for inharmonic sounds such as bells.
 - `compare` plays a sound as the sample's note, for as long, measures both the same way, and shows them side by
   side, with the average differences in loudness and harmonics in dB, and in pitch in cents. It saves what it
-  played beside the sound, as *name (EZ Synth).wav*, so you can listen to both.
+  played beside the sound, as *name (EZ Synth).wav*, so you can listen to both, and says which pitch set played
+  the note. `--note` plays another key, as a number or a name.
 - `render` plays a sound as one note into a WAV file; `describe` prints a sound, such as a factory preset, as a
   description; `prompt` prints the prompt.
 
@@ -631,6 +666,12 @@ save pictures of the window showing several waves.
   harmonics more of their travel, just as their dials and sliders do (`Source/Modulation.cpp`). The note
   then glides its harmonics, filters and volume there, so even a square LFO doesn't click. The window
   shows the same positions for the latest note, on the controls and in the grid's sine waves.
+- **Pitch sets.** The host's parameters, the waves and the modulation are always the active pitch set's.
+  Each pitch set has a slot of its own for the audio thread, with its own copy of every parameter, its own
+  waves and modulation shared through its own lock, and its own patch (`Source/Patch.h`). The active pitch
+  set's slot follows the host's parameters as they change. Another pitch set's sound is kept as saved state;
+  making it active saves the one before and loads it. A table of which slot plays each key is worked out
+  whenever the ranges change, and each voice takes its key's slot's patch as its note starts.
 - **Between the threads.** The window analyses the drawing on the message thread. The analysis reaches the
   audio thread through a lock that the audio thread only ever tries, so audio never waits on drawing.
 
@@ -646,11 +687,12 @@ save pictures of the window showing several waves.
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/TuneSlider.*` | The tune slider, with its intervals marked, and the zoom slider above it |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
-| `Source/Patch.h` | Everything the notes need to play a block |
+| `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
 | `Source/Envelope.*` | One note's run through an envelope's attack, decay, sustain and release |
 | `Source/EnvelopePanel.*` | An envelope's dials and the picture of its shape |
 | `Source/ModulationOverview.*` | The screen listing everything that moves a control, or is linked to one |
+| `Source/PitchSetScreen.*` | The screen listing the pitch sets, adding them from two keys pressed, and choosing the active one |
 | `Source/ModulationEditor.*` | The window for choosing an LFO or envelope, velocity and the mod wheel, with their ranges, phases and polarities |
 | `Source/LfoPanel.*` | The list of what an LFO moves |
 | `Source/ChoiceButtons.*` | Rows of joined buttons, such as Loop and Once |

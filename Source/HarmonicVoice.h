@@ -22,7 +22,8 @@ struct HarmonicSound final : public juce::SynthesiserSound
 class HarmonicVoice final : public juce::SynthesiserVoice
 {
 public:
-    explicit HarmonicVoice (const Patch&);
+    /** Plays each note with the patch of the pitch set its key is in. */
+    explicit HarmonicVoice (const Patches&);
 
     bool canPlaySound (juce::SynthesiserSound*) override;
     void startNote (int midiNoteNumber, float velocity, juce::SynthesiserSound*, int currentPitchWheelPosition) override;
@@ -51,6 +52,9 @@ public:
 
     /** How long ago the note started, so the window can show the newest note's envelopes. */
     juce::int64 getSamplesSinceNoteOn() const noexcept   { return samplesSinceNoteOn; }
+
+    /** The patch the note is playing, its pitch set's. */
+    const Patch& getPatch() const noexcept   { return *patch; }
 
     /** How hard the note's key was played, from 0 to 1. */
     float getVelocity() const noexcept   { return noteVelocity; }
@@ -100,7 +104,8 @@ private:
     /** Whether an envelope moves a control. */
     bool hasEnvelope (int target) const;
 
-    const Patch& patch;
+    const Patches& patches;
+    const Patch* patch = &patches.sets[0];   // the note's pitch set's, chosen as it starts
 
     // The amplitudes being played, by oscillator and harmonic, and how far each oscillator is tuned up, all gliding
     // towards the targets.

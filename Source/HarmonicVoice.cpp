@@ -45,8 +45,8 @@ namespace
     const juce::ADSR::Parameters afterLoudnessEnvelope { 0.008f, 0.05f, 1.0f, 0.03f };
 }
 
-HarmonicVoice::HarmonicVoice (const Patch& patchToPlay)
-    : patch (patchToPlay)
+HarmonicVoice::HarmonicVoice (const Patches& patchesToPlay)
+    : patches (patchesToPlay)
 {
     glideLengths.fill (1.0);
     ownEnvelope.setParameters (normalEnvelope);
@@ -76,16 +76,19 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
 {
     noteNumber = midiNoteNumber;
     pitchWheel = currentPitchWheelPosition;
+
+    // The note plays its key's pitch set's settings all through, even if the pitch sets change while it sounds.
+    patch = &patches.forNote (midiNoteNumber);
     updateFrequency();
 
     // Each oscillator that glides slides in from the pitch the note before had reached: always, or, legato, only
     // while another key's held.
     for (size_t i = 0; i < glideStarts.size(); ++i)
     {
-        const auto& oscillator = patch.oscillators[i];
-        const auto& from = patch.noteStart.glideFrom[i];
+        const auto& oscillator = patch->oscillators[i];
+        const auto& from = patch->noteStart.glideFrom[i];
         const auto glides = from.has_value() && oscillator.glideSeconds > 0.0f
-                         && (oscillator.glide == Patch::Glide::always || (oscillator.glide == Patch::Glide::legato && patch.noteStart.legato));
+                         && (oscillator.glide == Patch::Glide::always || (oscillator.glide == Patch::Glide::legato && patch->noteStart.legato));
         glideStarts[i] = glides ? *from - midiNoteNumber : 0.0;
         glideLengths[i] = glides ? std::max (1.0, oscillator.glideSeconds * getSampleRate()) : 1.0;
     }
@@ -143,7 +146,7 @@ void HarmonicVoice::stopNote (float, bool allowTailOff)
 bool HarmonicVoice::usesLoudnessEnvelope() const
 {
     for (int target = 0; target < modulation::numTargets; ++target)
-        if (const auto& assignment = patch.assignments[(size_t) target];
+        if (const auto& assignment = patch->assignments[(size_t) target];
             assignment.isActive() && modulation::isEnvelope (assignment.source) && modulation::isLoudness (target))
             return true;
 
@@ -152,14 +155,14 @@ bool HarmonicVoice::usesLoudnessEnvelope() const
 
 bool HarmonicVoice::hasEnvelope (int target) const
 {
-    const auto& assignment = patch.assignments[(size_t) target];
+    const auto& assignment = patch->assignments[(size_t) target];
     return assignment.isActive() && modulation::isEnvelope (assignment.source);
 }
 
 bool HarmonicVoice::isLoudnessEnvelopeRunning() const
 {
     for (int target = 0; target < modulation::numTargets; ++target)
-        if (const auto& assignment = patch.assignments[(size_t) target];
+        if (const auto& assignment = patch->assignments[(size_t) target];
             assignment.isActive() && modulation::isEnvelope (assignment.source) && modulation::isLoudness (target)
             && ! envelopeRuns[(size_t) (assignment.source - modulation::numLfos)].isIdle())
             return true;
@@ -197,10 +200,10 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
     for (size_t i = 0; i < lfoPeriodsGone.size(); ++i)
     {
-        const auto& lfo = patch.lfos[i];
-        lfoPeriodsGone[i] = lfo.fromKey || (patch.isLfoRateMovedByNote (i) && ! startingNote)
+        const auto& lfo = patch->lfos[i];
+        lfoPeriodsGone[i] = lfo.fromKey || (patch->isLfoRateMovedByNote (i) && ! startingNote)
                                 ? lfoPeriods[i]
-                                : (double) lfo.cycle + lfo.phase + startSample / patch.getLfoPeriodSamples (i);
+                                : (double) lfo.cycle + lfo.phase + startSample / patch->getLfoPeriodSamples (i);
     }
 
     // Moves a control's position, from 0 to 1, by the note's velocity, and by the LFO or envelope assigned to it, if
@@ -209,13 +212,13 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     // by its range times the scale given, which is less than 1 for an oscillator's tune with its slider zoomed in.
     const auto modulate = [this, &lfoPeriodsGone] (int target, float position, float scale = 1.0f)
     {
-        if (const auto& byVelocity = patch.velocityAssignments[(size_t) target]; byVelocity.isActive())
+        if (const auto& byVelocity = patch->velocityAssignments[(size_t) target]; byVelocity.isActive())
             position += scale * byVelocity.offset (noteVelocity);
 
-        if (const auto& byModWheel = patch.modWheelAssignments[(size_t) target]; byModWheel.isActive())
-            position += scale * byModWheel.offset (patch.modWheel);
+        if (const auto& byModWheel = patch->modWheelAssignments[(size_t) target]; byModWheel.isActive())
+            position += scale * byModWheel.offset (patch->modWheel);
 
-        const auto& assignment = patch.assignments[(size_t) target];
+        const auto& assignment = patch->assignments[(size_t) target];
 
         if (assignment.isActive() && isEnvelope (assignment.source))
         {
@@ -224,9 +227,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                                   { run.getLevel(), run.hasBeenReleased(), run.getReleaseFrom(), run.getReleaseLeft() }, scale);
         }
 
-        if (assignment.isActive() && patch.lfos[(size_t) assignment.source].on)
+        if (assignment.isActive() && patch->lfos[(size_t) assignment.source].on)
         {
-            const auto& lfo = patch.lfos[(size_t) assignment.source];
+            const auto& lfo = patch->lfos[(size_t) assignment.source];
             const auto periodsGone = lfoPeriodsGone[(size_t) assignment.source] - assignment.phase;
             const auto value = ! lfo.random ? lfoValue (lfo.shape, periodsGone, lfo.fromKey, lfo.times)
                              : lfo.fromKey  ? randomwave::fromKeyValueAt (randomSeeds[(size_t) assignment.source], periodsGone,
@@ -248,7 +251,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
     for (int i = 0; i < numOscillators; ++i)
     {
-        const auto& oscillator = patch.oscillators[(size_t) i];
+        const auto& oscillator = patch->oscillators[(size_t) i];
 
         // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on. Its zoom
         // sets how far modulation moves it.
@@ -279,13 +282,13 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             const auto target = harmonicTarget (i, harmonic);
             auto amplitude = oscillator.amplitudes[index];
 
-            if (patch.isMoved (target))
+            if (patch->isMoved (target))
                 amplitude = amplitudeRange().convertFrom0to1 (modulate (target, amplitudeRange().convertTo0to1 (amplitude)));
 
             // A sin (θ + φ) = A sin φ cos θ + A cos φ sin θ. A harmonic's phase can be moved round its whole turn.
             auto phaseSine = oscillator.phaseSines[index], phaseCosine = oscillator.phaseCosines[index];
 
-            if (const auto phaseTarget = harmonicPhaseTarget (i, harmonic); patch.isMoved (phaseTarget))
+            if (const auto phaseTarget = harmonicPhaseTarget (i, harmonic); patch->isMoved (phaseTarget))
             {
                 constexpr auto turn = juce::MathConstants<float>::twoPi;
                 const auto phase = oscillator.phases[index] - turn * std::floor (oscillator.phases[index] / turn);
@@ -305,7 +308,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
             const auto target = harmonicTuneTarget (i, harmonic);
             auto tune = oscillator.tunes[(size_t) harmonic - 1];
 
-            if (patch.isMoved (target))
+            if (patch->isMoved (target))
                 tune = (modulate (target, tune / (2.0f * waveform::furthestTune) + 0.5f) - 0.5f) * 2.0f * waveform::furthestTune;
 
             targets.harmonicTunes[(size_t) i][(size_t) harmonic] = tune;
@@ -314,7 +317,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
     for (int i = 0; i < numFilters; ++i)
     {
-        const auto& filter = patch.filters[(size_t) i];
+        const auto& filter = patch->filters[(size_t) i];
         // Moves a setting that travels along a range as its dial does.
         const auto modulateIn = [&modulate] (const juce::NormalisableRange<float>& range, int target, float value)
         {
@@ -332,16 +335,16 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                                         modulateIn (FilterStage::depthRange(), filterDepthTarget (i), filter.depth) };
     }
 
-    targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch.volume));
+    targets.gain = Patch::volumeToGain (modulate (volumeTarget, patch->volume));
 
     // Each LFO's rate, which the mod wheel, or another LFO, an envelope or velocity, can move.
     for (size_t i = 0; i < targets.lfoPeriods.size(); ++i)
     {
         targets.lfoPeriods[i] = lfoPeriodsGone[i];
         const auto rateTarget = lfoRateTarget ((int) i);
-        targets.lfoPeriodSamples[i] = patch.isMoved (rateTarget) && ! patch.lfos[i].synced
-                                          ? patch.getLfoPeriodSamplesAt (i, modulate (rateTarget, patch.getLfoRatePosition (i)))
-                                          : patch.lfos[i].periodSamples;
+        targets.lfoPeriodSamples[i] = patch->isMoved (rateTarget) && ! patch->lfos[i].synced
+                                          ? patch->getLfoPeriodSamplesAt (i, modulate (rateTarget, patch->getLfoRatePosition (i)))
+                                          : patch->lfos[i].periodSamples;
     }
 
     return targets;
@@ -365,7 +368,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     // An envelope stage that takes no time, such as an attack of 0, is over before the note's first sound.
     if (startingNote)
         for (size_t i = 0; i < envelopeRuns.size(); ++i)
-            envelopeRuns[i].advance (patch.envelopes[i], 0.0);
+            envelopeRuns[i].advance (patch->envelopes[i], 0.0);
 
     const auto targets = getTargets (startSample);
 
@@ -540,7 +543,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         samplesSinceKeyUp += numSamples;
 
     for (size_t i = 0; i < envelopeRuns.size(); ++i)
-        envelopeRuns[i].advance (patch.envelopes[i], numSamples / sampleRate);
+        envelopeRuns[i].advance (patch->envelopes[i], numSamples / sampleRate);
 
     // Once every envelope moving the loudness has finished its release, the note ends.
     if (waitingForEnvelopes && ! isLoudnessEnvelopeRunning())

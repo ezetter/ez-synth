@@ -63,6 +63,7 @@ target_sources(EZSynth
         Source/Modulation.cpp
         Source/ModulationEditor.cpp
         Source/ModulationOverview.cpp
+        Source/PitchSetScreen.cpp
         Source/PresetBar.cpp
         Source/RandomWave.cpp
         Source/SoundAnalysis.cpp

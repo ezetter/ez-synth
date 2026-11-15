@@ -8,6 +8,7 @@
 #include "Keyboard.h"
 #include "LfoPanel.h"
 #include "ModulationOverview.h"
+#include "PitchSetScreen.h"
 #include "MidiPanel.h"
 #include "ModulatableControls.h"
 #include "PresetBar.h"
@@ -55,6 +56,12 @@ public:
     /** Shows the screen listing everything that moves a control, or is linked to one, over the synth, or hides it. */
     void showModulationOverview (bool);
     bool isModulationOverviewShown() const   { return modulationOverview.isVisible(); }
+
+    /** Shows the screen listing the pitch sets, over the synth but for the keyboard, or hides it. */
+    void showPitchSetScreen (bool);
+    bool isPitchSetScreenShown() const   { return pitchSetScreen.isVisible(); }
+    PitchSetScreen& getPitchSetScreen() noexcept   { return pitchSetScreen; }
+    juce::String getPitchSetButtonText() const   { return pitchSetButton.getButtonText(); }
 
     /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
     bool keyPressed (const juce::KeyPress&) override;
@@ -132,6 +139,14 @@ private:
     */
     ModulationOverview modulationOverview { synthProcessor };
     juce::TextButton modulationButton { "Modulation" };
+
+    /** Over everything but the keyboard, which plays the keys that set a pitch set's range, and the header's button
+        that shows it, named after the active pitch set once there are others than the default.
+    */
+    PitchSetScreen pitchSetScreen { synthProcessor };
+    juce::TextButton pitchSetButton { "Pitch Sets" };
+    int shownPitchSetVersion = -1;
+    void showPitchSets();
 
     /** Opens the modulation editor for a control, next to something standing for it, such as its row in the overview. */
     void showModulationEditor (int target, juce::Component& anchor);

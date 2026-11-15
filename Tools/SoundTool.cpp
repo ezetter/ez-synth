@@ -19,7 +19,7 @@ namespace
 
   EZSynthSoundTool render <sound> <out.wav> [--note N] [--velocity V] [--hold S] [--length S]
       Plays a sound as one note and saves it. The sound is a sound description (.json), a preset (.ezsynth), or a
-      factory preset's name. The note is a MIDI note number, 60 to start with; velocity is from 0 to 1, 1 to start
+      factory preset's name. The note is a MIDI note number or a name, such as C4, 60 to start with; velocity is from 0 to 1, 1 to start
       with; hold is how long the key's held, 1 second to start with; length is how long to record, 2 seconds to
       start with.
 
@@ -54,7 +54,7 @@ namespace
             const auto& value = arguments[i + 1];
 
             if (name == "--note")
-                options.note = value.getIntValue();
+                options.note = sound::findNote (value.containsOnly ("0123456789") ? juce::var (value.getIntValue()) : juce::var (value));
             else if (name == "--velocity")
                 options.velocity = value.getFloatValue();
             else if (name == "--hold")
@@ -161,7 +161,9 @@ namespace
                                                                                                + " (EZ Synth).wav");
 
         if (out.getParentDirectory().isDirectory() && analysis::writeWav (played, out))
-            std::cout << "Played MIDI note " << note << " at velocity " << options.velocity << ", held " << juce::String (hold, 2)
+            std::cout << "Played MIDI note " << note << " (" << juce::MidiMessage::getMidiNoteName (note, true, true, 4)
+                      << ", the pitch set " << synth.getPitchSetName (synth.getPitchSetForNote (note)) << ")"
+                      << " at velocity " << options.velocity << ", held " << juce::String (hold, 2)
                       << " s, " << juce::String (length, 2) << " s long, saved as " << out.getFullPathName() << "\n\n";
 
         // The attempt is measured at the same moments as the sample.

@@ -72,7 +72,7 @@ namespace prompt
             }
 
             // The harmonics' keys follow a pattern, as the tests check.
-            return keys.joinIntoString (", ") + ".\n\nAnd each harmonic's controls, for oscillator N from 1 to 3 and harmonic H "
+            return keys.joinIntoString (", ") + ".\n\nAnd each harmonic's controls, for oscillator N from 1 to 6 and harmonic H "
                    "from 1 to 16: its amplitude, `oscNHarmonicH` (such as `osc2Harmonic3`), its tune, `oscNHarmonicHTune` "
                    "(H from 2), its phase, `oscNHarmonicHPhase`, and its switch, `oscNHarmonicHSwitch` (triggered).\n";
         }
@@ -91,8 +91,9 @@ namespace prompt
 
 You're going to listen, with measurements, to a recorded sample, and write settings for EZ Synth, a software
 synthesizer, that make it sound as much like the sample as it can. Everything you need to know about EZ Synth is
-below. The person you're working with will give you the sample, as a WAV, MP3 or other audio file. This is
-experimental: do your best, say how close you got, and what EZ Synth couldn't match.
+below. The person you're working with will give you the sample, as a WAV, MP3 or other audio file, or several
+samples of one instrument at different notes, such as C2, C3 and C4. This is experimental: do your best, say how
+close you got, and what EZ Synth couldn't match.
 
 ## What to do
 
@@ -110,6 +111,24 @@ experimental: do your best, say how close you got, and what EZ Synth couldn't ma
 5. Save the final description, as UTF-8 JSON with the `.json` extension, in the folder EZ Synth looks in, named after
    the sample, and say how to load it: in EZ Synth, click the preset's name, and choose it under From Claude.
    Say how close it got, and what it couldn't match.
+
+### Several samples at different notes
+
+Given several samples of one instrument, such as at C2, C3 and C4, match each with a pitch set of its own (see
+Pitch sets below), all in one description, so each range of keys sounds like its nearest sample:
+
+1. Measure every sample, and note each one's MIDI note.
+2. Choose the ranges: each sample's pitch set takes the keys nearer its note than any other sample's, splitting
+   halfway between neighbouring samples, and the lowest and highest reach to the ends of the keyboard. For samples
+   at C2, C3 and C4 (MIDI 36, 48 and 60): the default pitch set is C3's, for G2 to F#3 and anything else; one pitch
+   set for C2's, from 0 to F#2 (42); and one for C4's, from G3 (55) to 127. Make the sample in the middle the
+   default, so it's the one any key left over plays.
+3. Match each sample as in the steps above, its pitch set's sound the one you change. `compare` plays a sample as
+   its own note, so it plays the pitch set whose range takes that note in: compare each sample with the whole
+   description in turn.
+4. Keep the pitch sets' sounds alike where the samples allow: the same oscillators, envelopes and modulation doing
+   the same jobs, with only their amounts changed. A key either side of a boundary plays a different pitch set,
+   and the more their sounds differ, the more the instrument jumps there. Say where it jumps most.
 
 ## How EZ Synth makes sound
 
@@ -244,16 +263,27 @@ threshold, from 0 to 1, they're switched or randomized. They're rarely useful fo
 
 An LFO can't move its own rate, even through other LFOs.
 
+### Pitch sets
+
+Every setting above can be different for a range of keys. A sound has a default pitch set, which plays every key no
+other takes in, and up to 15 more, each with a range of keys, its lowest and highest, and a whole sound of its own:
+its own parameters, oscillators, LFOs and modulation. A key plays the pitch set whose range takes it in, the
+narrowest if more than one does, or the default if none does. A note plays its pitch set's sound from start to end.
+Looping LFOs run separately in each pitch set, at its own rates.
+
+They're for an instrument whose tone changes across its range, such as a piano, brighter and longer in the bass, or
+for matching several samples at different notes, one pitch set each.
+
 ## The sound description
 
 A JSON object. Everything is optional, and whatever's left out is as EZ Synth's Init sound has it: oscillator 1 on, a
 sine with 3 harmonics, the other oscillators off, filters off, LFOs off, nothing moving anything but velocity on the
-volume.
+volume. Its sound is the default pitch set's; `pitchSets` lists any others.
 
 ```json
 {
   "format": "EZ Synth sound",
-  "version": 2,
+  "version": 3,
   "name": "Short name for the sound",
   "notes": "Anything worth saying about it, such as what it couldn't match",
   "parameters": { "parameter ID": number, true or false, or a choice's name },
@@ -267,7 +297,12 @@ volume.
   "modulation": [ { "target": "control key", "source": "LFO 1 or Env 1", "range": 0.5, "inverted": false, "phase": 0,
                     "threshold": 0.5 } ],
   "velocity": [ { "target": "volume", "range": 0.35 } ],
-  "modWheel": [ { "target": "control key", "range": 0.5, "inverted": false } ]
+  "modWheel": [ { "target": "control key", "range": 0.5, "inverted": false } ],
+  "pitchSets": [
+    { "lowest": 0, "highest": "F#2", "parameters": { ... }, "oscillators": [ ... ], "lfos": [ ... ], "modulation": [ ... ] },
+    { "lowest": "G3", "highest": 127, ... },
+    ... up to 15
+  ]
 }
 ```
 
@@ -277,6 +312,10 @@ volume.
 - `modulation` gives each control's LFO or envelope. `velocity`, if given, replaces Init's velocity on the volume, so
   leave it out to keep that. `modWheel` doesn't matter for matching a sample.
 - Each oscillator's `oscNOn` must be true in `parameters` for it to play, apart from oscillator 1.
+- Each pitch set in `pitchSets` has `lowest` and `highest`, its range's ends, taken in, each a MIDI note number from 0
+  to 127 or a note name with middle C as C4, such as `"C2"`, `"F#3"` or `"Bb4"`; and `parameters`, `oscillators`,
+  `lfos`, `modulation`, `velocity` and `modWheel`, just as above. Its sound starts from Init, as the default's does,
+  not from the default's sound: give it everything it needs, even what's the same as the default's.
 - Save it as plain JSON, with no comments.
 
 )";
@@ -312,6 +351,7 @@ volume.
                  << quoted << " analyze sample.wav\n"
                  << quoted << " compare sound.json sample.wav\n"
                  << quoted << " compare sound.json sample.wav --hold 0.8   # if the sample's key is let go before it ends\n"
+                 << quoted << " compare sound.json C2.wav --note C2   # as a key of your choosing\n"
                  << quoted << " render sound.json out.wav --note 60 --hold 1 --length 2\n"
                  << quoted << " describe \"Grand Piano\"   # a factory preset, as a sound description\n"
                     "```\n\n"
@@ -319,7 +359,7 @@ volume.
                     "against the strongest harmonic at that moment, as EZ Synth's are; 64 harmonics are measured, where "
                     "they fit below 20 kHz. `compare` plays the sound as the sample's nearest MIDI note, holding the key "
                     "until the sample has faded 60 dB below its peak unless you give `--hold`, and saves what it played "
-                    "beside the description, so the person can listen to both. The factory presets are Bell, Brass, "
+                    "beside the description, so the person can listen to both, and says which pitch set played. The factory presets are Bell, Brass, "
                     "Electric Keys, Grand Piano, Harmonic Sweep, Organ, Pluck, Soft Pad, Square Lead, Step Filter and "
                     "Wobble Bass.\n\n";
         }

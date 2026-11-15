@@ -158,6 +158,24 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     modulationButton.onClick = [this] { showModulationOverview (! isModulationOverviewShown()); };
     addAndMakeVisible (modulationButton);
 
+    pitchSetScreen.onClose = [this] { showPitchSetScreen (false); };
+
+    // While it waits for keys, the computer's keys play the keyboard, as they do in the standalone app.
+    pitchSetScreen.onWaitingForKeys = [this] (bool waiting)
+    {
+        if (waiting)
+            keyboard.grabKeyboardFocus();
+        else if (pitchSetScreen.isShowing())
+            pitchSetScreen.grabKeyboardFocus();
+    };
+    addChildComponent (pitchSetScreen);
+
+    pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
+    pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
+    pitchSetButton.setWantsKeyboardFocus (false);
+    pitchSetButton.onClick = [this] { showPitchSetScreen (! isPitchSetScreenShown()); };
+    addAndMakeVisible (pitchSetButton);
+
     setResizable (true, true);
     setResizeLimits (1420, 900, 2200, 1400);
     setSize (1440, 960);
@@ -266,6 +284,8 @@ void SynthEditor::resized()
     presets.removeFromRight (12);
     modulationButton.setBounds (presets.removeFromRight (108));
     presets.removeFromRight (8);
+    pitchSetButton.setBounds (presets.removeFromRight (124));
+    presets.removeFromRight (8);
     presetBar.setBounds (presets.withWidth (juce::jmin (presets.getWidth(), 420)).withX (presets.getRight() - juce::jmin (presets.getWidth(), 420)));
 
     area.removeFromTop (12);
@@ -281,6 +301,7 @@ void SynthEditor::resized()
     }
 
     keyboard.setBounds (keys);
+    pitchSetScreen.setBounds (getLocalBounds().withBottom (keys.getY() - 6));
     area.removeFromBottom (12);
 
     // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
@@ -406,6 +427,8 @@ juce::String SynthEditor::getLfoWaveName (int lfo) const
 
 void SynthEditor::refresh()
 {
+    showPitchSets();
+
     Shown now;
     now.shapeVersion = synthProcessor.getShapeVersion();
     now.modulationVersion = synthProcessor.getModulationVersion();
@@ -642,8 +665,52 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
                                             getLocalArea (&anchor, anchor.getLocalBounds()), this);
 }
 
+void SynthEditor::showPitchSetScreen (bool visible)
+{
+    if (visible)
+        showModulationOverview (false);
+
+    pitchSetScreen.setVisible (visible);
+    pitchSetButton.setToggleState (visible, juce::dontSendNotification);
+
+    if (visible)
+    {
+        pitchSetScreen.toFront (true);
+        pitchSetScreen.grabKeyboardFocus();
+    }
+    else if (isShowing())
+    {
+        grabKeyboardFocus();
+    }
+}
+
+void SynthEditor::showPitchSets()
+{
+    if (synthProcessor.getPitchSetVersion() == shownPitchSetVersion)
+        return;
+
+    shownPitchSetVersion = synthProcessor.getPitchSetVersion();
+    const auto active = synthProcessor.getActivePitchSet();
+
+    // With only the default, the button says what it's for; with others, which pitch set the controls set.
+    const auto several = synthProcessor.getNumPitchSets() > 1;
+    pitchSetButton.setButtonText (several ? synthProcessor.getPitchSetName (active) : juce::String ("Pitch Sets"));
+    pitchSetButton.setColour (juce::TextButton::textColourOffId, several ? PitchSetScreen::getColour (active).brighter (0.3f) : colours::text);
+
+    // The keys the active pitch set plays are marked, unless it's the default with no others.
+    std::bitset<128> keys;
+
+    for (int note = 0; note < 128 && several; ++note)
+        keys[(size_t) note] = synthProcessor.getPitchSetForNote (note) == active;
+
+    keyboard.setMarkedKeys (keys, PitchSetScreen::getColour (active));
+}
+
 void SynthEditor::showModulationOverview (bool visible)
 {
+    if (visible)
+        showPitchSetScreen (false);
+
     modulationOverview.setVisible (visible);
     modulationButton.setToggleState (visible, juce::dontSendNotification);
 

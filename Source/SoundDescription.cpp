@@ -345,6 +345,124 @@ namespace sound
         }
     }
 
+    namespace
+    {
+        /** Loads a sound's parameters, oscillators, LFOs and modulation into the active pitch set, on top of what it
+            has, which is Init's.
+        */
+        void loadSound (SynthProcessor& synth, const juce::var& description, int version, juce::StringArray& problems)
+        {
+            // The parameters, in their own units. How many harmonics an oscillator plays is set from its harmonics,
+            // unless it's given here.
+            const auto parameters = description["parameters"];
+
+            if (parameters.isObject())
+            {
+                for (const auto& property : parameters.getDynamicObject()->getProperties())
+                {
+                    if (auto* parameter = findParameter (synth, property.name.toString()))
+                    {
+                        if (const auto problem = setParameter (*parameter, property.value); problem.isNotEmpty())
+                            problems.add ("parameters." + problem);
+                    }
+                    else
+                    {
+                        problems.add ("parameters: there's no parameter \"" + property.name.toString() + "\"");
+                    }
+                }
+
+            }
+            else if (! parameters.isVoid())
+            {
+                problems.add ("parameters should be an object, of parameter IDs and values");
+            }
+
+            // Version 1 was written when the tune slider reached an octave either side, zoomed out, so its tunes' zooms,
+            // given or left as Init's, are moved to where they reach as far as they did, and modulation moves the tunes
+            // as far as it did.
+            if (version < 2)
+                for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                    if (auto* zoom = synth.parameters.getParameter (SynthProcessor::tuneZoomId (i)))
+                        zoom->setValueNotifyingHost (tuning::updateOldZoom (zoom->getValue()));
+
+            if (const auto oscillators = description["oscillators"]; oscillators.isArray())
+            {
+                for (int i = 0; i < std::min (oscillators.getArray()->size(), SynthProcessor::numOscillators); ++i)
+                {
+                    const auto& entry = (*oscillators.getArray())[i];
+
+                    if (entry.isObject())
+                        loadOscillator (synth, i, entry, ! (parameters.isObject() && parameters.hasProperty (SynthProcessor::harmonicsId (i))),
+                                        problems);
+                }
+
+                if (oscillators.getArray()->size() > SynthProcessor::numOscillators)
+                    problems.add ("oscillators: there are only " + juce::String (SynthProcessor::numOscillators) + ", so the rest were left out");
+            }
+
+            if (const auto lfos = description["lfos"]; lfos.isArray())
+            {
+                for (int i = 0; i < std::min (lfos.getArray()->size(), SynthProcessor::numLfos); ++i)
+                    if (const auto& entry = (*lfos.getArray())[i]; entry.isObject())
+                        loadLfo (synth, i, entry, problems);
+
+                if (lfos.getArray()->size() > SynthProcessor::numLfos)
+                    problems.add ("lfos: there are only " + juce::String (SynthProcessor::numLfos) + ", so the rest were left out");
+            }
+
+            if (const auto modulations = description["modulation"]; ! modulations.isVoid())
+                loadAssignments (synth, modulations, "modulation", 0, problems);
+
+            // Listed, velocity moves only what's listed, even nothing; left out, it stays on the volume, as Init has it.
+            if (const auto velocity = description["velocity"]; ! velocity.isVoid())
+            {
+                for (int target = 0; target < modulation::numTargets; ++target)
+                    synth.setVelocityAssignment (target, {});
+
+                loadAssignments (synth, velocity, "velocity", 1, problems);
+            }
+
+            if (const auto modWheel = description["modWheel"]; ! modWheel.isVoid())
+                loadAssignments (synth, modWheel, "modWheel", 2, problems);
+        }
+    }
+
+    std::optional<int> findNote (const juce::var& value)
+    {
+        if (value.isInt() || value.isInt64() || value.isDouble())
+        {
+            const auto note = juce::roundToInt ((double) value);
+            return note >= 0 && note <= 127 ? std::optional (note) : std::nullopt;
+        }
+
+        const auto text = value.toString().trim().toUpperCase();
+
+        if (text.isEmpty())
+            return std::nullopt;
+
+        static constexpr int letters[] = { 9, 11, 0, 2, 4, 5, 7 };   // A to G
+
+        if (text[0] < 'A' || text[0] > 'G')
+            return std::nullopt;
+
+        auto pitch = letters[text[0] - 'A'];
+        auto rest = text.substring (1);
+
+        while (rest.startsWithChar ('#') || rest.startsWithChar ('B') || rest.startsWith (juce::CharPointer_UTF8 ("\xe2\x99\xaf"))
+               || rest.startsWith (juce::CharPointer_UTF8 ("\xe2\x99\xad")))
+        {
+            const auto sharp = rest.startsWithChar ('#') || rest.startsWith (juce::CharPointer_UTF8 ("\xe2\x99\xaf"));
+            pitch += sharp ? 1 : -1;
+            rest = rest.substring (1);
+        }
+
+        if (! rest.containsOnly ("-0123456789") || rest.isEmpty())
+            return std::nullopt;
+
+        const auto note = (rest.getIntValue() + 1) * 12 + pitch;
+        return note >= 0 && note <= 127 ? std::optional (note) : std::nullopt;
+    }
+
     LoadResult load (SynthProcessor& synth, const juce::String& json)
     {
         LoadResult result;
@@ -368,79 +486,50 @@ namespace sound
                                  + "\", but it's been loaded as one anyway");
 
         synth.loadInitPreset();
+        const auto version = (int) description.getProperty ("version", formatVersion);
+        loadSound (synth, description, version, result.problems);
 
-        // The parameters, in their own units. How many harmonics an oscillator plays is set from its harmonics,
-        // unless it's given here.
-        const auto parameters = description["parameters"];
-
-        if (parameters.isObject())
+        // Each pitch set is a sound of its own for a range of keys, starting from Init, as the default does.
+        if (const auto list = description["pitchSets"]; list.isArray())
         {
-            for (const auto& property : parameters.getDynamicObject()->getProperties())
+            for (int i = 0; i < list.getArray()->size(); ++i)
             {
-                if (auto* parameter = findParameter (synth, property.name.toString()))
+                const auto& entry = (*list.getArray())[i];
+                const auto name = "pitchSets[" + juce::String (i) + "]";
+                const auto lowest = findNote (entry["lowest"]);
+                const auto highest = findNote (entry["highest"]);
+
+                if (! entry.isObject() || ! lowest.has_value() || ! highest.has_value())
                 {
-                    if (const auto problem = setParameter (*parameter, property.value); problem.isNotEmpty())
-                        result.problems.add ("parameters." + problem);
+                    result.problems.add (name + " should have a lowest and a highest key, as note names such as \"C2\" or MIDI note numbers, so it was left out");
+                    continue;
                 }
-                else
+
+                const auto index = synth.addPitchSet ({ *lowest, *highest });
+
+                if (index < 0)
                 {
-                    result.problems.add ("parameters: there's no parameter \"" + property.name.toString() + "\"");
+                    result.problems.add (name + ": there can only be " + juce::String (SynthProcessor::maxPitchSets)
+                                         + " pitch sets, the default among them, so the rest were left out");
+                    break;
                 }
+
+                synth.setActivePitchSet (index);
+                synth.loadInitSound();
+
+                juce::StringArray problems;
+                loadSound (synth, entry, version, problems);
+
+                for (const auto& problem : problems)
+                    result.problems.add (name + "." + problem);
             }
 
+            synth.setActivePitchSet (0);
         }
-        else if (! parameters.isVoid())
+        else if (! list.isVoid())
         {
-            result.problems.add ("parameters should be an object, of parameter IDs and values");
+            result.problems.add ("pitchSets should be a list");
         }
-
-        // Version 1 was written when the tune slider reached an octave either side, zoomed out, so its tunes' zooms,
-        // given or left as Init's, are moved to where they reach as far as they did, and modulation moves the tunes
-        // as far as it did.
-        if ((int) description.getProperty ("version", formatVersion) < 2)
-            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
-                if (auto* zoom = synth.parameters.getParameter (SynthProcessor::tuneZoomId (i)))
-                    zoom->setValueNotifyingHost (tuning::updateOldZoom (zoom->getValue()));
-
-        if (const auto oscillators = description["oscillators"]; oscillators.isArray())
-        {
-            for (int i = 0; i < std::min (oscillators.getArray()->size(), SynthProcessor::numOscillators); ++i)
-            {
-                const auto& entry = (*oscillators.getArray())[i];
-
-                if (entry.isObject())
-                    loadOscillator (synth, i, entry, ! (parameters.isObject() && parameters.hasProperty (SynthProcessor::harmonicsId (i))),
-                                    result.problems);
-            }
-
-            if (oscillators.getArray()->size() > SynthProcessor::numOscillators)
-                result.problems.add ("oscillators: there are only " + juce::String (SynthProcessor::numOscillators) + ", so the rest were left out");
-        }
-
-        if (const auto lfos = description["lfos"]; lfos.isArray())
-        {
-            for (int i = 0; i < std::min (lfos.getArray()->size(), SynthProcessor::numLfos); ++i)
-                if (const auto& entry = (*lfos.getArray())[i]; entry.isObject())
-                    loadLfo (synth, i, entry, result.problems);
-
-            if (lfos.getArray()->size() > SynthProcessor::numLfos)
-                result.problems.add ("lfos: there are only " + juce::String (SynthProcessor::numLfos) + ", so the rest were left out");
-        }
-
-        if (const auto modulations = description["modulation"]; ! modulations.isVoid())
-            loadAssignments (synth, modulations, "modulation", 0, result.problems);
-
-        // Listed, velocity moves only what's listed, even nothing; left out, it stays on the volume, as Init has it.
-        if (const auto velocity = description["velocity"]; ! velocity.isVoid())
-        {
-            for (int target = 0; target < modulation::numTargets; ++target)
-                synth.setVelocityAssignment (target, {});
-
-            loadAssignments (synth, velocity, "velocity", 1, result.problems);
-        }
-
-        if (const auto modWheel = description["modWheel"]; ! modWheel.isVoid())
-            loadAssignments (synth, modWheel, "modWheel", 2, result.problems);
 
         synth.nameSound (description["name"].toString().trim().isNotEmpty() ? description["name"].toString().trim()
                                                                              : juce::String ("From Claude"));
@@ -462,7 +551,197 @@ namespace sound
         return result;
     }
 
-    juce::var describe (const SynthProcessor& synth, bool onlyChanged)
+    namespace
+    {
+        /** Describes the active pitch set's sound into an object: its parameters, oscillators, LFOs and modulation. */
+        void describeSound (juce::DynamicObject* root, const SynthProcessor& synth, bool onlyChanged)
+        {
+            auto* parameterObject = new juce::DynamicObject();
+
+            for (auto* parameter : synth.getParameters())
+            {
+                if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+                {
+                    const auto value = ranged->getValue();
+
+                    // How many harmonics each oscillator plays is always given, as loading harmonics without it plays
+                    // as many as there are.
+                    const auto isHarmonicCount = ranged->paramID.startsWith ("osc") && ranged->paramID.endsWith ("Harmonics");
+
+                    if (! onlyChanged || isHarmonicCount || std::abs (value - ranged->getDefaultValue()) > 1.0e-4f)
+                        parameterObject->setProperty (ranged->paramID, parameterValue (*ranged, value));
+                }
+            }
+
+            root->setProperty ("parameters", juce::var (parameterObject));
+
+            juce::Array<juce::var> oscillators;
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+            {
+                auto* oscillator = new juce::DynamicObject();
+
+                if (const auto preset = synth.getPreset (i))
+                    oscillator->setProperty ("wave", waveform::getName (*preset));
+
+                juce::Array<juce::var> harmonics;
+
+                for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
+                {
+                    const auto& partial = synth.getDecomposition (i).harmonics[(size_t) harmonic - 1];
+                    const auto tune = synth.getHarmonicTune (i, harmonic);
+                    const auto switched = synth.getHarmonicSwitch (i, harmonic);
+
+                    if (partial.amplitude < 5.0e-4f && juce::exactlyEqual (tune, 0.0f) && switched == waveform::HarmonicSwitch::follows)
+                        continue;
+
+                    auto* entry = new juce::DynamicObject();
+                    entry->setProperty ("harmonic", harmonic);
+                    entry->setProperty ("amplitude", std::round (partial.amplitude * 10000.0f) / 10000.0);
+
+                    auto phase = (double) synth.getHarmonicPhase (i, harmonic) * degreesPerRadian;
+                    phase -= 360.0 * std::floor (phase / 360.0);
+
+                    if (const auto rounded = std::round (phase * 10.0) / 10.0; rounded > 0.0 && rounded < 360.0)
+                        entry->setProperty ("phase", rounded);
+
+                    if (! juce::exactlyEqual (tune, 0.0f))
+                        entry->setProperty ("tune", tidy (tune));
+
+                    if (switched != waveform::HarmonicSwitch::follows)
+                        entry->setProperty ("switch", getSwitchName (switched));
+
+                    harmonics.add (juce::var (entry));
+                }
+
+                oscillator->setProperty ("harmonics", harmonics);
+
+                if (const auto& drawing = synth.getDrawing (i); drawing.stepped)
+                {
+                    oscillator->setProperty ("stepped", true);
+                    oscillator->setProperty ("steps", drawing.numSteps);
+                }
+
+                oscillators.add (juce::var (oscillator));
+            }
+
+            root->setProperty ("oscillators", oscillators);
+
+            // The LFOs that move something, or are on, or all of them.
+            juce::Array<juce::var> lfos;
+            auto lastShown = -1;
+
+            for (int i = 0; i < SynthProcessor::numLfos; ++i)
+            {
+                auto used = synth.isLfoOn (i);
+
+                for (int target = 0; target < modulation::numTargets && ! used; ++target)
+                    used = synth.getAssignment (target).source == i;
+
+                if (! onlyChanged || used)
+                    lastShown = i;
+            }
+
+            for (int i = 0; i <= lastShown; ++i)
+            {
+                auto* lfo = new juce::DynamicObject();
+                const auto& drawing = synth.getDrawing (SynthProcessor::numOscillators + i);
+
+                if (const auto preset = synth.getLfoPreset (i))
+                {
+                    lfo->setProperty ("wave", waveform::getName (*preset));
+                }
+                else
+                {
+                    // A stepped wave as its steps' levels, and a smooth one as 128 points along it, close enough to hear
+                    // no difference.
+                    const auto& shape = synth.getLfoShape (i);
+                    const auto count = drawing.stepped ? drawing.numSteps : 128;
+                    juce::Array<juce::var> points;
+
+                    for (int point = 0; point < count; ++point)
+                    {
+                        const auto position = drawing.stepped ? ((double) point + 0.5) / count : (double) point / count;
+                        points.add (std::round (waveform::valueAt (shape, position) * 1000.0f) / 1000.0);
+                    }
+
+                    lfo->setProperty ("points", points);
+                }
+
+                if (drawing.stepped)
+                {
+                    lfo->setProperty ("stepped", true);
+                    lfo->setProperty ("steps", drawing.numSteps);
+                }
+
+                lfos.add (juce::var (lfo));
+            }
+
+            root->setProperty ("lfos", lfos);
+
+            juce::Array<juce::var> modulations, velocity, modWheel;
+
+            for (int target = 0; target < modulation::numTargets; ++target)
+            {
+                const auto key = modulation::getKey (target);
+                const auto trigger = modulation::isTrigger (target);
+
+                if (const auto& assignment = synth.getAssignment (target); assignment.isActive())
+                {
+                    auto* entry = new juce::DynamicObject();
+                    entry->setProperty ("target", key);
+                    entry->setProperty ("source", modulation::getSourceName (assignment.source));
+                    entry->setProperty ("range", tidy (assignment.range));
+
+                    if (assignment.inverted)
+                        entry->setProperty ("inverted", true);
+
+                    if (! modulation::isEnvelope (assignment.source) && assignment.phase > 0.0f)
+                        entry->setProperty ("phase", std::round (assignment.phase * 3600.0f) / 10.0);
+
+                    if (trigger)
+                        entry->setProperty ("threshold", tidy (assignment.threshold));
+
+                    modulations.add (juce::var (entry));
+                }
+
+                if (const auto& assignment = synth.getVelocityAssignment (target); assignment.isActive())
+                {
+                    auto* entry = new juce::DynamicObject();
+                    entry->setProperty ("target", key);
+                    entry->setProperty ("range", tidy (assignment.range));
+
+                    if (trigger)
+                        entry->setProperty ("threshold", tidy (assignment.threshold));
+
+                    velocity.add (juce::var (entry));
+                }
+
+                if (const auto& assignment = synth.getModWheelAssignment (target); assignment.isActive())
+                {
+                    auto* entry = new juce::DynamicObject();
+                    entry->setProperty ("target", key);
+                    entry->setProperty ("range", tidy (assignment.range));
+
+                    if (assignment.inverted)
+                        entry->setProperty ("inverted", true);
+
+                    if (trigger)
+                        entry->setProperty ("threshold", tidy (assignment.threshold));
+
+                    modWheel.add (juce::var (entry));
+                }
+            }
+
+            root->setProperty ("modulation", modulations);
+            root->setProperty ("velocity", velocity);
+
+            if (! onlyChanged || ! modWheel.isEmpty())
+                root->setProperty ("modWheel", modWheel);
+        }
+    }
+
+    juce::var describe (SynthProcessor& synth, bool onlyChanged)
     {
         auto* root = new juce::DynamicObject();
         juce::var description (root);
@@ -470,189 +749,30 @@ namespace sound
         root->setProperty ("version", formatVersion);
         root->setProperty ("name", synth.getPresetName());
 
-        auto* parameterObject = new juce::DynamicObject();
+        // The default pitch set's sound, then each other's, for its range of keys, going back to the one active.
+        const auto active = synth.getActivePitchSet();
+        synth.setActivePitchSet (0);
+        describeSound (root, synth, onlyChanged);
 
-        for (auto* parameter : synth.getParameters())
+        if (synth.getNumPitchSets() > 1)
         {
-            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (parameter))
+            juce::Array<juce::var> pitchSets;
+
+            for (int i = 1; i < synth.getNumPitchSets(); ++i)
             {
-                const auto value = ranged->getValue();
-
-                // How many harmonics each oscillator plays is always given, as loading harmonics without it plays
-                // as many as there are.
-                const auto isHarmonicCount = ranged->paramID.startsWith ("osc") && ranged->paramID.endsWith ("Harmonics");
-
-                if (! onlyChanged || isHarmonicCount || std::abs (value - ranged->getDefaultValue()) > 1.0e-4f)
-                    parameterObject->setProperty (ranged->paramID, parameterValue (*ranged, value));
+                synth.setActivePitchSet (i);
+                auto* pitchSet = new juce::DynamicObject();
+                const auto range = *synth.getPitchSetRange (i);
+                pitchSet->setProperty ("lowest", juce::MidiMessage::getMidiNoteName (range.lowest, true, true, 4));
+                pitchSet->setProperty ("highest", juce::MidiMessage::getMidiNoteName (range.highest, true, true, 4));
+                describeSound (pitchSet, synth, onlyChanged);
+                pitchSets.add (juce::var (pitchSet));
             }
+
+            root->setProperty ("pitchSets", pitchSets);
         }
 
-        root->setProperty ("parameters", juce::var (parameterObject));
-
-        juce::Array<juce::var> oscillators;
-
-        for (int i = 0; i < SynthProcessor::numOscillators; ++i)
-        {
-            auto* oscillator = new juce::DynamicObject();
-
-            if (const auto preset = synth.getPreset (i))
-                oscillator->setProperty ("wave", waveform::getName (*preset));
-
-            juce::Array<juce::var> harmonics;
-
-            for (int harmonic = 1; harmonic <= waveform::maxHarmonics; ++harmonic)
-            {
-                const auto& partial = synth.getDecomposition (i).harmonics[(size_t) harmonic - 1];
-                const auto tune = synth.getHarmonicTune (i, harmonic);
-                const auto switched = synth.getHarmonicSwitch (i, harmonic);
-
-                if (partial.amplitude < 5.0e-4f && juce::exactlyEqual (tune, 0.0f) && switched == waveform::HarmonicSwitch::follows)
-                    continue;
-
-                auto* entry = new juce::DynamicObject();
-                entry->setProperty ("harmonic", harmonic);
-                entry->setProperty ("amplitude", std::round (partial.amplitude * 10000.0f) / 10000.0);
-
-                auto phase = (double) synth.getHarmonicPhase (i, harmonic) * degreesPerRadian;
-                phase -= 360.0 * std::floor (phase / 360.0);
-
-                if (const auto rounded = std::round (phase * 10.0) / 10.0; rounded > 0.0 && rounded < 360.0)
-                    entry->setProperty ("phase", rounded);
-
-                if (! juce::exactlyEqual (tune, 0.0f))
-                    entry->setProperty ("tune", tidy (tune));
-
-                if (switched != waveform::HarmonicSwitch::follows)
-                    entry->setProperty ("switch", getSwitchName (switched));
-
-                harmonics.add (juce::var (entry));
-            }
-
-            oscillator->setProperty ("harmonics", harmonics);
-
-            if (const auto& drawing = synth.getDrawing (i); drawing.stepped)
-            {
-                oscillator->setProperty ("stepped", true);
-                oscillator->setProperty ("steps", drawing.numSteps);
-            }
-
-            oscillators.add (juce::var (oscillator));
-        }
-
-        root->setProperty ("oscillators", oscillators);
-
-        // The LFOs that move something, or are on, or all of them.
-        juce::Array<juce::var> lfos;
-        auto lastShown = -1;
-
-        for (int i = 0; i < SynthProcessor::numLfos; ++i)
-        {
-            auto used = synth.isLfoOn (i);
-
-            for (int target = 0; target < modulation::numTargets && ! used; ++target)
-                used = synth.getAssignment (target).source == i;
-
-            if (! onlyChanged || used)
-                lastShown = i;
-        }
-
-        for (int i = 0; i <= lastShown; ++i)
-        {
-            auto* lfo = new juce::DynamicObject();
-            const auto& drawing = synth.getDrawing (SynthProcessor::numOscillators + i);
-
-            if (const auto preset = synth.getLfoPreset (i))
-            {
-                lfo->setProperty ("wave", waveform::getName (*preset));
-            }
-            else
-            {
-                // A stepped wave as its steps' levels, and a smooth one as 128 points along it, close enough to hear
-                // no difference.
-                const auto& shape = synth.getLfoShape (i);
-                const auto count = drawing.stepped ? drawing.numSteps : 128;
-                juce::Array<juce::var> points;
-
-                for (int point = 0; point < count; ++point)
-                {
-                    const auto position = drawing.stepped ? ((double) point + 0.5) / count : (double) point / count;
-                    points.add (std::round (waveform::valueAt (shape, position) * 1000.0f) / 1000.0);
-                }
-
-                lfo->setProperty ("points", points);
-            }
-
-            if (drawing.stepped)
-            {
-                lfo->setProperty ("stepped", true);
-                lfo->setProperty ("steps", drawing.numSteps);
-            }
-
-            lfos.add (juce::var (lfo));
-        }
-
-        root->setProperty ("lfos", lfos);
-
-        juce::Array<juce::var> modulations, velocity, modWheel;
-
-        for (int target = 0; target < modulation::numTargets; ++target)
-        {
-            const auto key = modulation::getKey (target);
-            const auto trigger = modulation::isTrigger (target);
-
-            if (const auto& assignment = synth.getAssignment (target); assignment.isActive())
-            {
-                auto* entry = new juce::DynamicObject();
-                entry->setProperty ("target", key);
-                entry->setProperty ("source", modulation::getSourceName (assignment.source));
-                entry->setProperty ("range", tidy (assignment.range));
-
-                if (assignment.inverted)
-                    entry->setProperty ("inverted", true);
-
-                if (! modulation::isEnvelope (assignment.source) && assignment.phase > 0.0f)
-                    entry->setProperty ("phase", std::round (assignment.phase * 3600.0f) / 10.0);
-
-                if (trigger)
-                    entry->setProperty ("threshold", tidy (assignment.threshold));
-
-                modulations.add (juce::var (entry));
-            }
-
-            if (const auto& assignment = synth.getVelocityAssignment (target); assignment.isActive())
-            {
-                auto* entry = new juce::DynamicObject();
-                entry->setProperty ("target", key);
-                entry->setProperty ("range", tidy (assignment.range));
-
-                if (trigger)
-                    entry->setProperty ("threshold", tidy (assignment.threshold));
-
-                velocity.add (juce::var (entry));
-            }
-
-            if (const auto& assignment = synth.getModWheelAssignment (target); assignment.isActive())
-            {
-                auto* entry = new juce::DynamicObject();
-                entry->setProperty ("target", key);
-                entry->setProperty ("range", tidy (assignment.range));
-
-                if (assignment.inverted)
-                    entry->setProperty ("inverted", true);
-
-                if (trigger)
-                    entry->setProperty ("threshold", tidy (assignment.threshold));
-
-                modWheel.add (juce::var (entry));
-            }
-        }
-
-        root->setProperty ("modulation", modulations);
-        root->setProperty ("velocity", velocity);
-
-        if (! onlyChanged || ! modWheel.isEmpty())
-            root->setProperty ("modWheel", modWheel);
-
+        synth.setActivePitchSet (active);
         return description;
     }
 
@@ -723,7 +843,7 @@ namespace sound
         }
     }
 
-    juce::String toJson (const SynthProcessor& synth, bool onlyChanged)
+    juce::String toJson (SynthProcessor& synth, bool onlyChanged)
     {
         juce::String text;
         write (text, describe (synth, onlyChanged), 0);

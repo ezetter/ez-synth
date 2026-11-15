@@ -34,6 +34,25 @@ void Keyboard::resized()
     MidiKeyboardComponent::resized();
 }
 
+void Keyboard::setMarkedKeys (std::bitset<128> keys, juce::Colour colour)
+{
+    if (keys == markedKeys && colour == markColour)
+        return;
+
+    markedKeys = keys;
+    markColour = colour;
+    repaint();
+}
+
+void Keyboard::drawMark (int midiNoteNumber, juce::Graphics& g, juce::Rectangle<float> key) const
+{
+    if (midiNoteNumber < 0 || midiNoteNumber > 127 || ! markedKeys[(size_t) midiNoteNumber])
+        return;
+
+    g.setColour (markColour);
+    g.fillRoundedRectangle (key.removeFromBottom (5.0f).reduced (2.0f, 0.0f).translated (0.0f, -2.0f), 2.0f);
+}
+
 void Keyboard::drawWhiteNote (int midiNoteNumber, juce::Graphics& g, juce::Rectangle<float> area,
                               bool isDown, bool isOver, juce::Colour, juce::Colour)
 {
@@ -62,11 +81,13 @@ void Keyboard::drawWhiteNote (int midiNoteNumber, juce::Graphics& g, juce::Recta
     {
         g.setColour (isDown ? colours::background : juce::Colour (0xff8a90a0));
         g.setFont (juce::FontOptions (11.0f));
-        g.drawText (text, key.withTrimmedBottom (6.0f), juce::Justification::centredBottom);
+        g.drawText (text, key.withTrimmedBottom (9.0f), juce::Justification::centredBottom);
     }
+
+    drawMark (midiNoteNumber, g, key);
 }
 
-void Keyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
+void Keyboard::drawBlackNote (int midiNoteNumber, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour)
 {
     auto top = juce::Colour (0xff3a3f4b);
     auto bottom = juce::Colour (0xff131519);
@@ -94,4 +115,6 @@ void Keyboard::drawBlackNote (int, juce::Graphics& g, juce::Rectangle<float> are
         g.setColour (juce::Colours::white.withAlpha (0.07f));
         g.fillRoundedRectangle (face, 2.0f);
     }
+
+    drawMark (midiNoteNumber, g, area);
 }
