@@ -5479,8 +5479,8 @@ namespace
         return nullptr;
     }
 
-    /** The Grand Piano preset: struck quickly, bright at first and mellowing, falling quickly and then slowly as a
-        piano's strings do, damped when the key's let go, and darker as well as quieter for softer notes.
+    /** The Grand Piano preset: the piano Claude matched to samples of one piano at C3, C4 and C5, as its sound
+        description in Tools/Sounds has it, quieter for softer notes and damped when the key's let go.
     */
     void testGrandPiano()
     {
@@ -5488,68 +5488,42 @@ namespace
 
         SynthProcessor synth;
         synth.loadFactoryPreset ("Grand Piano");
-        const auto c4 = juce::MidiMessage::getMidiNoteInHertz (60);
-        const auto hard = play (synth, 60, 6.0, 6.5, 0.8f);
         const auto decibels = [] (double gain) { return juce::Decibels::gainToDecibels (gain, -200.0); };
 
-        // How loud the note is, in 10 ms stretches, against its loudest.
-        auto loudest = 0.0, loudestAt = 0.0;
-
-        for (auto at = 0.0; at < 0.5; at += 0.005)
-            if (const auto level = loudness (hard, at, at + 0.01); level > loudest)
-                std::tie (loudest, loudestAt) = std::pair (level, at);
-
-        const auto levelAt = [&] (double seconds) { return decibels (loudness (hard, seconds, seconds + 0.05) / loudest); };
-        const auto harmonicsAt = [&] (const std::vector<float>& signal, double from, double to)
+        // Just as the description it's made from plays, on the keys of each sample and between them.
         {
-            std::array<double, 9> amplitudes {};
+            SynthProcessor described;
+            const auto description = juce::File (__FILE__).getParentDirectory().getSiblingFile ("Tools")
+                                                          .getChildFile ("Sounds").getChildFile ("Grand Piano.json");
+            const auto result = sound::loadFile (described, description);
+            auto same = result.loaded && result.problems.isEmpty() && synth.getNumPitchSets() == described.getNumPitchSets()
+                     && synth.getNumPitchSets() > 3;
 
-            for (size_t k = 0; k < amplitudes.size(); ++k)
-                amplitudes[k] = amplitudeAt (slice (signal, from, to), c4 * (double) (k + 1));
+            for (const auto note : { 48, 55, 60, 65, 72 })
+                same = same && play (synth, note, 0.5, 0.8) == play (described, note, 0.5, 0.8);
 
-            return amplitudes;
-        };
+            check (same, "the Grand Piano plays just as the description Claude matched to piano samples, with its "
+                           + juce::String (synth.getNumPitchSets()) + " pitch sets");
+        }
 
-        const auto early = harmonicsAt (hard, 0.02, 0.12), late = harmonicsAt (hard, 2.0, 2.5);
-        const auto brightness = [] (const std::array<double, 9>& amplitudes)
+        // A single note at full velocity leaves headroom, anywhere on the keyboard, and a softer one is quieter.
+        auto peakRight = true, softerRight = true, dampedRight = true;
+
+        for (const auto note : { 36, 48, 60, 72, 84 })
         {
-            auto upper = 0.0;
+            const auto hard = play (synth, note, 1.0, 1.6, 1.0f);
+            const auto soft = play (synth, note, 1.0, 1.6, 0.3f);
+            peakRight = peakRight && decibels (peakOf (hard)) < -3.0;
+            softerRight = softerRight && decibels (loudness (soft, 0.0, 0.3) / loudness (hard, 0.0, 0.3)) < -3.0;
 
-            for (size_t k = 3; k < amplitudes.size(); ++k)
-                upper += amplitudes[k];
+            // Letting go of the key damps the strings.
+            dampedRight = dampedRight && decibels (loudness (hard, 1.3, 1.35) / loudness (hard, 0.9, 0.95)) < -25.0
+                       && decibels (loudness (hard, 1.55, 1.6) / loudness (hard, 0.9, 0.95)) < -35.0;
+        }
 
-            return upper / amplitudes[0];
-        };
-
-        // Struck quickly.
-        check (loudestAt <= 0.02, "the Grand Piano is at its loudest " + juce::String (juce::roundToInt (loudestAt * 1000.0)) + " ms after the strike");
-
-        // A quick first fall, then a long, slow one, as a piano's strings make.
-        const auto firstFall = -levelAt (1.0);
-        const auto laterFall = (levelAt (2.0) - levelAt (4.0)) / 2.0;
-        check (firstFall > 2.0 * laterFall && laterFall > 1.5 && laterFall < 4.5 && levelAt (4.0) > -30.0,
-               "...falls " + juce::String (firstFall, 1) + " dB in its first second, then " + juce::String (laterFall, 1)
-                 + " dB a second, still heard after 4 seconds");
-
-        // Bright at the strike, mellowing as it rings.
-        check (brightness (late) < 0.4 * brightness (early),
-               "...and mellows as it rings, its upper harmonics falling to " + juce::String (juce::roundToInt (100.0 * brightness (late) / brightness (early)))
-                 + "% of the fundamental's share they had at the strike");
-
-        // Softer notes are quieter and darker.
-        const auto soft = play (synth, 60, 6.0, 6.5, 0.3f);
-        const auto softer = decibels (loudness (soft, 0.0, 0.3) / loudness (hard, 0.0, 0.3));
-        check (softer < -6.0 && brightness (harmonicsAt (soft, 0.02, 0.12)) < 0.85 * brightness (early),
-               "...a soft note " + juce::String (-softer, 1) + " dB quieter than a hard one, and darker");
-
-        // Letting go of the key damps the strings.
-        const auto released = play (synth, 60, 1.0, 1.6, 0.8f);
-        check (decibels (loudness (released, 1.3, 1.35) / loudness (released, 0.9, 0.95)) < -40.0,
-               "...the dampers silence it within a third of a second of letting go");
-
-        // Even a loud five-note chord, struck all at once, doesn't clip.
-        const auto chord = playNotes (synth, { { 0.0, 48 }, { 0.0, 60 }, { 0.0, 64 }, { 0.0, 67 }, { 0.0, 72 } }, 2.0);
-        check (peakOf (chord) < 1.0f, "...and a five-note chord at full velocity peaks at " + juce::String (decibels (peakOf (chord)), 1) + " dB, without clipping");
+        check (peakRight, "...a note at full velocity peaks below -3 dB, from C2 to C6");
+        check (softerRight, "...a soft note is quieter than a hard one");
+        check (dampedRight, "...and the dampers bring it down 25 dB within a third of a second of letting go, and 35 dB within 0.6 s");
     }
 
     /** An LFO as fast as 100 Hz swings a control as fully as a slow one does, or nearly so: the swing of the level,

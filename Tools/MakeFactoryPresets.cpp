@@ -6,6 +6,7 @@
 //
 // Each recipe starts from Init, the sound EZ Synth starts with, and changes what it needs to.
 
+#include "../Source/SoundDescription.h"
 #include "../Source/SynthProcessor.h"
 
 #include <iostream>
@@ -229,59 +230,6 @@ namespace
         const char* name;
         std::function<void (SynthProcessor&)> make;
     };
-
-    //==============================================================================
-    // The Grand Piano's three registers, each a pitch set, made the same way with different strings.
-    struct PianoRegister
-    {
-        std::vector<float> string, secondString, strike;
-        float stretch;          // how sharp the upper harmonics are, as a stiff string's: harmonic k by this times k cubed
-        float cutoff;           // where the felt's low pass rests, in hertz
-        float seconds;          // how long the ring's LFO runs
-        double quick, slow;     // the two stages of the ring: seconds for each to fall to about a third
-        float level;
-    };
-
-    void makePiano (SynthProcessor& synth, const PianoRegister& piano)
-    {
-        // The first string: its harmonics as the hammer leaves them, each a little sharper than the last, as a stiff
-        // string's are.
-        setPartials (synth, osc1, 1.0f, 0.0f, piano.string);
-
-        // The second string, 2 cents sharp, quieter, beating slowly against the first.
-        setPartials (synth, osc3, 0.25f, 0.02f, piano.secondString);
-
-        // The strike: bright upper harmonics, a little sharp, gone within a second.
-        setPartials (synth, osc2, 0.0f, 0.03f, piano.strike);
-        setEnvelope (synth, 0, { 0.002f, 0.9f, 0.0f, 0.25f });
-        assign (synth, oscillatorLevelTarget (osc2), env1, 0.7f);
-
-        for (const auto oscillator : { osc1, osc2 })
-            for (int harmonic = 2; harmonic <= waveform::maxHarmonics; ++harmonic)
-                synth.setHarmonicTune (oscillator, harmonic, std::min (0.6f, piano.stretch * (float) (harmonic * harmonic * harmonic)));
-
-        // Softer notes strike more quietly, and less brightly. Velocity turns down the strings' levels, rather
-        // than the volume, so a soft note rings as long as a hard one, just more quietly.
-        assignVelocity (synth, volumeTarget, 0.15f);
-        assignVelocity (synth, oscillatorLevelTarget (osc1), 0.85f);
-        assignVelocity (synth, oscillatorLevelTarget (osc3), 0.25f);
-        assignVelocity (synth, oscillatorLevelTarget (osc2), 0.6f);
-
-        // The felt and the wood: a low pass that opens with the strike and closes as the note rings, more for
-        // harder notes, so the upper harmonics die away first.
-        setFilter (synth, 0, FilterType::lowPass, piano.cutoff);
-        setEnvelope (synth, 1, { 0.0f, 2.0f, 0.15f, 0.3f });
-        assign (synth, filterCutoffTarget (0), env2, 0.42f);
-        assignVelocity (synth, filterCutoffTarget (0), 0.45f);
-
-        // The ring, drawn on an LFO that runs once: a quick fall, then a long, slow one, as a piano's strings fall
-        // once their quick first sound has gone, and to nothing at the end. It peaks low enough to leave room for
-        // big chords.
-        setRing (synth, lfo1, piano.seconds, piano.level, [&piano] (double seconds)
-        {
-            return 0.55 * std::exp (-seconds / piano.quick) + 0.45 * std::exp (-seconds / piano.slow);
-        });
-    }
 
     //==============================================================================
     const std::vector<Recipe> recipes {
@@ -545,34 +493,19 @@ namespace
             assign (synth, volumeTarget, env1, 0.7f);
         } },
 
-        // A grand piano. A hammer strikes the strings, bright at first, mellowing as they ring, then dying away in two
-        // stages, a quick fall and then a long, slow one, as a piano's strings do. Two strings a hair apart beat gently
-        // against each other, and letting go of the key damps them. Softer notes are quieter, and darker too. The
-        // bass, the middle and the treble are each a pitch set: the bass strings are rich in harmonics, each a little
-        // sharp, as stiff strings' are, and ring longest; the treble's are plain and short.
+        // A grand piano, matched by Claude to three samples of one piano, C3, C4 and C5, from the sound description
+        // beside this file. Pitch sets between the samples blend them, so the tone, level and decay change in small
+        // steps from key to key.
         { "Grand Piano", [] (SynthProcessor& synth)
         {
-            // The middle: the harmonics of a piano's middle register, struck near an eighth of the string's length,
-            // which leaves its 8th harmonic weak.
-            makePiano (synth, { { 1.0f, 0.62f, 0.36f, 0.24f, 0.14f, 0.09f, 0.05f, 0.012f, 0.03f },
-                                { 1.0f, 0.55f, 0.3f, 0.18f, 0.1f, 0.06f },
-                                { 0.0f, 0.35f, 0.45f, 0.5f, 0.45f, 0.4f, 0.3f, 0.08f, 0.25f },
-                                0.0f, 900.0f, 10.0f, 0.6, 3.5, 0.64f });
+            const auto description = juce::File (__FILE__).getSiblingFile ("Sounds").getChildFile ("Grand Piano.json");
+            const auto result = sound::loadFile (synth, description);
 
-            // The bass, up to the B below the C below middle C.
-            addPitchSet (synth, 0, 47);
-            makePiano (synth, { { 1.0f, 0.85f, 0.7f, 0.55f, 0.45f, 0.36f, 0.28f, 0.08f, 0.18f, 0.14f, 0.11f, 0.09f, 0.07f, 0.05f, 0.04f, 0.03f },
-                                { 1.0f, 0.7f, 0.5f, 0.35f, 0.25f, 0.18f, 0.12f, 0.08f },
-                                { 0.0f, 0.3f, 0.4f, 0.5f, 0.5f, 0.45f, 0.4f, 0.1f, 0.35f, 0.3f, 0.25f, 0.2f, 0.15f, 0.12f, 0.1f, 0.08f },
-                                0.00012f, 650.0f, 10.0f, 1.0, 6.0, 0.66f });
+            if (! result.loaded)
+                std::cerr << "Couldn't load " << description.getFullPathName() << std::endl;
 
-            // The treble, from the C two octaves above middle C.
-            addPitchSet (synth, 84, 127);
-            makePiano (synth, { { 1.0f, 0.4f, 0.12f, 0.05f },
-                                { 1.0f, 0.3f, 0.08f },
-                                { 0.0f, 0.5f, 0.4f, 0.25f },
-                                0.0f, 2500.0f, 5.0f, 0.3, 1.4, 0.62f });
-            synth.setActivePitchSet (0);
+            for (const auto& problem : result.problems)
+                std::cerr << "Grand Piano: " << problem << std::endl;
         } },
 
         // A drum: a sine whose pitch an envelope drops two octaves in a tenth of a second, with a click on top. It

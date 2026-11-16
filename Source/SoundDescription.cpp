@@ -664,17 +664,47 @@ namespace sound
                 }
                 else
                 {
-                    // A stepped wave as its steps' levels, and a smooth one as 128 points along it, close enough to hear
-                    // no difference.
+                    // A stepped wave as its steps' levels, and a smooth one as 128 points along it, which is close enough
+                    // to hear no difference for most waves. One with detail 128 points would lose, such as a quick
+                    // attack drawn on it, is written as every point it's drawn with, to five places.
                     const auto& shape = synth.getLfoShape (i);
-                    const auto count = drawing.stepped ? drawing.numSteps : 128;
+                    const auto pointsOf = [&shape, &drawing] (int count, float scale)
+                    {
+                        std::vector<double> values;
+
+                        for (int point = 0; point < count; ++point)
+                        {
+                            const auto position = drawing.stepped ? ((double) point + 0.5) / count : (double) point / count;
+                            values.push_back (std::round (waveform::valueAt (shape, position) * scale) / (double) scale);
+                        }
+
+                        return values;
+                    };
+
+                    auto values = pointsOf (drawing.stepped ? drawing.numSteps : 128, 1000.0f);
+
+                    if (! drawing.stepped)
+                    {
+                        // The 128 points joined by straight lines, as they're loaded, against the wave drawn.
+                        auto furthest = 0.0;
+
+                        for (int k = 0; k < waveform::numPoints; ++k)
+                        {
+                            const auto along = (double) k * (double) values.size() / waveform::numPoints;
+                            const auto before = (size_t) along;
+                            const auto proportion = along - (double) before;
+                            const auto joined = values[before] + proportion * (values[(before + 1) % values.size()] - values[before]);
+                            furthest = std::max (furthest, std::abs (joined - (double) shape[(size_t) k]));
+                        }
+
+                        if (furthest > 0.002)
+                            values = pointsOf (waveform::numPoints, 100000.0f);
+                    }
+
                     juce::Array<juce::var> points;
 
-                    for (int point = 0; point < count; ++point)
-                    {
-                        const auto position = drawing.stepped ? ((double) point + 0.5) / count : (double) point / count;
-                        points.add (std::round (waveform::valueAt (shape, position) * 1000.0f) / 1000.0);
-                    }
+                    for (const auto value : values)
+                        points.add (value);
 
                     lfo->setProperty ("points", points);
                 }

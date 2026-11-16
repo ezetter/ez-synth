@@ -445,7 +445,7 @@ them, marked *noise*, show what an oscillator playing white noise can do:
 | Fifth Lead | A sawtooth with another a fifth above and a square an octave below, gliding from every note to the next, with a vibrato |
 | Flute | A few harmonics blown in by an envelope, with breath made from an oscillator of high harmonics whose tune a fast random LFO smears into noise |
 | Glass Pad | Six sines stacked an octave, a twelfth and two octaves up, each level moved by its own slow random LFO, so the stack shimmers and never repeats |
-| Grand Piano | As near a grand piano as EZ Synth gets: two strings 2 cents apart that beat gently, a bright strike that fades within a second, a low pass that mellows the note as it rings, a ring drawn on an LFO run once, falling quickly and then slowly, and velocity on the strings' levels and the cutoff. The bass, middle and treble are pitch sets: the bass strings rich, their harmonics a little sharp as stiff strings' are, and long; the treble's plain and short |
+| Grand Piano | Matched by Claude to three samples of one piano, at C3, C4 and C5, each a pitch set covering its part of the keyboard, with pitch sets between them that blend their neighbours so the tone, level and decay change in small steps from key to key. The fundamental and the stiff strings' sharp partials are each drawn on LFOs, many as two components a fraction of a hertz apart so they beat, falling in two stages when the dampers land, with the hammer's thud and knocks two octaves down |
 | Helicopter | *Noise.* Noise through a low pass, chopped by a sawtooth LFO eleven times a second on the volume and the cutoff, over an engine's whine at the key's pitch; the mod wheel speeds the rotor up |
 | Kick Drum | A sine an envelope drops two octaves in a tenth of a second, with a click, an octave below the keys |
 | Marimba | A bar's partials near 4 and 9.2 times its note, by tuning oscillators and harmonics, each gone sooner than the last. The low and high bars are pitch sets, long and soft below, short and bright above |
@@ -480,6 +480,9 @@ from the repository's folder, and build again:
 ```bash
 ./build/EZSynthMakeFactoryPresets
 ```
+
+A recipe can load a sound description instead, as the Grand Piano's does from `Tools/Sounds/Grand Piano.json`,
+which Claude matched to piano samples.
 
 The tool takes away any other presets in the folder, so `Presets/` holds just the ones with recipes. To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
 presets in it, make an empty file for the new one first, so the tool can be built to fill it in:
@@ -652,8 +655,8 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that the arrows step through the factory presets, that the Grand Piano strikes, rings, mellows, damps and
-answers velocity as a piano does, that random LFOs stay smooth, joined up and natural,
+clipping, that the arrows step through the factory presets, that the Grand Piano plays just as the description Claude
+matched to piano samples, leaves headroom, damps and answers velocity, that random LFOs stay smooth, joined up and natural,
 or spread their steps evenly, and play a new wave every cycle or key, that a click or a drag on the grid sets steps, and
 that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the
 wave during a note doesn't click, and that saved settings load back. Add `--snapshots <folder>` to also
@@ -750,6 +753,7 @@ save pictures of the window showing several waves.
 | `Source/SoundAnalysis.*` | Measuring a note's pitch, loudness and harmonics, and comparing two |
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
+| `Tools/Sounds/` | Sound descriptions that factory presets are made from, such as the Grand Piano matched to samples |
 | `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
 | `Tools/SoundTool.cpp` | The tool Claude uses to measure samples and its own attempts |
 | `Tools/MakeIcon.cpp`, `Resources/Icon.png` | The tool that draws the icon, and the icon it draws |
