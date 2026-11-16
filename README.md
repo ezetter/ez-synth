@@ -469,14 +469,14 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 #### Factory presets
 
-EZ Synth comes with 35 presets, built into the app and the plugins. Each one shows off something different. Ten of
-them, marked *noise*, show what an oscillator playing white noise can do:
+EZ Synth comes with 36 presets, built into the app and the plugins. Each one shows off something different. Eleven
+of them, marked *noise*, show what an oscillator playing white noise can do:
 
 Each one's category is in `Tools/MakeFactoryPresets.cpp`, beside the recipes:
 
 - **Bass:** Acid Bass, Reese Bass, Wobble Bass
 - **Brass and Winds:** Brass Section, Flute, Pan Flute
-- **Drums:** Drum Kit, Kick Drum, Shaker Groove
+- **Drums:** Drum Kit, Kick Drum, Shaker Groove, Snare Drum
 - **Keys:** Drawbar Organ, Electric Piano, Grand Piano, Marimba, Music Box, Pipe Organ
 - **Leads:** Fifth Lead, Square Lead, Stepped Arp
 - **Pads:** Breath Choir, Glass Pad, Shifting Sands, Vox Pad, Warm Pad
@@ -512,6 +512,7 @@ Each one's category is in `Tools/MakeFactoryPresets.cpp`, beside the recipes:
 | Sample and Hold | An LFO playing random steps, synced to the tempo, jumping a resonant low pass to a new cutoff four times a beat, with a slower random LFO on the resonance |
 | Shaker Groove | *Noise.* A shaker playing sixteen to the bar, in time with the tempo: an LFO drawn as a bar of accents sets the noise's level step by step, a second shakes each step, and a third moves the high pass |
 | Shifting Sands | Triggers: two slow LFOs each randomizing an oscillator's harmonics as they cross their middles, while another sweeps how many harmonics play |
+| Snare Drum | *Noise.* Matched by Claude to a sample of a hard, compressed snare: four oscillators of noise for the wires, their loudness drawn on an LFO, through a high pass, a wide notch and two low passes, one darkening through the tail, over seven tuned partials for the drum's tones. Middle C plays it at the sample's pitch; other keys move the tones and leave the noise |
 | Square Lead | Two squares a tenth of a semitone apart over a sub, between a high pass and a resonant low pass, gliding between notes, with a vibrato from each key |
 | Step Filter | An LFO drawn as eight steps, synced to the tempo, moving a resonant low pass filter like a step sequencer |
 | Stepped Arp | A held key plays a tune: an LFO drawn in steps moves the oscillators' tune through a minor chord, starting with each key, while a second, four times as fast, plucks each step |
@@ -533,8 +534,8 @@ from the repository's folder, and build again:
 ./build/EZSynthMakeFactoryPresets
 ```
 
-Every recipe needs a category in the tool's list, or the tool says so and fails. A recipe can load a sound description instead, as the Grand Piano's does from `Tools/Sounds/Grand Piano.json`,
-which Claude matched to piano samples.
+Every recipe needs a category in the tool's list, or the tool says so and fails. A recipe can load a sound description instead, as the Grand Piano's and the Snare Drum's do from `Tools/Sounds/`,
+which Claude matched to samples.
 
 The tool takes away any other presets in the folder, so `Presets/` holds just the ones with recipes. To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
 presets in it, make an empty file for the new one first, so the tool can be built to fill it in:

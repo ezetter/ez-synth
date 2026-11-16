@@ -226,6 +226,19 @@ namespace
     constexpr int osc1 = 0, osc2 = 1, osc3 = 2, osc4 = 3, osc5 = 4, osc6 = 5;
     constexpr auto sine = waveform::Preset::sine, square = waveform::Preset::square, triangle = waveform::Preset::triangle;
 
+    /** Loads a sound description from the Sounds folder beside this file, such as one Claude matched to a sample. */
+    void loadDescription (SynthProcessor& synth, const juce::String& name)
+    {
+        const auto description = juce::File (__FILE__).getSiblingFile ("Sounds").getChildFile (name + ".json");
+        const auto result = sound::loadFile (synth, description);
+
+        if (! result.loaded)
+            std::cerr << "Couldn't load " << description.getFullPathName() << std::endl;
+
+        for (const auto& problem : result.problems)
+            std::cerr << name << ": " << problem << std::endl;
+    }
+
     struct Recipe
     {
         const char* name;
@@ -497,17 +510,12 @@ namespace
         // A grand piano, matched by Claude to three samples of one piano, C3, C4 and C5, from the sound description
         // beside this file. Pitch sets between the samples blend them, so the tone, level and decay change in small
         // steps from key to key.
-        { "Grand Piano", [] (SynthProcessor& synth)
-        {
-            const auto description = juce::File (__FILE__).getSiblingFile ("Sounds").getChildFile ("Grand Piano.json");
-            const auto result = sound::loadFile (synth, description);
+        { "Grand Piano", [] (SynthProcessor& synth) { loadDescription (synth, "Grand Piano"); } },
 
-            if (! result.loaded)
-                std::cerr << "Couldn't load " << description.getFullPathName() << std::endl;
-
-            for (const auto& problem : result.problems)
-                std::cerr << "Grand Piano: " << problem << std::endl;
-        } },
+        // A hard, compressed snare, matched by Claude to a sample, from the sound description beside this file: four
+        // oscillators of noise for the wires, through a high pass, a notch and two low passes, over seven tuned
+        // partials for the drum's tones.
+        { "Snare Drum", [] (SynthProcessor& synth) { loadDescription (synth, "Snare Drum"); } },
 
         // A drum: a sine whose pitch an envelope drops two octaves in a tenth of a second, with a click on top. It
         // plays an octave below the keys.
@@ -1235,7 +1243,7 @@ namespace
     const std::map<juce::String, juce::String> categories {
         { "Acid Bass", "Bass" }, { "Reese Bass", "Bass" }, { "Wobble Bass", "Bass" },
         { "Brass Section", "Brass and Winds" }, { "Flute", "Brass and Winds" }, { "Pan Flute", "Brass and Winds" },
-        { "Drum Kit", "Drums" }, { "Kick Drum", "Drums" }, { "Shaker Groove", "Drums" },
+        { "Drum Kit", "Drums" }, { "Kick Drum", "Drums" }, { "Shaker Groove", "Drums" }, { "Snare Drum", "Drums" },
         { "Drawbar Organ", "Keys" }, { "Electric Piano", "Keys" }, { "Grand Piano", "Keys" }, { "Marimba", "Keys" },
         { "Music Box", "Keys" }, { "Pipe Organ", "Keys" },
         { "Fifth Lead", "Leads" }, { "Square Lead", "Leads" }, { "Stepped Arp", "Leads" },

@@ -108,6 +108,7 @@ juce_add_binary_data(EZSynthFactoryPresets
         "Presets/Sample and Hold.ezsynth"
         "Presets/Shaker Groove.ezsynth"
         "Presets/Shifting Sands.ezsynth"
+        "Presets/Snare Drum.ezsynth"
         "Presets/Square Lead.ezsynth"
         "Presets/Step Filter.ezsynth"
         "Presets/Stepped Arp.ezsynth"

@@ -5652,7 +5652,8 @@ namespace
             piano.loadFactoryPreset ("Grand Piano");
             check (everyCategory && SynthProcessor::getFactoryPresetCategory ("Acid Bass") == "Bass"
                      && SynthProcessor::getFactoryPresetCategory ("Drum Kit") == "Drums"
-                     && SynthProcessor::getFactoryPresetCategory ("Bowed Cello") == "Strings" && piano.getPresetCategory() == "Keys",
+                     && SynthProcessor::getFactoryPresetCategory ("Bowed Cello") == "Strings"
+                     && SynthProcessor::getFactoryPresetCategory ("Snare Drum") == "Drums" && piano.getPresetCategory() == "Keys",
                    "each category has factory presets, such as the Grand Piano in Keys");
             check (! piano.setPresetCategory ("Pads") && piano.getPresetCategory() == "Keys", "a factory preset's category can't be changed");
 
