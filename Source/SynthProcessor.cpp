@@ -189,7 +189,9 @@ namespace
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::glideTimeId (i), 1 }, name + " Glide Time", SynthProcessor::glideTimeRange(), 0.2f,
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); }))));
+                        .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); })),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::noiseId (i), 1 }, name + " Noise", false)));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -296,6 +298,7 @@ juce::String SynthProcessor::tuneId (int oscillator)        { return modulation:
 juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (oscillator) + "Zoom"; }
 juce::String SynthProcessor::glideId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Glide"; }
 juce::String SynthProcessor::glideTimeId (int oscillator)   { return glideId (oscillator) + "Time"; }
+juce::String SynthProcessor::noiseId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Noise"; }
 
 juce::StringArray SynthProcessor::getGlideNames()   { return { "Off", "Glide", "Legato" }; }
 
@@ -430,7 +433,8 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
 
     for (int i = 0; i < numOscillators; ++i)
         set.oscillators[(size_t) i] = { find (onId (i)), find (levelId (i)), find (harmonicsId (i)), find (tuneId (i)),
-                                        find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)) };
+                                        find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)),
+                                        find (noiseId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -995,6 +999,24 @@ void SynthProcessor::shareNewestNote()
 
     noteSounding = newest != nullptr;
 
+    // The noise the newest note played, if the audio thread can have it without waiting for the window.
+    {
+        const juce::SpinLock::ScopedTryLockType lock (noiseLock);
+
+        if (lock.isLocked())
+        {
+            for (size_t i = 0; i < (size_t) numOscillators; ++i)
+            {
+                noisePlayed[i] = newest != nullptr && newest->getPatch().oscillators[i].noise && newest->getPatch().oscillators[i].on;
+
+                if (noisePlayed[i])
+                    newest->copyRecentNoise ((int) i, playedNoise[i].data(), noiseSamples);
+            }
+
+            ++noiseCount;
+        }
+    }
+
     if (newest == nullptr)
     {
         shownSlot = activeSlot.load();
@@ -1091,6 +1113,7 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.tuneReach = tuning::zoomToReach (source.tuneZoom->load());
         oscillator.glide = (Patch::Glide) juce::jlimit (0, 2, juce::roundToInt (source.glide->load()));
         oscillator.glideSeconds = source.glideTime->load();
+        oscillator.noise = source.noise->load() >= 0.5f;
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
@@ -1158,6 +1181,24 @@ std::optional<waveform::Preset> SynthProcessor::getPreset (int oscillator) const
 bool SynthProcessor::isOn (int oscillator) const noexcept
 {
     return oscillatorParameters[(size_t) oscillator].on->load() >= 0.5f;
+}
+
+static_assert (SynthProcessor::noiseSamples == HarmonicVoice::recentNoiseLength);
+
+bool SynthProcessor::isNoise (int oscillator) const noexcept
+{
+    return oscillatorParameters[(size_t) oscillator].noise->load() >= 0.5f;
+}
+
+std::vector<float> SynthProcessor::getPlayedNoise (int oscillator) const
+{
+    const juce::SpinLock::ScopedLockType lock (noiseLock);
+    const auto o = (size_t) oscillator;
+
+    if (! noisePlayed[o])
+        return {};
+
+    return { playedNoise[o].begin(), playedNoise[o].end() };
 }
 
 int SynthProcessor::getNumHarmonics (int oscillator) const noexcept

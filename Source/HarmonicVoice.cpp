@@ -48,6 +48,8 @@ namespace
 HarmonicVoice::HarmonicVoice (const Patches& patchesToPlay)
     : patches (patchesToPlay)
 {
+    // Each voice plays its own noise, so notes played together don't play the same.
+    noiseState = (std::uint32_t) juce::Random::getSystemRandom().nextInt() | 1u;
     glideLengths.fill (1.0);
     ownEnvelope.setParameters (normalEnvelope);
 }
@@ -265,6 +267,13 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
         const auto shaped = hasEnvelope (volumeTarget) || hasEnvelope (oscillatorLevelTarget (i));
         const auto oscillatorLevel = modulate (oscillatorLevelTarget (i), oscillator.level) * (shaped ? 1.0f : keyUpFade);
+
+        // White noise peaks at full scale, as a wave can, at the oscillator's level. Its harmonics fade out.
+        if (oscillator.noise)
+        {
+            targets.noiseLevels[(size_t) i] = oscillatorLevel;
+            continue;
+        }
         const auto numHarmonics = positionToHarmonics (modulate (oscillatorHarmonicsTarget (i),
                                                                  harmonicsToPosition (oscillator.numHarmonics)));
 
@@ -377,6 +386,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         cosines = targets.cosines;
         sines = targets.sines;
         harmonicTunes = targets.harmonicTunes;
+        noiseLevels = targets.noiseLevels;
         std::copy (targets.tunes.begin(), targets.tunes.end(), tunes.begin());
         gain.setCurrentAndTargetValue (targets.gain);
 
@@ -471,6 +481,27 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
+    // The oscillators playing white noise, or fading it out, each gliding to its level through the chunk.
+    struct Noise
+    {
+        float level = 0.0f, step = 0.0f;
+        size_t oscillator = 0;
+    };
+
+    std::array<Noise, (size_t) modulation::numOscillators> noises;
+    size_t numNoises = 0;
+
+    for (size_t i = 0; i < noiseLevels.size(); ++i)
+    {
+        if (std::abs (targets.noiseLevels[i] - noiseLevels[i]) < 1.0e-6f)
+            noiseLevels[i] = targets.noiseLevels[i];
+
+        if (noiseLevels[i] == 0.0f && targets.noiseLevels[i] == 0.0f)
+            continue;
+
+        noises[numNoises++] = { noiseLevels[i], (float) ((targets.noiseLevels[i] - noiseLevels[i]) / glideSamples), i };
+    }
+
     // A filter that's out starts afresh when it's switched back in.
     std::array<bool, modulation::numFilters> filterActive {};
 
@@ -499,6 +530,22 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             harmonic.sine += harmonic.sineStep;
         }
 
+        // Each oscillator's noise is its own, from a quick generator spreading it evenly from -1 to 1.
+        for (size_t i = 0; i < numNoises; ++i)
+        {
+            auto& noise = noises[i];
+            noiseState ^= noiseState << 13;
+            noiseState ^= noiseState >> 17;
+            noiseState ^= noiseState << 5;
+            const auto white = (float) (std::int32_t) noiseState * (1.0f / 2147483648.0f);
+            value += noise.level * white;
+            noise.level += noise.step;
+            recentNoise[noise.oscillator][recentNoisePosition] = white;
+        }
+
+        if (numNoises > 0)
+            recentNoisePosition = (recentNoisePosition + 1) % recentNoise[0].size();
+
         for (size_t i = 0; i < filters.size(); ++i)
             if (filterActive[i])
                 value = filters[i].process (value);
@@ -514,6 +561,9 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             return;
         }
     }
+
+    for (size_t i = 0; i < numNoises; ++i)
+        noiseLevels[noises[i].oscillator] = noises[i].level;
 
     for (size_t i = 0; i < numPlaying; ++i)
     {
@@ -551,5 +601,19 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         waitingForEnvelopes = false;
         ownEnvelope.setParameters (afterLoudnessEnvelope);
         ownEnvelope.noteOff();
+    }
+}
+
+void HarmonicVoice::copyRecentNoise (int oscillator, float* destination, int count) const noexcept
+{
+    const auto& ring = recentNoise[(size_t) oscillator];
+    const auto length = ring.size();
+    count = std::min (count, (int) length);
+    auto from = (recentNoisePosition + length - (size_t) count) % length;
+
+    for (int i = 0; i < count; ++i)
+    {
+        destination[i] = ring[from];
+        from = (from + 1) % length;
     }
 }

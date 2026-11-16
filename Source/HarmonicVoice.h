@@ -70,6 +70,12 @@ public:
     /** The seed of the random wave an LFO that starts with each key plays for this note, new with each note. */
     std::uint32_t getRandomSeed (int lfo) const noexcept   { return randomSeeds[(size_t) lfo]; }
 
+    /** How many of the samples of white noise an oscillator played last it keeps, for the window to show. */
+    static constexpr int recentNoiseLength = 512;
+
+    /** Copies the last samples of white noise an oscillator played, from -1 to 1 before its level, oldest first. */
+    void copyRecentNoise (int oscillator, float* destination, int count) const noexcept;
+
 private:
     /** Each oscillator's harmonics, from the 1st up, as the amplitudes of the cosine and sine waves that make them. */
     using Harmonics = std::array<std::array<float, waveform::maxHarmonics + 1>, modulation::numOscillators>;
@@ -84,6 +90,9 @@ private:
 
         /** How far each harmonic is tuned from its whole number, in harmonics. */
         Harmonics harmonicTunes {};
+
+        /** How loud each oscillator playing white noise is, or 0 for one playing harmonics. */
+        std::array<float, modulation::numOscillators> noiseLevels {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
 
@@ -120,6 +129,13 @@ private:
 
     std::array<FilterStage, modulation::numFilters> filters;
     juce::SmoothedValue<float> gain;
+
+    // How loud each oscillator's white noise is, gliding towards its target, the noise's generator, and the last
+    // samples of it each oscillator played, in a ring that's written at the position given.
+    std::array<float, modulation::numOscillators> noiseLevels {};
+    std::uint32_t noiseState = 0x9e3779b9u;
+    std::array<std::array<float, (size_t) recentNoiseLength>, modulation::numOscillators> recentNoise {};
+    size_t recentNoisePosition = 0;
 
     std::array<EnvelopeRun, modulation::numEnvelopes> envelopeRuns;
 

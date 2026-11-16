@@ -46,6 +46,17 @@ WaveGrid::WaveGrid()
     };
     addChildComponent (randomSwitch);
 
+    noiseSwitch.setTitle ("Play white noise rather than the wave");
+    noiseSwitch.setClickingTogglesState (true);
+    noiseSwitch.onClick = [this]
+    {
+        setNoise (noiseSwitch.getToggleState());
+
+        if (onNoiseChange != nullptr)
+            onNoiseChange (noise);
+    };
+    addChildComponent (noiseSwitch);
+
     setDrawing (drawing);
 }
 
@@ -79,6 +90,31 @@ void WaveGrid::setRandom (std::optional<bool> newRandom)
     random = newRandom.value_or (false);
     setMouseCursor (canDraw() ? juce::MouseCursor::CrosshairCursor : juce::MouseCursor::NormalCursor);
     hoveredStep = -1;
+    repaint();
+}
+
+void WaveGrid::setNoise (std::optional<bool> newNoise)
+{
+    noiseSwitch.setVisible (newNoise.has_value());
+    noiseSwitch.setToggleState (newNoise.value_or (false), juce::dontSendNotification);
+    noise = newNoise.value_or (false);
+
+    // Noise has no wave to choose or draw.
+    presetButtons.setVisible (! noise);
+    drawMode.setVisible (! noise);
+    stepCount.setVisible (! noise);
+
+    setMouseCursor (canDraw() ? juce::MouseCursor::CrosshairCursor : juce::MouseCursor::NormalCursor);
+    hoveredStep = -1;
+    updateValueRange();
+    repaint();
+}
+
+void WaveGrid::setNoiseSamples (std::vector<float> values, double seconds, bool played)
+{
+    noiseValues = std::move (values);
+    noiseSeconds = seconds;
+    noisePlayed = played;
     repaint();
 }
 
@@ -157,6 +193,13 @@ void WaveGrid::updateValueRange()
     if (isDrawing())
         return;
 
+    // Noise is from -1 to 1.
+    if (noise)
+    {
+        valueRange = smallestValueRange;
+        return;
+    }
+
     // Raising harmonics can take a wave, or its sine waves, past -1 to 1, so the grid stretches to fit them.
     auto highest = std::max (1.0f, getHighestValue (partials));
 
@@ -224,6 +267,7 @@ void WaveGrid::resized()
     presetButtons.setBounds (header.removeFromRight (288).withSizeKeepingCentre (288, 22));
     header.removeFromRight (10);
     randomSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
+    noiseSwitch.setBounds (randomSwitch.getBounds());
 }
 
 void WaveGrid::setPreset (std::optional<waveform::Preset> preset)
@@ -277,7 +321,9 @@ void WaveGrid::paint (juce::Graphics& g)
 
     const auto plot = getPlotArea();
     paintGrid (g, plot);
-    paintSteps (g, plot);
+
+    if (! noise)
+        paintSteps (g, plot);
 
     {
         const juce::Graphics::ScopedSaveState state (g);
@@ -286,30 +332,38 @@ void WaveGrid::paint (juce::Graphics& g)
         // The drawn wave is a broad, faint band, so you can see how closely the sum of the sine waves follows it.
         // An oscillator that's off is drawn more faintly still.
         const auto opacity = on ? 1.0f : 0.4f;
-        const auto drawnCurve = makeShapeCurve();
-        g.setColour (colours::drawn.withAlpha (0.2f * opacity));
-        g.strokePath (drawnCurve, juce::PathStrokeType (10.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (colours::drawn.withAlpha (0.55f * opacity));
-        g.strokePath (drawnCurve, juce::PathStrokeType (1.2f));
 
-        // An LFO plays its wave just as it's drawn, with a line showing where it's got to.
-        if (lfoPeriod.has_value())
+        if (noise)
         {
-            g.setColour (colours::sum.withAlpha (opacity));
-            g.strokePath (drawnCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-
-            if (playhead.has_value())
-            {
-                const auto x = toX (*playhead);
-                const auto y = toY (playheadValue);
-                g.setColour (colours::modulation.withAlpha (0.8f * opacity));
-                g.drawVerticalLine (juce::roundToInt (x), plot.getY(), plot.getBottom());
-                g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ x, y }));
-            }
+            paintNoise (g, opacity);
         }
         else
         {
-            paintHarmonics (g, opacity);
+            const auto drawnCurve = makeShapeCurve();
+            g.setColour (colours::drawn.withAlpha (0.2f * opacity));
+            g.strokePath (drawnCurve, juce::PathStrokeType (10.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.setColour (colours::drawn.withAlpha (0.55f * opacity));
+            g.strokePath (drawnCurve, juce::PathStrokeType (1.2f));
+
+            // An LFO plays its wave just as it's drawn, with a line showing where it's got to.
+            if (lfoPeriod.has_value())
+            {
+                g.setColour (colours::sum.withAlpha (opacity));
+                g.strokePath (drawnCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+                if (playhead.has_value())
+                {
+                    const auto x = toX (*playhead);
+                    const auto y = toY (playheadValue);
+                    g.setColour (colours::modulation.withAlpha (0.8f * opacity));
+                    g.drawVerticalLine (juce::roundToInt (x), plot.getY(), plot.getBottom());
+                    g.fillEllipse (juce::Rectangle<float> (9.0f, 9.0f).withCentre ({ x, y }));
+                }
+            }
+            else
+            {
+                paintHarmonics (g, opacity);
+            }
         }
     }
 
@@ -346,6 +400,33 @@ void WaveGrid::paintHarmonics (juce::Graphics& g, float opacity) const
     g.strokePath (sumCurve, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
+void WaveGrid::paintNoise (juce::Graphics& g, float opacity) const
+{
+    if (noiseValues.size() < 2)
+        return;
+
+    // Every sample, joined up: noise jumps anywhere from one to the next. What a note plays is bright, and some like
+    // it, while none does, is faint.
+    juce::Path curve;
+    const auto last = (double) (noiseValues.size() - 1);
+
+    for (size_t i = 0; i < noiseValues.size(); ++i)
+    {
+        const juce::Point<float> point (toX ((double) i / last), toY (noiseValues[i]));
+
+        if (i == 0)
+            curve.startNewSubPath (point);
+        else
+            curve.lineTo (point);
+    }
+
+    const auto strength = (noisePlayed ? 1.0f : 0.45f) * opacity;
+    g.setColour (colours::sum.withAlpha (0.12f * strength));
+    g.strokePath (curve, juce::PathStrokeType (4.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::butt));
+    g.setColour (colours::sum.withAlpha (0.9f * strength));
+    g.strokePath (curve, juce::PathStrokeType (1.1f));
+}
+
 void WaveGrid::paintSteps (juce::Graphics& g, juce::Rectangle<float> plot) const
 {
     if (! drawing.stepped)
@@ -372,9 +453,10 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     const auto name = (lfoPeriod.has_value() ? "LFO " : "OSC ") + juce::String (sourceNumber);
 
     // The caption, in full if it fits before the controls, or just the source's name.
-    const auto controlsLeft = (float) (randomSwitch.isVisible() ? randomSwitch.getX() : presetButtons.getX());
-    const auto movedShown = movedPartials.has_value() && ! lfoPeriod.has_value();
-    const auto fullCaption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : "ONE WAVELENGTH");
+    const auto controlsLeft = (float) (randomSwitch.isVisible() ? randomSwitch.getX()
+                                     : noiseSwitch.isVisible() ? noiseSwitch.getX() : presetButtons.getX());
+    const auto movedShown = noise ? noisePlayed : movedPartials.has_value() && ! lfoPeriod.has_value();
+    const auto fullCaption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : noise ? "WHITE NOISE" : "ONE WAVELENGTH");
     const auto fits = [&] (const juce::String& text)
     {
         return juce::GlyphArrangement::getStringWidth (fonts::caption(), text + (movedShown ? "  " + dot + "  AS PLAYED" : juce::String()))
@@ -396,15 +478,22 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     }
 
     // How the wave is drawn, with its caption.
-    const auto drawControls = drawMode.getBounds().toFloat();
-    g.drawText ("DRAW", header.withRight (drawControls.getX() - 10.0f), juce::Justification::centredRight);
+    if (! noise)
+    {
+        const auto drawControls = drawMode.getBounds().toFloat();
+        g.drawText ("DRAW", header.withRight (drawControls.getX() - 10.0f), juce::Justification::centredRight);
+    }
 
     // Between the caption and the controls, a hint for drawing, or that the source is off: the longest that fits.
-    const auto hintArea = header.withRight (controlsLeft - 20.0f)
-                                .withTrimmedLeft (juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f);
+    // Noise has no controls to its right, so its hint goes there.
+    const auto captionRight = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f;
+    const auto hintArea = noise && on ? header.withLeft ((float) noiseSwitch.getRight() + 20.0f)
+                                      : header.withRight (controlsLeft - 20.0f).withTrimmedLeft (captionRight);
     const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");
     const auto hints = ! on ? juce::StringArray { sourceName + " is off. Switch it on above " + (lfoPeriod.has_value() ? "for it to move anything." : "to hear it."),
                                                   sourceName + " is off" }
+                     : noise ? (noisePlayed ? juce::StringArray { "Every sample a new random value, as the newest note plays it", "A new random value every sample", "Random" }
+                                            : juce::StringArray { "Every sample a new random value. Play a key to see the noise it plays.", "Play a key to see its noise", "Random" })
                      : random ? juce::StringArray { startsWithKey ? "A new random wave with each key" : "A new random wave every cycle", "Random" }
                      : drawing.stepped ? juce::StringArray { "Click a step to set it, or drag across them", "Drag to set steps" }
                                        : juce::StringArray { "Click and drag to draw a wave", "Drag to draw" };
@@ -477,8 +566,15 @@ void WaveGrid::paintGrid (juce::Graphics& g, juce::Rectangle<float> plot) const
         return seconds < 1.0 ? juce::String (juce::roundToInt (seconds * 1000.0)) + " ms" : juce::String (seconds, 2) + " s";
     };
 
+    // Noise is marked in time too, to tenths of a millisecond.
+    const auto formatNoiseTime = [] (double seconds)
+    {
+        return seconds <= 0.0 ? juce::String ("0") : juce::String (seconds * 1000.0, 1) + " ms";
+    };
+
     for (int i = 0; i <= 4; ++i)
-        g.drawText (lfoPeriod.has_value() ? formatTime (*lfoPeriod * i / 4.0) : juce::String (i * 90) + degrees,
+        g.drawText (noise ? formatNoiseTime (noiseSeconds * i / 4.0)
+                    : lfoPeriod.has_value() ? formatTime (*lfoPeriod * i / 4.0) : juce::String (i * 90) + degrees,
                     juce::Rectangle<float> (48.0f, 16.0f).withCentre ({ toX (i / 4.0), plot.getBottom() + 15.0f }),
                     juce::Justification::centred);
 }

@@ -57,6 +57,9 @@ public:
     /** How long a glide takes, such as "40 ms" or "1.50 s". */
     static juce::String glideTimeToText (float seconds);
 
+    /** The ID of whether an oscillator plays white noise rather than its harmonics. */
+    static juce::String noiseId (int oscillator);
+
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
         low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
@@ -214,6 +217,22 @@ public:
     int getShapeVersion() const noexcept   { return shapeVersion; }
 
     bool isOn (int oscillator) const noexcept;
+
+    /** Whether the oscillator plays white noise, every frequency at once, rather than its harmonics. Its level, and
+        whether it's on, still count, but its wave, harmonics, tune and glide don't.
+    */
+    bool isNoise (int oscillator) const noexcept;
+
+    /** The white noise a noise oscillator has just played, from -1 to 1 before its level, as the newest note played
+        it: the last noiseSamples samples, oldest first, or nothing if no note sounding plays it as noise. The count
+        goes up with each block played, so the window can tell when there's more.
+    */
+    static constexpr int noiseSamples = 512;
+    std::vector<float> getPlayedNoise (int oscillator) const;
+    int getNoiseCount() const noexcept   { return noiseCount.load(); }
+
+    /** The sample rate playing, or the usual 48 kHz before the host has said. */
+    double getPlayingSampleRate() const noexcept   { return getSampleRate() > 0.0 ? getSampleRate() : 48000.0; }
 
     /** How many harmonics the oscillator plays its wave with, from the 1st up. */
     int getNumHarmonics (int oscillator) const noexcept;
@@ -627,6 +646,7 @@ private:
         std::atomic<float>* tuneZoom = nullptr;
         std::atomic<float>* glide = nullptr;
         std::atomic<float>* glideTime = nullptr;
+        std::atomic<float>* noise = nullptr;
     };
 
     struct FilterParameters
@@ -802,6 +822,12 @@ private:
     float getShownPosition (int target) const;
 
     std::array<SharedEnvelopeDisplay, numEnvelopes> envelopeDisplays;
+
+    // The noise the newest note played, for each oscillator playing noise, or none, for the window.
+    std::array<std::array<float, (size_t) noiseSamples>, numOscillators> playedNoise {};
+    std::array<bool, numOscillators> noisePlayed {};
+    mutable juce::SpinLock noiseLock;
+    std::atomic<int> noiseCount { 0 };
 
     // The controls that are triggered rather than moved: the oscillators' and filters' switches, each oscillator's randomizing, and
     // each of its harmonics' switches.

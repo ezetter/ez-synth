@@ -61,6 +61,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   mid-glide slides on from wherever the glide had got to. The slider beside the buttons sets how long the
   slide takes, from 5 ms to 5 seconds; double-click it for 200 ms. Since each oscillator has its own, one
   can glide while another jumps straight to the note, or two can glide at different speeds.
+- **Noise.** The **Noise** switch at the top of the grid, left of the preset waves, makes the oscillator play
+  white noise instead of its harmonics: every frequency at once, a new random value from −1 to 1 every
+  sample. The preset waves and the drawing controls go, and so do the harmonics, the tune and the glide,
+  which noise has no use for; its level and switch still count, as do the LFOs and envelopes on them, and
+  the filters shape it. The grid shows the noise itself, the last 10 ms or so the newest note played, moving
+  as it plays and marked **As played**, or faint sample noise while no note plays it; the oscillator's card
+  shows it too. Each note plays noise of its own, so a chord's notes don't play the same noise. Each pitch set
+  can switch it separately, as with every setting.
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Draw in steps.** **Draw** at the top right of the grid switches between **Smooth**, freehand drawing,
@@ -620,7 +628,8 @@ pitch with the right harmonics, that raising and lowering a harmonic changes it 
 plays at its own multiple of the fundamental, glides there without a click and is saved, that turning a
 harmonic's phase turns only its sine wave, as heard, that oscillators add
 together at their levels, that a tuned oscillator plays as far above or below the note as it's tuned, glides there
-without a click and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, as low, mid and high passes and notches,
+without a click, that an oscillator playing noise plays white noise at its level, the same on any key and its
+own in each note, which the window is given just as it played it, and leaves out the harmonics too high for its pitch, that the filters cut and boost each harmonic by as much as theory says, as low, mid and high passes and notches,
 that a filter's type can change during a note without a click, that saves from before the filters had types
 load as they were, that LFOs
 move each kind of control by the range and in the direction they're set to, looping or once per note, and
@@ -659,6 +668,10 @@ save pictures of the window showing several waves.
   new sound, most of the way in 1.5 ms and all of it in about 6, rather than clicking, quickly enough to follow
   an LFO at 100 Hz. The volume glides over 1.5 ms. Notes
   start in 8 ms and fade out over 250 ms when let go.
+  An oscillator playing noise adds a value from a quick random generator (xorshift) every sample, its own in
+  each voice, at its level, gliding as levels do, so switching to noise mid-note fades across. Each voice keeps
+  the last 512 samples of each oscillator's noise, which the newest note's are copied from after each block for
+  the window to show.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the

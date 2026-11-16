@@ -33,6 +33,9 @@ struct Patch
         Glide glide = Glide::off;
         float glideSeconds = 0.2f;
 
+        /** Whether it plays white noise rather than its harmonics, at its level. */
+        bool noise = false;
+
         /** Each harmonic's amplitude, its phase, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phases {}, phaseSines {}, phaseCosines {};
 

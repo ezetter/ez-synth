@@ -89,6 +89,7 @@ private:
         std::array<bool, SynthProcessor::numSources> on {};
         std::array<waveform::Drawing, SynthProcessor::numSources> drawings {};
         std::array<bool, SynthProcessor::numLfos> random {};
+        std::array<bool, SynthProcessor::numOscillators> noise {};
 
         bool operator== (const Shown&) const = default;
     };
@@ -158,6 +159,13 @@ private:
     Shown shown;
     std::array<SynthProcessor::LiveWave, SynthProcessor::numOscillators> liveWaves;
     std::array<SynthProcessor::RandomCycle, SynthProcessor::numLfos> randomCycles;
+
+    /** Shows the noise each oscillator playing it has just played, or, with no note playing it, some like it, which
+        stays still. It's brought up to date as often as the audio thread has played more.
+    */
+    void showNoise (bool changed);
+    int shownNoiseCount = -1;
+    std::vector<float> stillNoise;
     int shownNote = -2;
     bool focusGiven = false;
 

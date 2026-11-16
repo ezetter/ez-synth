@@ -20,6 +20,9 @@
 
     An LFO can play a random wave instead, drawn smoothly or in steps, which the grid shows as it plays, and which
     can't be drawn on.
+
+    An oscillator can play white noise instead, which hides the preset waves and the drawing controls. The grid then
+    shows the noise itself: the last few milliseconds the newest note played, or, with none playing, some like it.
 */
 class WaveGrid final : public juce::Component
 {
@@ -43,6 +46,20 @@ public:
 
     /** Called when the user switches an LFO's random wave on or off. */
     std::function<void (bool)> onRandomChange;
+
+    /** Shows whether an oscillator plays white noise, with a switch for it, or for an LFO, nothing, which hides the
+        switch. Noise can't be drawn on.
+    */
+    void setNoise (std::optional<bool>);
+    bool isNoise() const noexcept   { return noise; }
+
+    /** Called when the user switches an oscillator's noise on or off. */
+    std::function<void (bool)> onNoiseChange;
+
+    /** The noise to show, from -1 to 1, oldest first, spread over the time given, in seconds, and whether it's what
+        a note's playing, rather than some like it.
+    */
+    void setNoiseSamples (std::vector<float>, double seconds, bool played);
 
     /** Shows which preset the wave is, if it's one, on the buttons in the header, without calling onPresetChosen. */
     void setPreset (std::optional<waveform::Preset>);
@@ -132,17 +149,25 @@ private:
         void paintButton (juce::Graphics&, bool highlighted, bool pressed) override;
     };
 
-    bool canDraw() const noexcept   { return ! random; }
+    bool canDraw() const noexcept   { return ! random && ! noise; }
+    void paintNoise (juce::Graphics&, float opacity) const;
 
     waveform::Drawing drawing;
     int hoveredStep = -1;
     bool random = false;
+    bool noise = false;
+    std::vector<float> noiseValues;
+    double noiseSeconds = 0.0;
+    bool noisePlayed = false;
     ChoiceButtons drawMode { { "Smooth", "Steps" } };
 
     /** The preset waves, in the header, none of them chosen for a wave that's been drawn. */
     ChoiceButtons presetButtons { [] { juce::StringArray names; for (const auto preset : waveform::allPresets) names.add (waveform::getName (preset)); return names; }() };
     NumberStepper stepCount { waveform::fewestSteps, waveform::mostSteps };
     Switch randomSwitch { "Random" };
+
+    /** An oscillator's switch for white noise, where an LFO's random switch is, to the left of the preset waves. */
+    Switch noiseSwitch { "Noise" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WaveGrid)
 };

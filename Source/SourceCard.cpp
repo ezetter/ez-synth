@@ -215,6 +215,18 @@ void OscillatorCard::setWave (const std::vector<waveform::Partial>& harmonics, c
               tuning::toWholeSemitones (tune) != 0 ? tuning::toText (tune) : juce::String());
 }
 
+void OscillatorCard::setNoise (const std::vector<float>& samples)
+{
+    // A sample in every few is plenty for a picture this size, and still looks like noise.
+    std::vector<float> values;
+
+    for (size_t i = 0; i < samples.size(); i += 4)
+        values.push_back (samples[i]);
+
+    setWaveValues (std::move (values));
+    setLines ("White noise", "Random");
+}
+
 //==============================================================================
 LfoCard::LfoCard (int lfo, juce::AudioProcessorValueTreeState& parameters)
     : SourceCard ("LFO " + juce::String (lfo + 1), parameters, SynthProcessor::lfoOnId (lfo),

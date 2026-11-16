@@ -175,6 +175,11 @@ oscillator's tune.
   of R swings the tune R × reach semitones either way, so at a zoom of 1 an LFO range of 0.1 is a vibrato of 10
   cents either way. An envelope with a range of R raises it by up to 2 × R × reach semitones.
 - `oscNGlide` and `oscNGlideTime` slide into each note from the one before; they don't matter for a single note.
+- `oscNNoise`, true or false, makes the oscillator play white noise, evenly from -1 to 1 at its level, instead of
+  its harmonics; its wave, harmonics, tune and glide then don't matter. Use it for breath, bow and hammer noise,
+  wind, cymbals and the attack of drums, shaped with the filters (a mid pass for a band of noise) and with an
+  envelope on its level. Noise has no harmonics, so the compare command's harmonic measurements won't show it,
+  except as a lower harmonic share.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
 - The wave can be given as one of the presets, `"wave": "Sine"`, `"Sawtooth"`, `"Square"` or `"Triangle"`, with its
@@ -233,7 +238,7 @@ Eight, LFO 1 to LFO 8. Each has a wave, from -1 to 1, and plays it over its peri
   each, runs through its wave once over its period, then holds its last value: an envelope of any shape you draw.
   "Twice" up to "5 times" run through it that many times from each note, and "∞" runs it forever from each note.
 - `lfoNRandom` plays a new random wave every cycle instead of its own, smooth, or in steps if the LFO is stepped.
-  A fast random LFO on a harmonic's amplitude or the tune can rough a sound up, the nearest EZ Synth has to noise.
+  A fast random LFO on a harmonic's amplitude or the tune can rough a sound up; for real noise, use `oscNNoise`.
 - `lfoNSync`, `lfoNBeatRate` and `lfoNStartOnPlay` tie it to a host's tempo; leave them for samples.
 
 An LFO swings a control either side of where it's set: its wave's value v moves the control by range × v / 2 of its

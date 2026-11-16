@@ -162,6 +162,27 @@ namespace
         return peak;
     }
 
+    double hertzOf (int note)
+    {
+        return 440.0 * std::pow (2.0, (note - 69) / 12.0);
+    }
+
+    /** The first component of a type inside another, at any depth. */
+    template <typename Type>
+    Type* findChild (juce::Component& parent)
+    {
+        for (auto* child : parent.getChildren())
+        {
+            if (auto* found = dynamic_cast<Type*> (child))
+                return found;
+
+            if (auto* found = findChild<Type> (*child))
+                return found;
+        }
+
+        return nullptr;
+    }
+
     /** Checks a preset's harmonics, 1st to 9th, have their textbook strengths. Missing ones should be exactly 0. */
     void checkPreset (waveform::Preset preset, const juce::String& description,
                       const std::function<double (int harmonic)>& expectedAmplitude)
@@ -3456,6 +3477,220 @@ namespace
         synth.randomizeAsTriggered();
     }
 
+    void testNoise()
+    {
+        std::cout << "Noise" << std::endl;
+
+        const auto rms = [] (const std::vector<float>& signal)
+        {
+            auto sum = 0.0;
+
+            for (const auto sample : signal)
+                sum += (double) sample * sample;
+
+            return std::sqrt (sum / (double) signal.size());
+        };
+
+        const auto noisy = [] (float level = 1.0f)
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::noiseId (0), 1.0f);
+            setParameter (*synth, SynthProcessor::levelId (0), level);
+            return synth;
+        };
+
+        {
+            SynthProcessor fresh;
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                check (! fresh.isNoise (i), "to start with, oscillator " + juce::String (i + 1) + " plays its harmonics, not noise");
+        }
+
+        // Even from -1 to 1 at the oscillator's level, a note at 0.3 of full scale, the volume at 0.75, squared.
+        const auto expectedRms = 0.3 * 0.75 * 0.75 / std::sqrt (3.0);
+
+        {
+            auto synth = noisy();
+            const auto played = slice (play (*synth, 69, 1.0, 0.5), 0.1, 0.4);
+            check (isNear (rms (played), expectedRms, 0.03), "an oscillator playing noise plays it evenly from -1 to 1 at its level");
+
+            auto crossings = 0;
+            std::vector<float> steps;
+
+            for (size_t i = 1; i < played.size(); ++i)
+            {
+                crossings += (played[i - 1] < 0.0f) != (played[i] < 0.0f) ? 1 : 0;
+                steps.push_back (played[i] - played[i - 1]);
+            }
+
+            // White noise changes sign about every other sample, and each sample is unrelated to the one before, so
+            // from one to the next it changes by √2 times as much as it is.
+            check (isNear ((double) crossings / (double) played.size(), 0.5, 0.05)
+                     && isNear (rms (steps) / rms (played), std::sqrt (2.0), 0.05),
+                   "its noise is white, each sample unrelated to the one before");
+            check (amplitudeAt (played, 440.0) < 0.01, "it plays none of the note's pitch");
+
+            const auto high = slice (play (*noisy(), 96, 1.0, 0.5), 0.1, 0.4);
+            const auto low = slice (play (*noisy(), 36, 1.0, 0.5), 0.1, 0.4);
+            check (isNear (rms (high), expectedRms, 0.03) && isNear (rms (low), expectedRms, 0.03),
+                   "it's the same noise, as loud, whichever key is played");
+
+            // The window sees the noise the note played, before its level, the volume and the note's loudness.
+            synth = noisy();
+            const auto output = play (*synth, 69, 1.0, 0.5);
+            const auto seen = synth->getPlayedNoise (0);
+            auto same = seen.size() == (size_t) SynthProcessor::noiseSamples;
+
+            for (size_t i = 0; same && i < seen.size(); ++i)
+                same = std::abs (output[output.size() - seen.size() + i] / (0.3f * 0.75f * 0.75f) - seen[i]) < 1.0e-4f;
+
+            check (same, "the window is given the last 512 samples of noise the newest note played, just as it played them");
+            const auto count = synth->getNoiseCount();
+            juce::AudioBuffer<float> more (2, 256);
+            juce::MidiBuffer noMidi;
+            synth->processBlock (more, noMidi);
+            const auto later = synth->getPlayedNoise (0);
+            check (synth->getNoiseCount() > count && std::equal (seen.begin() + 256, seen.end(), later.begin())
+                     && std::abs (later.back() - more.getSample (0, 255) / (0.3f * 0.75f * 0.75f)) < 1.0e-4f,
+                   "and the newest noise with each block played, the older moving along");
+            check (synth->getPlayedNoise (1).empty(), "an oscillator that isn't playing noise gives the window none");
+        }
+
+        {
+            auto synth = noisy();
+            play (*synth, 69, 0.1, 0.6);
+            check (synth->getPlayedNoise (0).empty(), "with no note sounding, the window is given no noise");
+        }
+
+        {
+            auto synth = noisy (0.5f);
+            check (isNear (rms (slice (play (*synth, 69, 1.0, 0.5), 0.1, 0.4)), expectedRms / 2.0, 0.03), "half its level plays half as loud");
+
+            synth = noisy();
+            setParameter (*synth, SynthProcessor::onId (0), 0.0f);
+            check (peakOf (play (*synth, 69, 0.3, 0.5)) == 0.0f, "an oscillator playing noise that's switched off is silent");
+        }
+
+        // Each note plays noise of its own, so two keys played together are louder by √2, as two unrelated sounds are.
+        {
+            auto synth = noisy();
+            synth->prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> output;
+
+            for (int block = 0; block < 40; ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                {
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, 1.0f), 0);
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 67, 1.0f), 0);
+                }
+
+                synth->processBlock (buffer, midi);
+
+                if (block >= 10)
+                    output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            check (isNear (rms (output), expectedRms * std::sqrt (2.0), 0.05), "each note plays noise of its own");
+        }
+
+        // A sine and noise together: the sine is still there, at its own level.
+        {
+            auto synth = noisy();
+            setParameter (*synth, SynthProcessor::onId (1), 1.0f);
+            setPreset (*synth, 1, waveform::Preset::sine);
+            setNumHarmonics (*synth, 1, 1);
+            const auto played = slice (play (*synth, 69, 1.0, 0.5), 0.1, 0.4);
+            check (isNear (amplitudeAt (played, 440.0), 0.3 * 0.75 * 0.75, 0.05), "another oscillator plays its harmonics alongside the noise");
+        }
+
+        // Switching noise on and off while a note plays fades between them rather than clicking.
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            synth->prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> output;
+
+            for (int block = 0; block < 30; ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+                if (block == 15)
+                    setParameter (*synth, SynthProcessor::noiseId (0), 1.0f);
+
+                synth->processBlock (buffer, midi);
+                output.insert (output.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            const auto switchPoint = (size_t) (15 * blockSize);
+            check (amplitudeAt (slice (output, 0.05, 0.15), 440.0) > 0.15 && amplitudeAt (slice (output, 0.2, 0.3), 440.0) < 0.01,
+                   "switching noise on mid-note changes the wave playing to noise");
+            check (peakOf ({ output.begin() + (std::ptrdiff_t) switchPoint, output.begin() + (std::ptrdiff_t) switchPoint + 32 }) < 0.2f,
+                   "without a jump as it does");
+        }
+
+        // It's kept with the sound and in its description, and each pitch set has its own.
+        {
+            auto synth = noisy();
+            juce::MemoryBlock state;
+            synth->getStateInformation (state);
+            SynthProcessor restored;
+            restored.setStateInformation (state.getData(), (int) state.getSize());
+            check (restored.isNoise (0) && ! restored.isNoise (1), "whether an oscillator plays noise is saved with the sound");
+
+            const auto json = sound::toJson (*synth, true);
+            SynthProcessor described;
+            sound::load (described, json);
+            check (json.contains ("\"osc1Noise\": true") && described.isNoise (0), "and in its description, as osc1Noise");
+
+            SynthProcessor sets;
+            sets.setActivePitchSet (sets.addPitchSet ({ 60, 71 }));
+            setParameter (sets, SynthProcessor::noiseId (0), 1.0f);
+            sets.setActivePitchSet (0);
+            check (! sets.isNoise (0) && peakOf (play (sets, 48, 1.0, 0.3)) > 0.0f && amplitudeAt (slice (play (sets, 48, 1.0, 0.5), 0.1, 0.4), hertzOf (48)) > 0.1
+                     && amplitudeAt (slice (play (sets, 64, 1.0, 0.5), 0.1, 0.4), hertzOf (64)) < 0.01,
+                   "a pitch set can play noise where the default plays the wave");
+        }
+
+        // The window hides the wave's presets and drawing, and the harmonics' controls, for an oscillator playing noise.
+        {
+            SynthProcessor shown;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            auto* grid = findChild<WaveGrid> (*editor);
+            auto* sliders = findChild<HarmonicSliders> (*editor);
+            auto* tune = findChild<TuneSlider> (*editor);
+            shown.editedSource = 0;
+            synthEditor.refresh();
+            check (grid != nullptr && ! grid->isNoise() && sliders->isVisible() && tune->isVisible(),
+                   "an oscillator playing its harmonics has them, its tune and the wave's controls in the window");
+
+            grid->onNoiseChange (true);
+            synthEditor.refresh();
+            check (shown.isNoise (0) && grid->isNoise() && ! sliders->isVisible() && ! tune->isVisible(),
+                   "the grid's Noise switch makes it play noise, and hides the harmonics and tune");
+
+            shown.editedSource = 1;
+            synthEditor.refresh();
+            check (! grid->isNoise() && sliders->isVisible(), "another oscillator still has them");
+
+            shown.editedSource = 0;
+            synthEditor.refresh();
+            grid->onNoiseChange (false);
+            synthEditor.refresh();
+            check (! shown.isNoise (0) && ! grid->isNoise() && sliders->isVisible(), "switching Noise off brings them back");
+            shown.editorBeingDeleted (editor.get());
+        }
+    }
+
     void testMidiLearn()
     {
         std::cout << "MIDI learn" << std::endl;
@@ -5559,6 +5794,28 @@ namespace
         setPreset (synth, 0, waveform::Preset::square);
         save ("3a-square-3");
 
+        // Oscillator 1 playing noise, as the note held plays it, then, in a synth that's played nothing, with no note
+        // playing it.
+        setParameter (synth, SynthProcessor::noiseId (0), 1.0f);
+        hold (69);
+        save ("3c-noise");
+
+        {
+            SynthProcessor quiet;
+            setParameter (quiet, SynthProcessor::noiseId (0), 1.0f);
+            std::unique_ptr<juce::AudioProcessorEditor> quietEditor (quiet.createEditorAndMakeActive());
+            dynamic_cast<SynthEditor&> (*quietEditor).refresh();
+            const auto image = quietEditor->createComponentSnapshot (quietEditor->getLocalBounds(), true, 2.0f);
+            const auto file = folder.getChildFile ("3d-noise-silent.png");
+            file.deleteFile();
+            juce::FileOutputStream stream (file);
+            juce::PNGImageFormat().writeImageToStream (image, stream);
+            quiet.editorBeingDeleted (quietEditor.get());
+        }
+
+        setParameter (synth, SynthProcessor::noiseId (0), 0.0f);
+        hold (69);
+
         setPreset (synth, 0, waveform::Preset::sine);
         synth.setHarmonicAmplitude (0, 2, 0.25f);
         synth.setHarmonicAmplitude (0, 3, 0.6f);
@@ -5906,6 +6163,7 @@ int main (int argc, char* argv[])
     testShowingMovedHarmonics();
     testTuning();
     testGlide();
+    testNoise();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

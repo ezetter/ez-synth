@@ -80,6 +80,9 @@ public:
 
     /** Shows the harmonics the oscillator plays, the name of its wave, and how many semitones it's tuned up. */
     void setWave (const std::vector<waveform::Partial>& harmonics, const juce::String& waveName, float tune);
+
+    /** Shows the oscillator playing white noise, with the samples given, oldest first. */
+    void setNoise (const std::vector<float>& samples);
 };
 
 /** An LFO's card: its switch, its wave, whether it loops or starts with each key, and how many times it plays then,

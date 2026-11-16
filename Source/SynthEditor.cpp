@@ -57,6 +57,24 @@ SynthEditor::SynthEditor (SynthProcessor& p)
         refresh();
     };
 
+    grid.onNoiseChange = [this] (bool noise)
+    {
+        if (SynthProcessor::isLfo (synthProcessor.editedSource))
+            return;
+
+        auto& parameter = *synthProcessor.parameters.getParameter (SynthProcessor::noiseId (synthProcessor.editedSource));
+        parameter.beginChangeGesture();
+        parameter.setValueNotifyingHost (noise ? 1.0f : 0.0f);
+        parameter.endChangeGesture();
+        refresh();
+    };
+
+    // Noise like an oscillator's, to show while no note plays it, the same each time.
+    juce::Random stillRandom (20261115);
+
+    for (int i = 0; i < SynthProcessor::noiseSamples; ++i)
+        stillNoise.push_back (stillRandom.nextFloat() * 2.0f - 1.0f);
+
     harmonicSliders.onAmplitudeChange = [this] (int harmonic, float amplitude)
     {
         synthProcessor.setHarmonicAmplitude (synthProcessor.editedSource, harmonic, amplitude);
@@ -211,7 +229,18 @@ void SynthEditor::paint (juce::Graphics& g)
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
 
-    if (! SynthProcessor::isLfo (edited))
+    if (! SynthProcessor::isLfo (edited) && synthProcessor.isNoise (edited))
+    {
+        // White noise has no harmonics, pitch or glide to set.
+        g.drawText ("OSC " + juce::String (edited + 1) + " WHITE NOISE", harmonicsCaption, juce::Justification::centredLeft);
+        g.setColour (colours::dimText);
+        g.setFont (fonts::body (14.0f));
+        g.drawFittedText ("Every frequency at once, with a new random value every sample, so there are no harmonics, "
+                          "tune or glide to set.\n\nIts level and switch still count, as do the envelopes and LFOs on them. "
+                          "Shape its sound with the filters.\n\nSwitch Noise off, above the wave, to play harmonics again.",
+                          sidePanel.reduced (16, 14).withTop (harmonicsCaption.getBottom() + 14), juce::Justification::topLeft, 12);
+    }
+    else if (! SynthProcessor::isLfo (edited))
     {
         g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
         g.setColour (colours::outline);
@@ -423,6 +452,7 @@ void SynthEditor::refresh()
         now.numHarmonics[(size_t) i] = synthProcessor.getNumHarmonics (i);
         now.tuneCents[(size_t) i] = juce::roundToInt (synthProcessor.getTune (i) * 100.0f);
         now.on[(size_t) i] = synthProcessor.isOn (i);
+        now.noise[(size_t) i] = synthProcessor.isNoise (i);
     }
 
     for (int i = 0; i < SynthProcessor::numLfos; ++i)
@@ -467,11 +497,15 @@ void SynthEditor::refresh()
         grid.setPreset (preset);
 
         grid.setDrawing (synthProcessor.getDrawing (edited));
-        harmonicSelector.setVisible (! editingLfo);
-        randomizeButton.setVisible (! editingLfo);
-        harmonicSliders.setVisible (! editingLfo);
-        tuneSlider.setVisible (! editingLfo);
+
+        // An oscillator playing noise has none of its harmonics' controls.
+        const auto harmonicsShown = ! editingLfo && ! now.noise[(size_t) edited];
+        harmonicSelector.setVisible (harmonicsShown);
+        randomizeButton.setVisible (harmonicsShown);
+        harmonicSliders.setVisible (harmonicsShown);
+        tuneSlider.setVisible (harmonicsShown);
         lfoPanel.setVisible (editingLfo);
+        grid.setNoise (editingLfo ? std::nullopt : std::optional (now.noise[(size_t) edited]));
 
         if (editingLfo)
         {
@@ -555,7 +589,7 @@ void SynthEditor::refresh()
     {
         auto live = synthProcessor.getLiveWave (i);
 
-        if (! changed && live == liveWaves[(size_t) i])
+        if (now.noise[(size_t) i] || (! changed && live == liveWaves[(size_t) i]))
             continue;
 
         oscillatorCards[(size_t) i]->setWave (live.harmonics, getWaveName (synthProcessor.getPreset (i)), synthProcessor.getTune (i));
@@ -565,6 +599,8 @@ void SynthEditor::refresh()
 
         liveWaves[(size_t) i] = std::move (live);
     }
+
+    showNoise (changed);
 
     // An LFO's period and where it has got to change all the time, so they're shown on every refresh.
     if (editingLfo)
@@ -604,6 +640,31 @@ void SynthEditor::refresh()
         const auto tune = editingLfo ? 0.0f : synthProcessor.getTune (edited);
         harmonicSliders.setFundamental (note >= 0 ? std::optional (juce::MidiMessage::getMidiNoteInHertz (note) * tuning::toRatio (tune))
                                                   : std::nullopt);
+    }
+}
+
+void SynthEditor::showNoise (bool changed)
+{
+    const auto count = synthProcessor.getNoiseCount();
+
+    if (! changed && count == shownNoiseCount)
+        return;
+
+    shownNoiseCount = count;
+    const auto edited = synthProcessor.editedSource;
+    const auto seconds = SynthProcessor::noiseSamples / synthProcessor.getPlayingSampleRate();
+
+    for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+    {
+        if (! shown.noise[(size_t) i])
+            continue;
+
+        const auto played = synthProcessor.getPlayedNoise (i);
+        const auto& samples = played.empty() ? stillNoise : played;
+        oscillatorCards[(size_t) i]->setNoise (samples);
+
+        if (i == edited)
+            grid.setNoiseSamples (samples, seconds, ! played.empty());
     }
 }
 
