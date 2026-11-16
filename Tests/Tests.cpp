@@ -5633,8 +5633,8 @@ namespace
         // Every factory preset is in a category, and every category but Other has some.
         {
             const auto categories = SynthProcessor::getPresetCategories();
-            check (categories == juce::StringArray { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", "Other" },
-                   "presets are in categories: Bass, Brass and Winds, Drums, Keys, Leads, Pads and Other");
+            check (categories == juce::StringArray { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", "Strings", "Other" },
+                   "presets are in categories: Bass, Brass and Winds, Drums, Keys, Leads, Pads, Strings and Other");
 
             auto everyCategory = true;
 
@@ -5651,7 +5651,8 @@ namespace
             SynthProcessor piano;
             piano.loadFactoryPreset ("Grand Piano");
             check (everyCategory && SynthProcessor::getFactoryPresetCategory ("Acid Bass") == "Bass"
-                     && SynthProcessor::getFactoryPresetCategory ("Drum Kit") == "Drums" && piano.getPresetCategory() == "Keys",
+                     && SynthProcessor::getFactoryPresetCategory ("Drum Kit") == "Drums"
+                     && SynthProcessor::getFactoryPresetCategory ("Bowed Cello") == "Strings" && piano.getPresetCategory() == "Keys",
                    "each category has factory presets, such as the Grand Piano in Keys");
             check (! piano.setPresetCategory ("Pads") && piano.getPresetCategory() == "Keys", "a factory preset's category can't be changed");
 

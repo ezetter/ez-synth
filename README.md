@@ -415,8 +415,8 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
   suggests the current preset's name, so saving again over it is quick.
 - **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
-  then a submenu for each category, **Bass**, **Brass and Winds**, **Drums**, **Keys**, **Leads**, **Pads** and
-  **Other**, holding its factory presets and then your own. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
+  then a submenu for each category, **Bass**, **Brass and Winds**, **Drums**, **Keys**, **Leads**, **Pads**,
+  **Strings** and **Other**, holding its factory presets and then your own. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
   sawtooth with 3 harmonics each, only the sine on, every oscillator and harmonic in tune and every
   harmonic's phase as its wave has it, each wave drawn smoothly, the filters a low pass and a high pass, both
   off, the LFOs off and not random, the envelopes as they start, and nothing moved by an LFO or envelope.
@@ -446,9 +446,10 @@ Each one's category is in `Tools/MakeFactoryPresets.cpp`, beside the recipes:
 - **Drums:** Drum Kit, Kick Drum, Shaker Groove
 - **Keys:** Drawbar Organ, Electric Piano, Grand Piano, Marimba, Music Box, Pipe Organ
 - **Leads:** Fifth Lead, Square Lead, Stepped Arp
-- **Pads:** Breath Choir, Glass Pad, Shifting Sands, String Ensemble, Vox Pad, Warm Pad
-- **Other:** Bowed Cello, Church Bell, Helicopter, Noise Riser, Nylon Guitar, Ocean Surf, Rain, Sample and
-  Hold, Step Filter, Thunder, Wind
+- **Pads:** Breath Choir, Glass Pad, Shifting Sands, Vox Pad, Warm Pad
+- **Strings:** Bowed Cello, Nylon Guitar, String Ensemble
+- **Other:** Church Bell, Helicopter, Noise Riser, Ocean Surf, Rain, Sample and Hold, Step Filter, Thunder,
+  Wind
 
 | Preset | What it shows |
 | --- | --- |

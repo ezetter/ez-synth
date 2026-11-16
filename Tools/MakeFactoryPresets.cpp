@@ -1239,10 +1239,11 @@ namespace
         { "Drawbar Organ", "Keys" }, { "Electric Piano", "Keys" }, { "Grand Piano", "Keys" }, { "Marimba", "Keys" },
         { "Music Box", "Keys" }, { "Pipe Organ", "Keys" },
         { "Fifth Lead", "Leads" }, { "Square Lead", "Leads" }, { "Stepped Arp", "Leads" },
-        { "Breath Choir", "Pads" }, { "Glass Pad", "Pads" }, { "Shifting Sands", "Pads" }, { "String Ensemble", "Pads" },
+        { "Breath Choir", "Pads" }, { "Glass Pad", "Pads" }, { "Shifting Sands", "Pads" },
         { "Vox Pad", "Pads" }, { "Warm Pad", "Pads" },
-        { "Bowed Cello", "Other" }, { "Church Bell", "Other" }, { "Helicopter", "Other" }, { "Noise Riser", "Other" },
-        { "Nylon Guitar", "Other" }, { "Ocean Surf", "Other" }, { "Rain", "Other" }, { "Sample and Hold", "Other" },
+        { "Bowed Cello", "Strings" }, { "Nylon Guitar", "Strings" }, { "String Ensemble", "Strings" },
+        { "Church Bell", "Other" }, { "Helicopter", "Other" }, { "Noise Riser", "Other" },
+        { "Ocean Surf", "Other" }, { "Rain", "Other" }, { "Sample and Hold", "Other" },
         { "Step Filter", "Other" }, { "Thunder", "Other" }, { "Wind", "Other" },
     };
 }

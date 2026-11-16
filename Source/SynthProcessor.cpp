@@ -2659,7 +2659,7 @@ void SynthProcessor::nameSound (const juce::String& name)
 
 juce::StringArray SynthProcessor::getPresetCategories()
 {
-    return { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", otherCategory };
+    return { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", "Strings", otherCategory };
 }
 
 bool SynthProcessor::setPresetCategory (const juce::String& category)
