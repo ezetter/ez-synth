@@ -429,34 +429,45 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 #### Factory presets
 
-EZ Synth comes with 25 presets, built into the app and the plugins. Each one shows off something different:
+EZ Synth comes with 35 presets, built into the app and the plugins. Each one shows off something different. Ten of
+them, marked *noise*, show what an oscillator playing white noise can do:
 
 | Preset | What it shows |
 | --- | --- |
 | Acid Bass | A sawtooth and a sub through a resonant low pass an envelope snaps open, further for harder notes; legato notes slide, and the mod wheel opens the filter |
 | Bowed Cello | Two sawtooths a few cents apart, bowed in by an envelope, between a resonant high pass and low pass standing for the body, with a vibrato from each key and legato slides |
 | Brass Section | Three sawtooths spread a few cents apart, a low pass an envelope opens with each note, and a quick envelope, inverted, on the tunes, so each note scoops up into its pitch |
+| Breath Choir | *Noise.* A choir breathing its notes: mostly noise, with two quiet sawtooths for the pitch, through a resonant high pass and low pass as a vowel's formants, which two slow random LFOs move and the mod wheel moves apart |
 | Church Bell | A bell's partials, which aren't harmonics: the hum an octave down, the minor third, and upper partials tuned between harmonics, each group fading with its own envelope, a clang two octaves up, and a ring drawn on an LFO run once |
 | Drawbar Organ | Drawbars as one oscillator's harmonics an octave down, a percussive twelfth and a key click on others, and a rotary speaker: one LFO on the volume, the tune and a low pass, a quarter turn apart, which the mod wheel speeds up |
+| Drum Kit | *Noise.* A drum kit, each drum a pitch set on its General MIDI key: the kick on B1 and C2, a clap on D#2, toms from F2 to D3 tuned by their keys, closed, pedal and open hi-hats on F#2, G#2 and A#2, a crash on C#3, and the snare on every other key. The hats and crash are noise through a high pass, the clap noise through a mid pass that an LFO run three times claps, and the drums add noise to a sine an envelope drops in pitch |
 | Electric Piano | A mellow fundamental, a bark only hard notes bring out, and a tine's ping two octaves up with a partial that isn't a harmonic. Its low and high keys are pitch sets: longer and growlier below, shorter and clearer above |
 | Fifth Lead | A sawtooth with another a fifth above and a square an octave below, gliding from every note to the next, with a vibrato |
 | Flute | A few harmonics blown in by an envelope, with breath made from an oscillator of high harmonics whose tune a fast random LFO smears into noise |
 | Glass Pad | Six sines stacked an octave, a twelfth and two octaves up, each level moved by its own slow random LFO, so the stack shimmers and never repeats |
 | Grand Piano | As near a grand piano as EZ Synth gets: two strings 2 cents apart that beat gently, a bright strike that fades within a second, a low pass that mellows the note as it rings, a ring drawn on an LFO run once, falling quickly and then slowly, and velocity on the strings' levels and the cutoff. The bass, middle and treble are pitch sets: the bass strings rich, their harmonics a little sharp as stiff strings' are, and long; the treble's plain and short |
+| Helicopter | *Noise.* Noise through a low pass, chopped by a sawtooth LFO eleven times a second on the volume and the cutoff, over an engine's whine at the key's pitch; the mod wheel speeds the rotor up |
 | Kick Drum | A sine an envelope drops two octaves in a tenth of a second, with a click, an octave below the keys |
 | Marimba | A bar's partials near 4 and 9.2 times its note, by tuning oscillators and harmonics, each gone sooner than the last. The low and high bars are pitch sets, long and soft below, short and bright above |
 | Music Box | Teeth an octave above their keys, one a few cents sharp, with a partial at 6.27 times the note, ringing on after the key |
+| Noise Riser | *Noise.* Noise through a resonant low pass that an LFO, run once from the key over two bars of the tempo, sweeps up five octaves as it brings the volume up |
 | Nylon Guitar | A string plucked a fifth of the way along, its low harmonics ringing on an LFO run once while the high ones fade on an envelope, with a body resonance from a high pass. The low strings are a pitch set that rings longer |
+| Ocean Surf | *Noise.* Waves on a beach: an LFO drawn as a wave that rushes in and draws slowly back moves the volume and a low pass together every nine seconds, with random LFOs making some waves bigger and moving the foam's hiss |
+| Pan Flute | *Noise.* A stopped pipe's odd harmonics with breath made of noise: a chiff as each note starts and a little all through, more for harder notes and with the mod wheel |
 | Pipe Organ | Six ranks of pipes, each an oscillator: an octave below the note up to two octaves above, a twelfth among them, and one a little sharp, with a chiff as the highest speaks |
+| Rain | *Noise.* A steady hiss between a high pass and a low pass, under drops: noise that a fast LFO playing random steps lets through in bursts. The mod wheel makes it heavier |
 | Reese Bass | Three sawtooths a fifth of a semitone apart over a sub, through a low pass and a notch an LFO slowly sweeps |
 | Sample and Hold | An LFO playing random steps, synced to the tempo, jumping a resonant low pass to a new cutoff four times a beat, with a slower random LFO on the resonance |
+| Shaker Groove | *Noise.* A shaker playing sixteen to the bar, in time with the tempo: an LFO drawn as a bar of accents sets the noise's level step by step, a second shakes each step, and a third moves the high pass |
 | Shifting Sands | Triggers: two slow LFOs each randomizing an oscillator's harmonics as they cross their middles, while another sweeps how many harmonics play |
 | Square Lead | Two squares a tenth of a semitone apart over a sub, between a high pass and a resonant low pass, gliding between notes, with a vibrato from each key |
 | Step Filter | An LFO drawn as eight steps, synced to the tempo, moving a resonant low pass filter like a step sequencer |
 | Stepped Arp | A held key plays a tune: an LFO drawn in steps moves the oscillators' tune through a minor chord, starting with each key, while a second, four times as fast, plucks each step |
 | String Ensemble | Sawtooths a few cents apart, two drifting on slow LFOs, swelling in. The low keys are a pitch set, darker with an octave below, and the high keys another, brighter and quicker |
+| Thunder | *Noise.* Four oscillators of noise through a low pass an LFO run once drops from the crack to the rumble, shaken by a fast random LFO, dying away over seven seconds after the key |
 | Vox Pad | A voice singing "ah": a resonant high pass and a resonant low pass as a vowel's two formants, which the mod wheel moves apart, towards "ee" |
 | Warm Pad | A triangle, a sawtooth, a sine and a triangle an octave up, swelling in through a low pass one LFO slowly opens and closes, while another makes the sawtooth shimmer |
+| Wind | *Noise.* Noise through a resonant low pass, which whistles where it peaks, with slow random LFOs on the cutoff, the resonance and the volume, so it gusts; the mod wheel raises the whistle |
 | Wobble Bass | A square, a sawtooth and a sub through a resonant low pass an LFO wobbles twice a beat, in time with the tempo, with legato slides |
 
 A factory preset can't be saved over. **Save** suggests saving a copy, under the same name, among your own

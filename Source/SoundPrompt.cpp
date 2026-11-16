@@ -364,10 +364,12 @@ volume. Its sound is the default pitch set's; `pitchSets` lists any others.
                     "against the strongest harmonic at that moment, as EZ Synth's are; 64 harmonics are measured, where "
                     "they fit below 20 kHz. `compare` plays the sound as the sample's nearest MIDI note, holding the key "
                     "until the sample has faded 60 dB below its peak unless you give `--hold`, and saves what it played "
-                    "beside the description, so the person can listen to both, and says which pitch set played. The factory presets are Acid Bass, Bowed Cello, Brass Section, Church Bell, Drawbar Organ, Electric "
-                    "Piano, Fifth Lead, Flute, Glass Pad, Grand Piano, Kick Drum, Marimba, Music Box, Nylon Guitar, Pipe "
-                    "Organ, Reese Bass, Sample and Hold, Shifting Sands, Square Lead, Step Filter, Stepped Arp, String "
-                    "Ensemble, Vox Pad, Warm Pad and Wobble Bass.\n\n";
+                    "beside the description, so the person can listen to both, and says which pitch set played. The factory presets are Acid Bass, Bowed Cello, Brass Section, Breath Choir, Church Bell, Drawbar "
+                    "Organ, Drum Kit, Electric Piano, Fifth Lead, Flute, Glass Pad, Grand Piano, Helicopter, Kick Drum, "
+                    "Marimba, Music Box, Noise Riser, Nylon Guitar, Ocean Surf, Pan Flute, Pipe Organ, Rain, Reese Bass, "
+                    "Sample and Hold, Shaker Groove, Shifting Sands, Square Lead, Step Filter, Stepped Arp, String "
+                    "Ensemble, Thunder, Vox Pad, Warm Pad, Wind and Wobble Bass. Breath Choir, Drum Kit, Helicopter, "
+                    "Noise Riser, Ocean Surf, Pan Flute, Rain, Shaker Groove, Thunder and Wind use noise.\n\n";
         }
         else
         {

@@ -121,6 +121,7 @@
   <PARAM id="osc1GlideTime" value="0.07000000029802322"/>
   <PARAM id="osc1Harmonics" value="16.0"/>
   <PARAM id="osc1Level" value="0.800000011920929"/>
+  <PARAM id="osc1Noise" value="0.0"/>
   <PARAM id="osc1On" value="1.0"/>
   <PARAM id="osc1Tune" value="0.0"/>
   <PARAM id="osc1TuneZoom" value="1.0"/>
@@ -128,6 +129,7 @@
   <PARAM id="osc2GlideTime" value="0.07000000029802322"/>
   <PARAM id="osc2Harmonics" value="16.0"/>
   <PARAM id="osc2Level" value="0.5"/>
+  <PARAM id="osc2Noise" value="0.0"/>
   <PARAM id="osc2On" value="1.0"/>
   <PARAM id="osc2Tune" value="7.020000457763672"/>
   <PARAM id="osc2TuneZoom" value="1.0"/>
@@ -135,6 +137,7 @@
   <PARAM id="osc3GlideTime" value="0.07000000029802322"/>
   <PARAM id="osc3Harmonics" value="9.0"/>
   <PARAM id="osc3Level" value="0.3499999940395355"/>
+  <PARAM id="osc3Noise" value="0.0"/>
   <PARAM id="osc3On" value="1.0"/>
   <PARAM id="osc3Tune" value="-12.0"/>
   <PARAM id="osc3TuneZoom" value="1.0"/>
@@ -142,6 +145,7 @@
   <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc4Harmonics" value="3.0"/>
   <PARAM id="osc4Level" value="1.0"/>
+  <PARAM id="osc4Noise" value="0.0"/>
   <PARAM id="osc4On" value="0.0"/>
   <PARAM id="osc4Tune" value="0.0"/>
   <PARAM id="osc4TuneZoom" value="0.0"/>
@@ -149,6 +153,7 @@
   <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc5Harmonics" value="3.0"/>
   <PARAM id="osc5Level" value="1.0"/>
+  <PARAM id="osc5Noise" value="0.0"/>
   <PARAM id="osc5On" value="0.0"/>
   <PARAM id="osc5Tune" value="0.0"/>
   <PARAM id="osc5TuneZoom" value="0.0"/>
@@ -156,6 +161,7 @@
   <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc6Harmonics" value="3.0"/>
   <PARAM id="osc6Level" value="1.0"/>
+  <PARAM id="osc6Noise" value="0.0"/>
   <PARAM id="osc6On" value="0.0"/>
   <PARAM id="osc6Tune" value="0.0"/>
   <PARAM id="osc6TuneZoom" value="0.0"/>

@@ -115,6 +115,14 @@ namespace
         setHarmonics (synth, oscillator, amplitudes);
     }
 
+    /** Switches an oscillator on playing white noise, rather than its harmonics, at a level. */
+    void setNoise (SynthProcessor& synth, int oscillator, float level)
+    {
+        setParameter (synth, SynthProcessor::onId (oscillator), 1.0f);
+        setParameter (synth, SynthProcessor::noiseId (oscillator), 1.0f);
+        setParameter (synth, SynthProcessor::levelId (oscillator), level);
+    }
+
     void setTune (SynthProcessor& synth, int oscillator, float semitones)
     {
         setParameter (synth, SynthProcessor::tuneId (oscillator), semitones);
@@ -939,6 +947,350 @@ namespace
             setSync (synth, lfo1, 2.0);
             assign (synth, filterCutoffTarget (0), lfo1, 0.5f);
             assignModWheel (synth, filterResonanceTarget (0), 0.3f);
+        } },
+
+        //==============================================================================
+        // The presets that show what an oscillator playing white noise can do. Noise has no pitch, so every key plays
+        // it the same, unless a pitch set or something that does follow the key makes the difference.
+
+        // A choir breathing its notes: mostly white noise, with two quiet sawtooths for the pitch, through a resonant
+        // high pass and a resonant low pass that stand for a vowel's two formants. Two slow random LFOs move them, so
+        // the vowel wanders, and the mod wheel moves them apart, from "ah" towards "ee".
+        { "Breath Choir", [] (SynthProcessor& synth)
+        {
+            setOscillator (synth, osc1, fallingSawtooth(), 16, 0.16f);
+            setOscillator (synth, osc2, fallingSawtooth(), 16, 0.12f);
+            setTune (synth, osc2, 0.08f);
+            setNoise (synth, osc3, 1.0f);
+            setNoise (synth, osc4, 1.0f);
+
+            setFilter (synth, 1, FilterType::highPass, 640.0f, 0.6f);
+            setFilter (synth, 0, FilterType::lowPass, 1200.0f, 0.6f);
+            assignModWheel (synth, filterCutoffTarget (0), 0.12f);
+            assignModWheel (synth, filterCutoffTarget (1), 0.12f, true);
+
+            setLfo (synth, lfo1, 4.7f, loops, sine);
+            setRandom (synth, lfo1, false);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.12f);
+            setLfo (synth, lfo2, 6.1f, loops, sine);
+            setRandom (synth, lfo2, false);
+            assign (synth, filterCutoffTarget (1), lfo2, 0.08f);
+
+            setParameter (synth, SynthProcessor::volumeId, 0.0f);
+            setEnvelope (synth, 0, { 0.4f, 0.5f, 0.9f, 0.9f });
+            assign (synth, volumeTarget, env1, 0.8f);
+        } },
+
+        // A drum kit, each drum a pitch set on the keys a General MIDI kit has it on: the kick on the B and C two
+        // octaves below middle C, a clap on the D sharp above, toms from the F above that up to the D below middle C,
+        // tuned by their keys, with the closed, pedal and open hi-hats on the F sharp, G sharp and A sharp among them
+        // and a crash on the C sharp. Every other key plays the snare, its drum tuned by the key. The hats and the
+        // crash are nothing but noise through a high pass; the snare, the kick and the toms add it to a sine an
+        // envelope drops in pitch; and the clap is noise through a mid pass that an LFO run three times claps.
+        { "Drum Kit", [] (SynthProcessor& synth)
+        {
+            // The loudness of a drum: an envelope on the volume that falls from the strike, the same if the key is
+            // let go early.
+            const auto strike = [&synth] (float seconds, float level)
+            {
+                setParameter (synth, SynthProcessor::volumeId, 0.0f);
+                setEnvelope (synth, 0, { 0.0f, seconds, 0.0f, seconds });
+                assign (synth, volumeTarget, env1, level);
+            };
+
+            // A sine an envelope drops in pitch, by a share of four octaves, as a drum's skin does after it's struck.
+            const auto skin = [&synth] (float tune, float drop, float dropSeconds, const std::vector<float>& partials)
+            {
+                setPartials (synth, osc1, 1.0f, tune, partials);
+                setEnvelope (synth, 1, { 0.0f, dropSeconds, 0.0f, dropSeconds });
+                assign (synth, oscillatorTuneTarget (osc1), env2, drop);
+            };
+
+            // Noise on the second oscillator that an envelope brings in with the strike and fades.
+            const auto burst = [&synth] (float level, float seconds)
+            {
+                setNoise (synth, osc2, 0.0f);
+                setEnvelope (synth, 2, { 0.0f, seconds, 0.0f, seconds });
+                assign (synth, oscillatorLevelTarget (osc2), env3, level);
+            };
+
+            const auto hat = [&synth, &strike] (float seconds, float level, float cutoff)
+            {
+                setNoise (synth, osc1, 1.0f);
+                setFilter (synth, 1, FilterType::highPass, cutoff, 0.3f);
+                strike (seconds, level);
+            };
+
+            // The snare: its drum a sixth above the key's octave, and its wires, which are noise.
+            skin (16.0f, 0.06f, 0.04f, { 1.0f, 0.0f, 0.25f });
+            setParameter (synth, SynthProcessor::levelId (osc1), 0.7f);
+            burst (0.9f, 0.2f);
+            setFilter (synth, 1, FilterType::highPass, 160.0f);
+            setFilter (synth, 0, FilterType::lowPass, 9000.0f);
+            strike (0.22f, 0.9f);
+
+            // The kick, with a click of noise.
+            addPitchSet (synth, 35, 36);
+            synth.loadInitSound();
+            skin (-5.0f, 0.5f, 0.09f, { 1.0f });
+            burst (0.35f, 0.012f);
+            setFilter (synth, 0, FilterType::lowPass, 3000.0f);
+            strike (0.4f, 0.95f);
+
+            // The clap: a band of noise that an LFO, run three times from the key, claps before it fades.
+            addPitchSet (synth, 39, 39);
+            synth.loadInitSound();
+            setNoise (synth, osc1, 0.0f);
+            setNoise (synth, osc2, 0.0f);
+            setEnvelope (synth, 0, { 0.0f, 0.3f, 0.0f, 0.3f });
+            assign (synth, oscillatorLevelTarget (osc1), env1, 1.0f);
+            assign (synth, oscillatorLevelTarget (osc2), env1, 1.0f);
+            setFilter (synth, 2, FilterType::midPass, 1300.0f);
+            setParameter (synth, SynthProcessor::filterIds (2).width, 2.0f);
+            setParameter (synth, SynthProcessor::volumeId, 1.0f);
+            setLfo (synth, lfo1, 0.012f, 3, waveform::Preset::sawtooth);
+            assign (synth, volumeTarget, lfo1, 0.4f, true);
+
+            // The toms, each tuned by its key.
+            addPitchSet (synth, 41, 50);
+            synth.loadInitSound();
+            skin (0.0f, 0.12f, 0.12f, { 1.0f, 0.15f });
+            burst (0.3f, 0.05f);
+            setFilter (synth, 0, FilterType::lowPass, 2500.0f);
+            strike (0.5f, 0.9f);
+
+            // The hi-hats, closed, with the pedal, and open, and the crash.
+            addPitchSet (synth, 42, 42);
+            synth.loadInitSound();
+            hat (0.06f, 0.75f, 7000.0f);
+
+            addPitchSet (synth, 44, 44);
+            synth.loadInitSound();
+            hat (0.035f, 0.8f, 8000.0f);
+
+            addPitchSet (synth, 46, 46);
+            synth.loadInitSound();
+            hat (0.45f, 0.75f, 6500.0f);
+
+            addPitchSet (synth, 49, 49);
+            synth.loadInitSound();
+            hat (2.0f, 0.7f, 3500.0f);
+            setNoise (synth, osc2, 1.0f);
+            synth.setActivePitchSet (0);
+        } },
+
+        // A helicopter: noise through a low pass, chopped by a falling sawtooth eleven times a second, which moves
+        // the volume and the cutoff together, over an engine's whine at the key's pitch. The mod wheel speeds the
+        // rotor up, and a slow LFO moves a high pass, as if it were circling.
+        { "Helicopter", [] (SynthProcessor& synth)
+        {
+            setNoise (synth, osc1, 1.0f);
+            setNoise (synth, osc2, 1.0f);
+            setOscillator (synth, osc3, fallingSawtooth(), 12, 0.05f);
+            setOscillator (synth, osc4, sine, 1, 0.5f);
+            setTune (synth, osc4, -24.0f);
+
+            setFilter (synth, 0, FilterType::lowPass, 900.0f, 0.3f);
+            setLfo (synth, lfo1, 1.0f / 11.0f, loops, waveform::Preset::sawtooth);
+            setParameter (synth, SynthProcessor::volumeId, 0.55f);
+            assign (synth, volumeTarget, lfo1, 0.8f, true);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.3f, true);
+            assignModWheel (synth, lfoRateTarget (lfo1), 0.2f);
+
+            setFilter (synth, 1, FilterType::highPass, 120.0f);
+            setLfo (synth, lfo2, 8.0f, loops, sine);
+            assign (synth, filterCutoffTarget (1), lfo2, 0.25f);
+        } },
+
+        // A riser: noise through a resonant low pass that an LFO, run once from the key over two bars of the tempo,
+        // sweeps up five octaves as it brings the volume up. The mod wheel sharpens the resonance.
+        { "Noise Riser", [] (SynthProcessor& synth)
+        {
+            setNoise (synth, osc1, 0.8f);
+
+            setFilter (synth, 0, FilterType::lowPass, 2000.0f, 0.5f);
+            setLfo (synth, lfo1, 4.0f, once, waveform::Preset::sawtooth);
+            setSync (synth, lfo1, 0.125);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.5f);
+            assignModWheel (synth, filterResonanceTarget (0), 0.3f);
+
+            setParameter (synth, SynthProcessor::volumeId, 0.55f);
+            assign (synth, volumeTarget, lfo1, 0.5f);
+        } },
+
+        // Waves breaking on a beach: noise through a low pass, with an LFO drawn as a wave that rushes in and draws
+        // slowly back, moving the volume and the cutoff together every nine seconds. A random LFO makes some waves
+        // bigger than others, and another moves the hiss of the foam.
+        { "Ocean Surf", [] (SynthProcessor& synth)
+        {
+            setNoise (synth, osc1, 0.0f);
+            setNoise (synth, osc2, 0.5f);
+            setNoise (synth, osc3, 0.0f);
+
+            // The sound fades in and out with the key.
+            setEnvelope (synth, 0, { 1.5f, 0.5f, 1.0f, 3.0f });
+            assign (synth, oscillatorLevelTarget (osc1), env1, 1.0f);
+            assign (synth, oscillatorLevelTarget (osc3), env1, 0.7f);
+
+            setFilter (synth, 0, FilterType::lowPass, 1100.0f);
+            setLfo (synth, lfo1, 9.0f, loops, draw ([] (double t)
+            {
+                return t < 0.25 ? -1.0 + 2.0 * std::pow (t / 0.25, 2.0) : 1.0 - 2.0 * std::pow ((t - 0.25) / 0.75, 0.6);
+            }));
+            setParameter (synth, SynthProcessor::volumeId, 0.65f);
+            assign (synth, volumeTarget, lfo1, 0.5f);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.3f);
+
+            setLfo (synth, lfo2, 9.0f, loops, sine);
+            setRandom (synth, lfo2, true, 2);
+            assign (synth, oscillatorLevelTarget (osc2), lfo2, 0.8f);
+
+            setFilter (synth, 1, FilterType::highPass, 150.0f);
+            setLfo (synth, lfo3, 3.7f, loops, sine);
+            setRandom (synth, lfo3, false);
+            assign (synth, filterCutoffTarget (1), lfo3, 0.2f);
+        } },
+
+        // A pan flute: a stopped pipe's odd harmonics, with the breath across its top, which is noise: a chiff as each
+        // note starts, and a little all the way through, more for harder notes and with the mod wheel. A vibrato
+        // starts with each note.
+        { "Pan Flute", [] (SynthProcessor& synth)
+        {
+            setPartials (synth, osc1, 1.0f, 0.0f, { 1.0f, 0.08f, 0.3f, 0.03f, 0.09f, 0.0f, 0.03f });
+
+            // The breath.
+            setNoise (synth, osc2, 0.12f);
+            setEnvelope (synth, 1, { 0.0f, 0.14f, 0.0f, 0.1f });
+            assign (synth, oscillatorLevelTarget (osc2), env2, 0.5f);
+            assignVelocity (synth, oscillatorLevelTarget (osc2), 0.1f);
+            assignModWheel (synth, oscillatorLevelTarget (osc2), 0.3f);
+
+            setFilter (synth, 1, FilterType::highPass, 120.0f);
+            setFilter (synth, 0, FilterType::lowPass, 3200.0f, 0.15f);
+            assignVelocity (synth, filterCutoffTarget (0), 0.15f);
+
+            setLfo (synth, lfo1, 1.0f / 5.2f, fromKey, sine);
+            setTuneReach (synth, osc1, 1.0);
+            assign (synth, oscillatorTuneTarget (osc1), lfo1, 0.07f);
+
+            setParameter (synth, SynthProcessor::volumeId, 0.0f);
+            setEnvelope (synth, 0, { 0.05f, 0.25f, 0.8f, 0.2f });
+            assign (synth, volumeTarget, env1, 0.85f);
+        } },
+
+        // Rain: a steady hiss between a high pass and a low pass, under drops, which are two more oscillators' noise
+        // that a fast LFO playing random steps lets through in bursts. A slow random LFO moves the low pass as the
+        // rain comes and goes, and the mod wheel makes it heavier.
+        { "Rain", [] (SynthProcessor& synth)
+        {
+            setNoise (synth, osc1, 0.0f);
+            setEnvelope (synth, 0, { 1.0f, 0.5f, 1.0f, 2.0f });
+            assign (synth, oscillatorLevelTarget (osc1), env1, 0.6f);
+
+            // The drops: the LFO takes the level below nothing half the time, and up to a new height the rest.
+            setLfo (synth, lfo1, 0.2f, loops, sine);
+            setRandom (synth, lfo1, true, 20);
+
+            for (const auto oscillator : { osc2, osc3 })
+            {
+                setNoise (synth, oscillator, 0.0f);
+                assign (synth, oscillatorLevelTarget (oscillator), lfo1, 1.0f);
+                assignModWheel (synth, oscillatorLevelTarget (oscillator), 0.4f);
+            }
+
+            setFilter (synth, 1, FilterType::highPass, 1800.0f);
+            setFilter (synth, 0, FilterType::lowPass, 7000.0f);
+            setLfo (synth, lfo2, 6.0f, loops, sine);
+            setRandom (synth, lfo2, false);
+            assign (synth, filterCutoffTarget (0), lfo2, 0.2f);
+            setParameter (synth, SynthProcessor::volumeId, 1.0f);
+        } },
+
+        // A shaker playing sixteen to the bar, in time with the tempo, from each key: noise through a high pass, its
+        // level set step by step by an LFO drawn as a bar of accents, each step shaken by a second LFO four times as
+        // fast, while a third moves the high pass from beat to beat.
+        { "Shaker Groove", [] (SynthProcessor& synth)
+        {
+            setNoise (synth, osc1, 0.5f);
+            setNoise (synth, osc2, 0.25f);
+
+            setLfo (synth, lfo1, 2.0f, fromKey, sine);
+            setSteps (synth, lfo1, { 1.0, -0.6, 0.0, -0.6, 0.6, -0.6, 0.0, -0.2, 1.0, -0.6, 0.0, -0.6, 0.6, -0.2, 0.4, 0.8 });
+            setSync (synth, lfo1, 0.25);
+            assign (synth, oscillatorLevelTarget (osc1), lfo1, 1.0f);
+
+            // Each shake swells and stops, as the beads cross the shaker and land.
+            setLfo (synth, lfo2, 0.125f, fromKey, waveform::Preset::sawtooth);
+            setSync (synth, lfo2, 4.0);
+            setParameter (synth, SynthProcessor::volumeId, 0.5f);
+            assign (synth, volumeTarget, lfo2, 1.0f);
+
+            setFilter (synth, 1, FilterType::highPass, 4500.0f, 0.25f);
+            setLfo (synth, lfo3, 2.0f, fromKey, sine);
+            setSteps (synth, lfo3, { 0.0, 0.5, -0.5, 1.0 });
+            setSync (synth, lfo3, 0.25);
+            assign (synth, filterCutoffTarget (1), lfo3, 0.12f);
+        } },
+
+        // Thunder: four oscillators of noise through a low pass that an LFO, run once, drops from the crack to the
+        // rumble in under a second. A fast random LFO shakes two of them, and the roll dies away over seven seconds on
+        // another LFO run once, ringing on after the key is let go.
+        { "Thunder", [] (SynthProcessor& synth)
+        {
+            // Two that the envelope keeps sounding after the key, and two the rumble shakes.
+            setEnvelope (synth, 0, { 0.0f, 0.1f, 1.0f, 7.0f });
+
+            for (const auto oscillator : { osc1, osc2 })
+            {
+                setNoise (synth, oscillator, 0.0f);
+                assign (synth, oscillatorLevelTarget (oscillator), env1, 1.0f);
+            }
+
+            setLfo (synth, lfo3, 0.3f, loops, sine);
+            setRandom (synth, lfo3, false);
+
+            for (const auto oscillator : { osc3, osc4 })
+            {
+                setNoise (synth, oscillator, 0.5f);
+                assign (synth, oscillatorLevelTarget (oscillator), lfo3, 1.0f);
+            }
+
+            // The crack: the low pass starts two octaves above where it's set, and ends two below.
+            setFilter (synth, 0, FilterType::lowPass, 800.0f, 0.25f);
+            setLfo (synth, lfo2, 0.8f, once, draw ([] (double t) { return 2.0 * std::exp (-5.0 * t) - 1.0; }));
+            assign (synth, filterCutoffTarget (0), lfo2, 0.4f);
+
+            setRing (synth, lfo1, 7.0f, 1.0f, [] (double seconds) { return 0.4 * std::exp (-seconds / 0.6) + 0.6 * std::exp (-seconds / 3.0); });
+        } },
+
+        // Wind: noise through a resonant low pass, which whistles where it peaks. Slow random LFOs move the cutoff,
+        // the resonance and the volume, so it gusts and never the same way twice, and the mod wheel raises the
+        // whistle. It fades in and out with the key.
+        { "Wind", [] (SynthProcessor& synth)
+        {
+            setEnvelope (synth, 0, { 1.2f, 0.5f, 1.0f, 2.5f });
+
+            for (const auto oscillator : { osc1, osc2 })
+            {
+                setNoise (synth, oscillator, 0.0f);
+                assign (synth, oscillatorLevelTarget (oscillator), env1, 1.0f);
+            }
+
+            setFilter (synth, 1, FilterType::highPass, 120.0f);
+            setFilter (synth, 0, FilterType::lowPass, 520.0f, 0.6f);
+            setLfo (synth, lfo1, 5.0f, loops, sine);
+            setRandom (synth, lfo1, false);
+            assign (synth, filterCutoffTarget (0), lfo1, 0.3f);
+            assignModWheel (synth, filterCutoffTarget (0), 0.25f);
+
+            setLfo (synth, lfo2, 7.3f, loops, sine);
+            setRandom (synth, lfo2, false);
+            assign (synth, filterResonanceTarget (0), lfo2, 0.4f);
+
+            setLfo (synth, lfo3, 3.3f, loops, sine);
+            setRandom (synth, lfo3, false);
+            setParameter (synth, SynthProcessor::volumeId, 0.7f);
+            assign (synth, volumeTarget, lfo3, 0.4f);
         } },
     };
 }

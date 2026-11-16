@@ -4494,9 +4494,9 @@ namespace
             SynthProcessor original, copy;
             original.loadFactoryPreset (name);
             const auto result = sound::load (copy, sound::toJson (original, true));
-            // A random LFO's wave is new in every copy of the synth, so a preset with one is the same if it's written
-            // out the same again.
-            auto random = false;
+            // A random LFO's wave is new in every copy of the synth, and so is an oscillator's noise, so a preset
+            // with either is the same if it's written out the same again.
+            auto random = sound::toJson (original, true).contains ("Noise\": true");
 
             for (int lfo = 0; lfo < SynthProcessor::numLfos; ++lfo)
                 random = random || original.isLfoRandom (lfo);
