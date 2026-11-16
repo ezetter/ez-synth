@@ -8,6 +8,9 @@
 /** Loads and saves presets: arrows to step through the factory presets and those saved, the preset's name, which
     opens a menu of them, and a button to save the sound as a preset. A dot after the name shows the sound has been
     changed since.
+
+    The menu lists the presets by category, each category a submenu of its factory presets and then the user's own,
+    and lets the preset shown be moved to another category.
 */
 class PresetBar final : public juce::Component
 {
@@ -36,6 +39,17 @@ private:
     };
 
     void showMenu();
+
+    /** Every preset, factory and the user's own, in the order the menu lists them: by category, and in each, the
+        factory presets and then the user's own, each by name.
+    */
+    struct Listed
+    {
+        juce::String category, name;
+        juce::File file;   // none for a factory preset
+    };
+
+    static std::vector<Listed> listPresets();
     void step (int direction);
     void load (const juce::File&);
     void loadFactory (const juce::String& name);

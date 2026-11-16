@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<EZSynth beatRates="12" tuneReach="24.0">
+<EZSynth beatRates="12" tuneReach="24.0" presetCategory="Pads">
   <PARAM id="env1Attack" value="0.7999999523162842"/>
   <PARAM id="env1Decay" value="0.9999999403953552"/>
   <PARAM id="env1Release" value="1.99999988079071"/>

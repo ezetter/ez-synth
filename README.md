@@ -415,14 +415,21 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
   suggests the current preset's name, so saving again over it is quick.
 - **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
-  then the factory presets, then your own. Init puts every control back as it starts: a sine, a square and a
+  then a submenu for each category, **Bass**, **Brass and Winds**, **Drums**, **Keys**, **Leads**, **Pads** and
+  **Other**, holding its factory presets and then your own. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
   sawtooth with 3 harmonics each, only the sine on, every oscillator and harmonic in tune and every
   harmonic's phase as its wave has it, each wave drawn smoothly, the filters a low pass and a high pass, both
   off, the LFOs off and not random, the envelopes as they start, and nothing moved by an LFO or envelope.
   Velocity still makes softer notes quieter, as it starts out doing. It also has a way to open a preset file from anywhere, and a way
   to show the presets folder in Finder.
-- **The arrows** either side of the name step back and forth through the factory presets, then your own,
-  each in order of name.
+- **Categories.** Every factory preset is in one. Your own presets go in **Other** to begin with, as do
+  presets saved before there were categories, sounds from Claude and Init, except that a copy of a factory
+  preset is saved in its category. **Put "…" in**, in the menu, moves the preset loaded to another category:
+  a saved preset is moved in its file straight away, without saving any other changes to the sound, and one
+  not saved yet is saved in the category chosen. Factory presets keep theirs. The category is kept in the
+  preset's file, as its `presetCategory`, and with a host's project.
+- **The arrows** either side of the name step back and forth through the presets as the menu lists them,
+  category by category, the factory presets and then your own in each, by name.
 - A dot after the name means the sound has changed since the preset was loaded or saved.
 - Presets are kept in `~/Documents/EZ Synth/Presets`, as `.ezsynth` files. They're readable XML, so they
   can be copied, shared or renamed in Finder; a preset is named after its file.
@@ -431,6 +438,17 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 EZ Synth comes with 35 presets, built into the app and the plugins. Each one shows off something different. Ten of
 them, marked *noise*, show what an oscillator playing white noise can do:
+
+Each one's category is in `Tools/MakeFactoryPresets.cpp`, beside the recipes:
+
+- **Bass:** Acid Bass, Reese Bass, Wobble Bass
+- **Brass and Winds:** Brass Section, Flute, Pan Flute
+- **Drums:** Drum Kit, Kick Drum, Shaker Groove
+- **Keys:** Drawbar Organ, Electric Piano, Grand Piano, Marimba, Music Box, Pipe Organ
+- **Leads:** Fifth Lead, Square Lead, Stepped Arp
+- **Pads:** Breath Choir, Glass Pad, Shifting Sands, String Ensemble, Vox Pad, Warm Pad
+- **Other:** Bowed Cello, Church Bell, Helicopter, Noise Riser, Nylon Guitar, Ocean Surf, Rain, Sample and
+  Hold, Step Filter, Thunder, Wind
 
 | Preset | What it shows |
 | --- | --- |
@@ -481,7 +499,7 @@ from the repository's folder, and build again:
 ./build/EZSynthMakeFactoryPresets
 ```
 
-A recipe can load a sound description instead, as the Grand Piano's does from `Tools/Sounds/Grand Piano.json`,
+Every recipe needs a category in the tool's list, or the tool says so and fails. A recipe can load a sound description instead, as the Grand Piano's does from `Tools/Sounds/Grand Piano.json`,
 which Claude matched to piano samples.
 
 The tool takes away any other presets in the folder, so `Presets/` holds just the ones with recipes. To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
@@ -655,7 +673,7 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that the arrows step through the factory presets, that the Grand Piano plays just as the description Claude
+clipping, that every factory preset is in a category, that a preset of your own can be moved to another and keeps it, that the arrows step through the presets category by category, that the Grand Piano plays just as the description Claude
 matched to piano samples, leaves headroom, damps and answers velocity, that random LFOs stay smooth, joined up and natural,
 or spread their steps evenly, and play a new wave every cycle or key, that a click or a drag on the grid sets steps, and
 that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the

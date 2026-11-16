@@ -260,11 +260,23 @@ namespace
         return name.compareNatural (other) < 0;
     }
 
-    /** A factory preset: its name, and its XML, which is built into EZ Synth. */
+    /** A preset's category, from the start of its XML, where its outermost element's attributes are, without
+        reading the rest, which can be long. Other if it has none, or one that isn't a category any more.
+    */
+    juce::String findCategory (const juce::String& xmlStart)
+    {
+        const auto element = xmlStart.fromFirstOccurrenceOf ("<EZSynth", false, false).upToFirstOccurrenceOf (">", false, false);
+        const auto category = element.fromFirstOccurrenceOf ("presetCategory=\"", false, false).upToFirstOccurrenceOf ("\"", false, false);
+        const auto unescaped = category.replace ("&amp;", "&").replace ("&quot;", "\"").replace ("&lt;", "<").replace ("&gt;", ">");
+        return SynthProcessor::getPresetCategories().contains (unescaped) ? unescaped : juce::String (SynthProcessor::otherCategory);
+    }
+
+    /** A factory preset: its name, its category, and its XML, which is built into EZ Synth. */
     struct FactoryPreset
     {
         juce::String name;
         juce::String xml;
+        juce::String category;
     };
 
     std::vector<FactoryPreset> getFactoryPresets()
@@ -279,7 +291,10 @@ namespace
 
             if (const auto* data = BinaryData::getNamedResource (BinaryData::namedResourceList[i], size);
                 data != nullptr && filename.endsWith (extension))
-                presets.push_back ({ filename.dropLastCharacters (extension.length()), juce::String::fromUTF8 (data, size) });
+            {
+                const auto xml = juce::String::fromUTF8 (data, size);
+                presets.push_back ({ filename.dropLastCharacters (extension.length()), xml, findCategory (xml.substring (0, 4096)) });
+            }
         }
 
         std::sort (presets.begin(), presets.end(), [] (const FactoryPreset& a, const FactoryPreset& b)
@@ -1987,6 +2002,7 @@ juce::ValueTree SynthProcessor::createState()
     state.setProperty ("presetName", presetName, nullptr);
     state.setProperty ("presetEdited", presetEdited.load(), nullptr);
     state.setProperty ("presetFactory", factoryPreset, nullptr);
+    state.setProperty ("presetCategory", presetCategory, nullptr);
 
     // A sound with pitch sets lists them all, in order, with the sound of each but the active one, whose sound is
     // the state's own. A sound with only the default has no list, as before there were pitch sets.
@@ -2113,9 +2129,14 @@ void SynthProcessor::loadState (juce::ValueTree state)
     const auto name = state.getProperty ("presetName", initPresetName).toString();
     const auto edited = (bool) state.getProperty ("presetEdited", false);
     const auto factory = (bool) state.getProperty ("presetFactory", false);
+    auto category = state.getProperty ("presetCategory", otherCategory).toString();
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
+    state.removeProperty ("presetCategory", nullptr);
+
+    if (! getPresetCategories().contains (category))
+        category = otherCategory;
 
     // The pitch sets, each in its own slot. A save from before there were pitch sets has only the default.
     const auto list = state.getChildWithName ("PITCHSETS");
@@ -2188,12 +2209,14 @@ void SynthProcessor::loadState (juce::ValueTree state)
     presetName = name;
     presetEdited = edited;
     factoryPreset = factory;
+    presetCategory = category;
     ++presetVersion;
     ++changeCount;
 }
 
 void SynthProcessor::loadSoundState (juce::ValueTree state)
 {
+    state.removeProperty ("presetCategory", nullptr);
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
@@ -2626,11 +2649,69 @@ void SynthProcessor::loadInitPreset()
 void SynthProcessor::nameSound (const juce::String& name)
 {
     presetName = name.isNotEmpty() ? name : juce::String (initPresetName);
+    presetCategory = otherCategory;
     presetEdited = false;
     factoryPreset = false;
     presetFile = juce::File();
     ++presetVersion;
     ++changeCount;
+}
+
+juce::StringArray SynthProcessor::getPresetCategories()
+{
+    return { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", otherCategory };
+}
+
+bool SynthProcessor::setPresetCategory (const juce::String& category)
+{
+    if (factoryPreset || ! getPresetCategories().contains (category))
+        return false;
+
+    // A saved preset is moved in its file, leaving the rest of it as it was saved.
+    if (presetFile.existsAsFile())
+    {
+        auto xml = juce::XmlDocument::parse (presetFile);
+
+        if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
+            return false;
+
+        xml->setAttribute ("presetCategory", category);
+
+        if (! xml->writeTo (presetFile))
+            return false;
+    }
+
+    presetCategory = category;
+
+    // Undoing a change to the sound doesn't move the preset back. Undoing loading it still goes back to the preset
+    // before, in its own category.
+    for (auto& step : undoHistory)
+        if (step.getProperty ("presetName").toString() == presetName && ! (bool) step.getProperty ("presetFactory", false))
+            step.setProperty ("presetCategory", category, nullptr);
+
+    ++presetVersion;
+    return true;
+}
+
+juce::String SynthProcessor::getPresetCategory (const juce::File& file)
+{
+    juce::FileInputStream stream (file);
+
+    if (! stream.openedOk())
+        return otherCategory;
+
+    juce::MemoryBlock start;
+    stream.readIntoMemoryBlock (start, 4096);
+    return findCategory (start.toString());
+}
+
+juce::String SynthProcessor::getFactoryPresetCategory (const juce::String& name)
+{
+    for (const auto& preset : getFactoryPresets())
+        if (preset.name == name)
+            return preset.category;
+
+    return otherCategory;
 }
 
 juce::StringArray SynthProcessor::getFactoryPresetNames()

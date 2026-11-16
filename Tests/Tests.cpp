@@ -5630,6 +5630,82 @@ namespace
                "...which loads as the user's own");
         folder.deleteRecursively();
 
+        // Every factory preset is in a category, and every category but Other has some.
+        {
+            const auto categories = SynthProcessor::getPresetCategories();
+            check (categories == juce::StringArray { "Bass", "Brass and Winds", "Drums", "Keys", "Leads", "Pads", "Other" },
+                   "presets are in categories: Bass, Brass and Winds, Drums, Keys, Leads, Pads and Other");
+
+            auto everyCategory = true;
+
+            for (const auto& category : categories)
+            {
+                auto count = 0;
+
+                for (const auto& name : names)
+                    count += SynthProcessor::getFactoryPresetCategory (name) == category ? 1 : 0;
+
+                everyCategory = everyCategory && count > 0;
+            }
+
+            SynthProcessor piano;
+            piano.loadFactoryPreset ("Grand Piano");
+            check (everyCategory && SynthProcessor::getFactoryPresetCategory ("Acid Bass") == "Bass"
+                     && SynthProcessor::getFactoryPresetCategory ("Drum Kit") == "Drums" && piano.getPresetCategory() == "Keys",
+                   "each category has factory presets, such as the Grand Piano in Keys");
+            check (! piano.setPresetCategory ("Pads") && piano.getPresetCategory() == "Keys", "a factory preset's category can't be changed");
+
+            SynthProcessor plain;
+            check (plain.getPresetCategory() == "Other", "Init is in Other");
+            plain.nameSound ("From Claude");
+            check (plain.getPresetCategory() == "Other", "...as is a sound from Claude");
+        }
+
+        // A preset of the user's own is saved in Other to begin with, can be moved, and keeps its category.
+        {
+            const auto presets = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                     .getChildFile ("EZ Synth category tests " + juce::String (juce::Time::currentTimeMillis()));
+            SynthProcessor own;
+            const auto file = presets.getChildFile ("Mine" + juce::String (SynthProcessor::presetExtension));
+            check (own.savePreset (file) && SynthProcessor::getPresetCategory (file) == "Other", "a preset of the user's own is saved in Other");
+
+            setParameter (own, SynthProcessor::volumeId, 0.2f);
+            check (own.setPresetCategory ("Leads") && SynthProcessor::getPresetCategory (file) == "Leads" && own.isPresetEdited(),
+                   "...and can be moved to another category, which moves it in its file straight away");
+
+            SynthProcessor reloaded;
+            check (reloaded.loadPreset (file) && reloaded.getPresetCategory() == "Leads"
+                     && isNear (reloaded.parameters.getRawParameterValue (SynthProcessor::volumeId)->load(), 0.75, 1.0e-6),
+                   "...without saving the sound's other changes");
+
+            own.undo();
+            check (own.getPresetCategory() == "Leads", "undoing a change to the sound doesn't move the preset back");
+
+            juce::MemoryBlock ownState;
+            own.getStateInformation (ownState);
+            SynthProcessor reopenedOwn;
+            reopenedOwn.setStateInformation (ownState.getData(), (int) ownState.getSize());
+            check (reopenedOwn.getPresetCategory() == "Leads", "a host's project remembers the preset's category");
+
+            // One saved before there were categories, or with one there isn't any more, is in Other.
+            auto xml = juce::XmlDocument::parse (file);
+            xml->removeAttribute ("presetCategory");
+            xml->writeTo (file);
+            check (SynthProcessor::getPresetCategory (file) == "Other" && reloaded.loadPreset (file) && reloaded.getPresetCategory() == "Other",
+                   "a preset saved before there were categories is in Other");
+            xml->setAttribute ("presetCategory", "Polka");
+            xml->writeTo (file);
+            check (SynthProcessor::getPresetCategory (file) == "Other", "...as is one in a category there isn't any more");
+
+            // A copy of a factory preset is saved in its category.
+            SynthProcessor copied;
+            copied.loadFactoryPreset ("Acid Bass");
+            const auto copiedFile = presets.getChildFile ("Acid Bass" + juce::String (SynthProcessor::presetExtension));
+            check (copied.savePreset (copiedFile) && SynthProcessor::getPresetCategory (copiedFile) == "Bass" && copied.setPresetCategory ("Leads"),
+                   "a copy of a factory preset is saved in its category, and can then be moved");
+            presets.deleteRecursively();
+        }
+
         // The arrows in the window step through the factory presets, starting from Init.
         SynthProcessor stepped;
         std::unique_ptr<juce::AudioProcessorEditor> editor (stepped.createEditorAndMakeActive());
@@ -5644,8 +5720,8 @@ namespace
             const auto second = stepped.getPresetName();
             previous->onClick();
 
-            check (first == names[0] && second == names[1] && stepped.getPresetName() == names[0] && stepped.isFactoryPreset(),
-                   "the arrows step through the factory presets, from Init");
+            check (first == "Acid Bass" && second == "Reese Bass" && stepped.getPresetName() == first && stepped.isFactoryPreset(),
+                   "the arrows step through the presets as the menu lists them, category by category, from Init");
         }
         else
         {

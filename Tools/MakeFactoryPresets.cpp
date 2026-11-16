@@ -10,6 +10,7 @@
 #include "../Source/SynthProcessor.h"
 
 #include <iostream>
+#include <map>
 
 namespace
 {
@@ -1228,6 +1229,24 @@ namespace
     };
 }
 
+namespace
+{
+    /** The category each factory preset is listed under. Every recipe needs one. */
+    const std::map<juce::String, juce::String> categories {
+        { "Acid Bass", "Bass" }, { "Reese Bass", "Bass" }, { "Wobble Bass", "Bass" },
+        { "Brass Section", "Brass and Winds" }, { "Flute", "Brass and Winds" }, { "Pan Flute", "Brass and Winds" },
+        { "Drum Kit", "Drums" }, { "Kick Drum", "Drums" }, { "Shaker Groove", "Drums" },
+        { "Drawbar Organ", "Keys" }, { "Electric Piano", "Keys" }, { "Grand Piano", "Keys" }, { "Marimba", "Keys" },
+        { "Music Box", "Keys" }, { "Pipe Organ", "Keys" },
+        { "Fifth Lead", "Leads" }, { "Square Lead", "Leads" }, { "Stepped Arp", "Leads" },
+        { "Breath Choir", "Pads" }, { "Glass Pad", "Pads" }, { "Shifting Sands", "Pads" }, { "String Ensemble", "Pads" },
+        { "Vox Pad", "Pads" }, { "Warm Pad", "Pads" },
+        { "Bowed Cello", "Other" }, { "Church Bell", "Other" }, { "Helicopter", "Other" }, { "Noise Riser", "Other" },
+        { "Nylon Guitar", "Other" }, { "Ocean Surf", "Other" }, { "Rain", "Other" }, { "Sample and Hold", "Other" },
+        { "Step Filter", "Other" }, { "Thunder", "Other" }, { "Wind", "Other" },
+    };
+}
+
 int main (int argc, char* argv[])
 {
     const juce::ScopedJuceInitialiser_GUI initialiser;
@@ -1242,6 +1261,14 @@ int main (int argc, char* argv[])
     {
         SynthProcessor synth;
         recipe.make (synth);
+
+        const auto category = categories.find (recipe.name);
+
+        if (category == categories.end() || ! synth.setPresetCategory (category->second))
+        {
+            std::cout << "No category for " << recipe.name << std::endl;
+            failed = true;
+        }
 
         const auto file = folder.getChildFile (recipe.name);
         const auto saved = synth.savePreset (file);

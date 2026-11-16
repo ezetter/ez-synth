@@ -132,6 +132,31 @@ void PresetBar::mouseExit (const juce::MouseEvent&)
     repaint (nameArea);
 }
 
+std::vector<PresetBar::Listed> PresetBar::listPresets()
+{
+    std::vector<Listed> listed;
+    const auto factory = SynthProcessor::getFactoryPresetNames();
+    const auto saved = SynthProcessor::findPresets();
+
+    juce::StringArray savedCategories;
+
+    for (const auto& file : saved)
+        savedCategories.add (SynthProcessor::getPresetCategory (file));
+
+    for (const auto& category : SynthProcessor::getPresetCategories())
+    {
+        for (const auto& name : factory)
+            if (SynthProcessor::getFactoryPresetCategory (name) == category)
+                listed.push_back ({ category, name, {} });
+
+        for (int i = 0; i < saved.size(); ++i)
+            if (savedCategories[i] == category)
+                listed.push_back ({ category, saved[i].getFileNameWithoutExtension(), saved[i] });
+    }
+
+    return listed;
+}
+
 void PresetBar::showMenu()
 {
     const auto current = synthProcessor.getPresetFile();
@@ -144,21 +169,71 @@ void PresetBar::showMenu()
     });
 
     menu.addSeparator();
-    menu.addSectionHeader ("Factory");
 
-    for (const auto& name : SynthProcessor::getFactoryPresetNames())
-        menu.addItem (name, true, synthProcessor.isFactoryPreset() && name == synthProcessor.getPresetName(), [this, name] { loadFactory (name); });
+    // Each category's presets, the factory ones and then the user's own, the category of the one loaded ticked.
+    const auto listed = listPresets();
 
-    menu.addSeparator();
-    menu.addSectionHeader ("Your presets");
+    for (const auto& category : SynthProcessor::getPresetCategories())
+    {
+        juce::PopupMenu presets;
+        auto holdsCurrent = false, factoryDone = false, anyFactory = false;
 
-    const auto presets = SynthProcessor::findPresets();
+        for (const auto& preset : listed)
+        {
+            if (preset.category != category)
+                continue;
 
-    if (presets.isEmpty())
-        menu.addItem ("No saved presets yet", false, false, nullptr);
+            const auto isFactory = preset.file == juce::File();
 
-    for (const auto& file : presets)
-        menu.addItem (file.getFileNameWithoutExtension(), true, file == current, [this, file] { load (file); });
+            if (isFactory)
+            {
+                anyFactory = true;
+            }
+            else if (! factoryDone)
+            {
+                factoryDone = true;
+
+                if (anyFactory)
+                    presets.addSeparator();
+
+                presets.addSectionHeader ("Your presets");
+            }
+
+            const auto ticked = isFactory ? synthProcessor.isFactoryPreset() && preset.name == synthProcessor.getPresetName()
+                                          : preset.file == current;
+            holdsCurrent = holdsCurrent || ticked;
+
+            if (isFactory)
+                presets.addItem (preset.name, true, ticked, [this, name = preset.name] { loadFactory (name); });
+            else
+                presets.addItem (preset.name, true, ticked, [this, file = preset.file] { load (file); });
+        }
+
+        if (presets.getNumItems() == 0)
+            presets.addItem ("No presets yet", false, false, nullptr);
+
+        menu.addSubMenu (category, presets, true, nullptr, holdsCurrent);
+    }
+
+    // The preset shown can be moved to another category, unless it's a factory preset. A sound not saved yet is
+    // saved in the category chosen.
+    {
+        juce::PopupMenu categories;
+        const auto movable = ! synthProcessor.isFactoryPreset();
+
+        for (const auto& category : SynthProcessor::getPresetCategories())
+            categories.addItem (category, movable, category == synthProcessor.getPresetCategory(), [this, category]
+            {
+                if (! synthProcessor.setPresetCategory (category))
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't move the preset",
+                                                            "EZ Synth couldn't write " + synthProcessor.getPresetFile().getFullPathName() + ".");
+
+                refresh();
+            });
+
+        menu.addSeparator();
+        menu.addSubMenu (movable ? "Put \"" + shownName + "\" in" : "Factory presets keep their category", categories, movable);
+    }
 
     // Sounds Claude has made to match a sample, and how to ask it for one. Experimental.
     menu.addSeparator();
@@ -191,29 +266,33 @@ void PresetBar::showMenu()
 
 void PresetBar::step (int direction)
 {
-    // Stepping goes through the factory presets, then the user's own, and round again.
-    const auto factory = SynthProcessor::getFactoryPresetNames();
-    const auto saved = SynthProcessor::findPresets();
-    const auto count = factory.size() + saved.size();
+    // Stepping goes through the presets as the menu lists them, category by category, and round again.
+    const auto listed = listPresets();
+    const auto count = (int) listed.size();
 
     if (count == 0)
         return;
 
     auto index = -1;
 
-    if (synthProcessor.isFactoryPreset())
-        index = factory.indexOf (synthProcessor.getPresetName());
-    else if (const auto savedIndex = saved.indexOf (synthProcessor.getPresetFile()); savedIndex >= 0)
-        index = factory.size() + savedIndex;
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& preset = listed[(size_t) i];
+
+        if (preset.file == juce::File() ? synthProcessor.isFactoryPreset() && preset.name == synthProcessor.getPresetName()
+                                        : preset.file == synthProcessor.getPresetFile())
+            index = i;
+    }
 
     // From Init, or a preset that isn't among them, stepping starts at one end of the list.
     const auto nextIndex = index < 0 ? (direction > 0 ? 0 : count - 1)
                                      : (index + direction + count) % count;
+    const auto& chosen = listed[(size_t) nextIndex];
 
-    if (nextIndex < factory.size())
-        loadFactory (factory[nextIndex]);
+    if (chosen.file == juce::File())
+        loadFactory (chosen.name);
     else
-        load (saved[nextIndex - factory.size()]);
+        load (chosen.file);
 }
 
 void PresetBar::load (const juce::File& file)

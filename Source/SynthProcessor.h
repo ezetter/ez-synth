@@ -452,6 +452,26 @@ public:
     /** Goes up whenever a preset is loaded or saved. */
     int getPresetVersion() const noexcept   { return presetVersion; }
 
+    /** The categories presets are put in, in the order they're listed, Other last. A preset with none, such as one
+        saved before there were categories, Init, or a sound from Claude, is in Other.
+    */
+    static juce::StringArray getPresetCategories();
+    static constexpr auto otherCategory = "Other";
+
+    /** The category of the preset last loaded or saved, which is saved with it. */
+    juce::String getPresetCategory() const   { return presetCategory; }
+
+    /** Puts the preset in a category, one of getPresetCategories(). A preset of the user's own that's been saved is
+        moved in its file straight away, without saving any other changes to the sound; otherwise the category is
+        saved with the preset when it's saved. A factory preset's category can't be changed. Returns false if it
+        couldn't be.
+    */
+    bool setPresetCategory (const juce::String& category);
+
+    /** The category a preset's file, or a factory preset, is in, read from its file without loading it. */
+    static juce::String getPresetCategory (const juce::File&);
+    static juce::String getFactoryPresetCategory (const juce::String& name);
+
     //==============================================================================
     // Pitch sets: every setting of the sound, set differently for a range of keys. There's always the default pitch
     // set, which plays every key no other's range takes in. The window shows and edits one pitch set at a time, the
@@ -741,6 +761,7 @@ private:
 
     juce::String presetName { initPresetName };
     juce::File presetFile;
+    juce::String presetCategory { otherCategory };
     bool factoryPreset = false;
     std::atomic<bool> presetEdited { false };   // set from whichever thread changes a parameter
     std::atomic<int> changeCount { 0 };
