@@ -421,21 +421,35 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 #### Factory presets
 
-EZ Synth comes with eleven presets, built into the app and the plugins. Each one shows off something different:
+EZ Synth comes with 25 presets, built into the app and the plugins. Each one shows off something different:
 
 | Preset | What it shows |
 | --- | --- |
-| Bell | A wave made from its harmonics, an envelope on the 9th harmonic that lights it up for a moment as each note strikes, and an envelope on the volume for a long ring |
-| Brass | An envelope opening the low pass filter with each note, and velocity on the cutoff, so softer notes are darker |
-| Electric Keys | Velocity alongside envelopes: softer notes are quieter, darker and lose the triangle's bark, while the volume dies away and the 4th harmonic pings |
-| Grand Piano | As near a grand piano as EZ Synth gets: two strings 2 cents apart that beat gently, a bright strike of upper harmonics that fades within a second, a low pass that mellows the note as it rings, a ring drawn on an LFO run once, falling quickly and then slowly, and velocity on the strings' levels and the cutoff, so soft notes are quieter and darker but ring as long |
-| Harmonic Sweep | One LFO moving two controls: the number of harmonics of a sawtooth, drawn falling, and of a square, inverted, so one brightens as the other darkens |
-| Organ | A sine with raised harmonics, like drawbars, a tremolo, a click on each key, and velocity taken off the volume |
-| Pluck | An oscillator at no level that an envelope plucks, with a low pass filter that snaps shut after it |
-| Soft Pad | All three oscillators swelling in through a low pass filter that one LFO slowly opens and closes, while another makes one shimmer |
-| Square Lead | Both filters, and an LFO run once per note, drawn to wait and then rise, bringing a sawtooth in under held notes |
-| Step Filter | An LFO drawn as eight steps, moving a resonant low pass filter like a step sequencer |
-| Wobble Bass | A square and a sine through a resonant low pass filter that an LFO wobbles |
+| Acid Bass | A sawtooth and a sub through a resonant low pass an envelope snaps open, further for harder notes; legato notes slide, and the mod wheel opens the filter |
+| Bowed Cello | Two sawtooths a few cents apart, bowed in by an envelope, between a resonant high pass and low pass standing for the body, with a vibrato from each key and legato slides |
+| Brass Section | Three sawtooths spread a few cents apart, a low pass an envelope opens with each note, and a quick envelope, inverted, on the tunes, so each note scoops up into its pitch |
+| Church Bell | A bell's partials, which aren't harmonics: the hum an octave down, the minor third, and upper partials tuned between harmonics, each group fading with its own envelope, a clang two octaves up, and a ring drawn on an LFO run once |
+| Drawbar Organ | Drawbars as one oscillator's harmonics an octave down, a percussive twelfth and a key click on others, and a rotary speaker: one LFO on the volume, the tune and a low pass, a quarter turn apart, which the mod wheel speeds up |
+| Electric Piano | A mellow fundamental, a bark only hard notes bring out, and a tine's ping two octaves up with a partial that isn't a harmonic. Its low and high keys are pitch sets: longer and growlier below, shorter and clearer above |
+| Fifth Lead | A sawtooth with another a fifth above and a square an octave below, gliding from every note to the next, with a vibrato |
+| Flute | A few harmonics blown in by an envelope, with breath made from an oscillator of high harmonics whose tune a fast random LFO smears into noise |
+| Glass Pad | Six sines stacked an octave, a twelfth and two octaves up, each level moved by its own slow random LFO, so the stack shimmers and never repeats |
+| Grand Piano | As near a grand piano as EZ Synth gets: two strings 2 cents apart that beat gently, a bright strike that fades within a second, a low pass that mellows the note as it rings, a ring drawn on an LFO run once, falling quickly and then slowly, and velocity on the strings' levels and the cutoff. The bass, middle and treble are pitch sets: the bass strings rich, their harmonics a little sharp as stiff strings' are, and long; the treble's plain and short |
+| Kick Drum | A sine an envelope drops two octaves in a tenth of a second, with a click, an octave below the keys |
+| Marimba | A bar's partials near 4 and 9.2 times its note, by tuning oscillators and harmonics, each gone sooner than the last. The low and high bars are pitch sets, long and soft below, short and bright above |
+| Music Box | Teeth an octave above their keys, one a few cents sharp, with a partial at 6.27 times the note, ringing on after the key |
+| Nylon Guitar | A string plucked a fifth of the way along, its low harmonics ringing on an LFO run once while the high ones fade on an envelope, with a body resonance from a high pass. The low strings are a pitch set that rings longer |
+| Pipe Organ | Six ranks of pipes, each an oscillator: an octave below the note up to two octaves above, a twelfth among them, and one a little sharp, with a chiff as the highest speaks |
+| Reese Bass | Three sawtooths a fifth of a semitone apart over a sub, through a low pass and a notch an LFO slowly sweeps |
+| Sample and Hold | An LFO playing random steps, synced to the tempo, jumping a resonant low pass to a new cutoff four times a beat, with a slower random LFO on the resonance |
+| Shifting Sands | Triggers: two slow LFOs each randomizing an oscillator's harmonics as they cross their middles, while another sweeps how many harmonics play |
+| Square Lead | Two squares a tenth of a semitone apart over a sub, between a high pass and a resonant low pass, gliding between notes, with a vibrato from each key |
+| Step Filter | An LFO drawn as eight steps, synced to the tempo, moving a resonant low pass filter like a step sequencer |
+| Stepped Arp | A held key plays a tune: an LFO drawn in steps moves the oscillators' tune through a minor chord, starting with each key, while a second, four times as fast, plucks each step |
+| String Ensemble | Sawtooths a few cents apart, two drifting on slow LFOs, swelling in. The low keys are a pitch set, darker with an octave below, and the high keys another, brighter and quicker |
+| Vox Pad | A voice singing "ah": a resonant high pass and a resonant low pass as a vowel's two formants, which the mod wheel moves apart, towards "ee" |
+| Warm Pad | A triangle, a sawtooth, a sine and a triangle an octave up, swelling in through a low pass one LFO slowly opens and closes, while another makes the sawtooth shimmer |
+| Wobble Bass | A square, a sawtooth and a sub through a resonant low pass an LFO wobbles twice a beat, in time with the tempo, with legato slides |
 
 A factory preset can't be saved over. **Save** suggests saving a copy, under the same name, among your own
 presets, where you can change it as you like.
@@ -448,7 +462,7 @@ from the repository's folder, and build again:
 ./build/EZSynthMakeFactoryPresets
 ```
 
-To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
+The tool takes away any other presets in the folder, so `Presets/` holds just the ones with recipes. To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
 presets in it, make an empty file for the new one first, so the tool can be built to fill it in:
 
 ```bash

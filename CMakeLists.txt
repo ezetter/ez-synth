@@ -82,16 +82,30 @@ target_sources(EZSynth
 # Tools/MakeFactoryPresets.cpp.
 juce_add_binary_data(EZSynthFactoryPresets
     SOURCES
-        "Presets/Bell.ezsynth"
-        "Presets/Brass.ezsynth"
-        "Presets/Electric Keys.ezsynth"
+        "Presets/Acid Bass.ezsynth"
+        "Presets/Bowed Cello.ezsynth"
+        "Presets/Brass Section.ezsynth"
+        "Presets/Church Bell.ezsynth"
+        "Presets/Drawbar Organ.ezsynth"
+        "Presets/Electric Piano.ezsynth"
+        "Presets/Fifth Lead.ezsynth"
+        "Presets/Flute.ezsynth"
+        "Presets/Glass Pad.ezsynth"
         "Presets/Grand Piano.ezsynth"
-        "Presets/Harmonic Sweep.ezsynth"
-        "Presets/Organ.ezsynth"
-        "Presets/Pluck.ezsynth"
-        "Presets/Soft Pad.ezsynth"
+        "Presets/Kick Drum.ezsynth"
+        "Presets/Marimba.ezsynth"
+        "Presets/Music Box.ezsynth"
+        "Presets/Nylon Guitar.ezsynth"
+        "Presets/Pipe Organ.ezsynth"
+        "Presets/Reese Bass.ezsynth"
+        "Presets/Sample and Hold.ezsynth"
+        "Presets/Shifting Sands.ezsynth"
         "Presets/Square Lead.ezsynth"
         "Presets/Step Filter.ezsynth"
+        "Presets/Stepped Arp.ezsynth"
+        "Presets/String Ensemble.ezsynth"
+        "Presets/Vox Pad.ezsynth"
+        "Presets/Warm Pad.ezsynth"
         "Presets/Wobble Bass.ezsynth")
 
 # The prompt for Claude points it at the sound tool, built beside everything else.

@@ -204,9 +204,20 @@ namespace sound
                         continue;
                     }
 
-                    // The phase first, so a harmonic raised from nothing comes in at it.
+                    // The phase first, so a harmonic raised from nothing comes in at it. A phase the harmonic already
+                    // has, to the tenth of a degree it's written to, is left alone.
+                    auto phaseChanged = false;
+
                     if (const auto phase = number (entry, "phase"))
-                        synth.setHarmonicPhase (oscillator, harmonic, (float) (*phase / degreesPerRadian));
+                    {
+                        const auto turn = juce::MathConstants<float>::twoPi;
+                        const auto wanted = (float) (*phase / degreesPerRadian);
+                        const auto apart = std::abs (std::remainder (wanted - synth.getHarmonicPhase (oscillator, harmonic), turn));
+                        phaseChanged = apart > 0.002f;
+
+                        if (phaseChanged)
+                            synth.setHarmonicPhase (oscillator, harmonic, wanted);
+                    }
 
                     if (const auto amplitude = number (entry, "amplitude"))
                     {
@@ -214,7 +225,7 @@ namespace sound
                         const auto current = synth.getDecomposition (oscillator).harmonics[(size_t) harmonic - 1].amplitude;
 
                         // A preset's own harmonics, given again, leave it the preset.
-                        if (std::abs (clamped - current) > 1.0e-3f || number (entry, "phase").has_value())
+                        if (std::abs (clamped - current) > 1.0e-3f || phaseChanged)
                             synth.setHarmonicAmplitude (oscillator, harmonic, clamped);
                     }
 
