@@ -8,6 +8,10 @@ envelopes, which run with each key pressed, and how hard each key is played can 
 
 It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW.
 
+![EZ Synth playing a sawtooth with all 16 harmonics: the oscillator and LFO cards, the grid showing each harmonic as a coloured sine wave and their sum in white, the harmonics panel with a slider and dials for each, and the envelopes, filters and keyboard below](docs/images/window.png)
+
+*A sawtooth played with all 16 of its harmonics. The grid draws each harmonic as a sine wave in its own colour, and their sum, what you hear, in white, over the wave as drawn.*
+
 ## Using it
 
 - **The window** has two rows of cards across the top, the grid under them, and the volume, envelopes and filters
@@ -69,6 +73,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   as it plays and marked **As played**, or faint sample noise while no note plays it; the oscillator's card
   shows it too. Each note plays noise of its own, so a chord's notes don't play the same noise. Each pitch set
   can switch it separately, as with every setting.
+
+![Oscillator 1 playing white noise: the grid shows the noise samples just played, with the Noise switch lit and the wave presets and drawing controls gone](docs/images/noise.png)
+
+*Oscillator 1 playing white noise. The grid shows the last 10 ms of noise the held key played.*
+
 - **Draw a wave.** Click and drag on the grid. It shows one wavelength, from 0° to 360°, and values from
   −1 to +1. Fast strokes are joined up, so there are no gaps.
 - **Draw in steps.** **Draw** at the top right of the grid switches between **Smooth**, freehand drawing,
@@ -81,6 +90,11 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   changing how many, leaves the wave as it is until you draw on it. Each oscillator and LFO keeps its own
   way of drawing and number of steps, which are saved with the sound, so the Step Filter preset's LFO opens
   in its 8 steps.
+
+![A hand-drawn wave on the grid, with the five harmonics that make it up and their sum following it closely, and a dial for each harmonic's phase and amplitude in the panel](docs/images/drawn-wave.png)
+
+*A wave drawn by hand, played with 5 harmonics. The white sum follows the drawn wave as closely as 5 sine waves can.*
+
 - **Start from a preset.** Sine, Sawtooth, Square or Triangle, above the grid beside the Draw buttons,
   replace the wave; the one the wave is stays lit, and none is once you've drawn over it.
 - **Pick how many harmonics to play**, 1 to 16, with the slider under *Harmonics* (3 to start with;
@@ -213,6 +227,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### LFOs
 
+![LFO 1, a sine synced to the tempo, on the grid with a line marking where it has got to, and the panel listing the controls it moves: oscillator 1's level, its 2nd harmonic and filter 1's cutoff](docs/images/lfo.png)
+
+*LFO 1 synced to the tempo, the line showing where it is. The panel lists what it moves.*
+
+![LFO 1 playing a random wave, a new smooth shape each cycle](docs/images/random-lfo.png)
+
+*An LFO playing a new random wave every cycle.*
+
 - **There are eight LFOs**, LFO 1 to LFO 8. Three of their cards show at a time, beside the oscillators'
   and the same size. Swipe sideways over them with two fingers on a trackpad, turn a mouse wheel, or drag the
   thin scroll bar under them, to see the others. A swipe moves the row with your fingers, even over a dial, and
@@ -302,6 +324,14 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ### Giving an LFO, envelope, velocity or the mod wheel something to move
 
+![The window while a note plays, with rings on the dials and sliders showing where LFOs and envelopes have moved them, and the grid showing the harmonics as played](docs/images/modulated-controls.png)
+
+*While a note plays, a ring on each moved control shows where it has been moved to, and the grid shows the harmonics as played.*
+
+<img src="docs/images/modulation-editor.png" width="400" alt="The modulation editor for filter 1's cutoff: moved by LFO 1 with a range, phase and polarity, with velocity, the mod wheel and a learned MIDI controller below">
+
+*Right-clicking a control opens its modulation editor.*
+
 - **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
   the number of harmonics, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth, or an LFO's rate. A small window opens,
   in three parts. In the top part you pick an LFO or envelope to move the control; in the middle part you
@@ -366,6 +396,9 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
 ### Modulation overview
+
+![The modulation overview listing what each LFO, envelope, velocity and MIDI controller moves, with ranges and phases](docs/images/modulation-overview.png)
+
 
 - **See everything that moves a control** on one screen: click **Modulation** in the header, to the
   right, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
@@ -522,6 +555,10 @@ Everything is also saved with your DAW project, including which preset the sound
 been edited since. Everything except the waves and what moves what can be automated.
 
 ### Pitch sets
+
+![The pitch sets screen: a coloured bar over the keys showing which pitch set plays each, a list of the default and three ranges, and the keyboard marking the active set's keys](docs/images/pitch-sets.png)
+
+*Three pitch sets over the default. The bar shows which plays each key, and the keyboard marks the active one's keys.*
 
 Every setting can be different for a range of keys, so a sound can brighten towards the bass, or match several
 samples of one instrument, one for each part of the keyboard.
@@ -771,6 +808,7 @@ save pictures of the window showing several waves.
 | `Source/SoundPrompt.*` | The prompt that teaches Claude EZ Synth, made from its own parameters |
 | `Source/SoundAnalysis.*` | Measuring a note's pitch, loudness and harmonics, and comparing two |
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
+| `docs/images/` | The pictures in this README, from the window pictures `./build/EZSynthTests --snapshots <folder>` saves, scaled down |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
 | `Tools/Sounds/` | Sound descriptions that factory presets are made from, such as the Grand Piano matched to samples |
 | `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
