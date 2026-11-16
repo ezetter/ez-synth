@@ -2,7 +2,7 @@
  "format": "EZ Synth sound",
  "version": 3,
  "name": "piano-v3",
- "notes": "Matched to three samples of one piano, C3, C4 and C5, each held about 2 s and played at its sample's level. C3 and every key below play the C3 match, B3 to C#4 the C4 match (the default), and C5 and every key above the C5 match. Between them, ten pitch sets of two keys each play blends of the neighbouring samples' measurements, so the tone, level and decay change in small steps from key to key. Every set is built the same way. Oscillator 1 is the fundamental alone, its level drawn on LFO 1, let go in two stages when the dampers land. Oscillators 2, 3, 4 and 6 play the other partials, each tuned sharp as the piano's stiff strings are; seven partials are drawn on LFOs 2 to 8 and the others follow those curves, many as two or three components a fraction of a hertz apart so they beat. Env 4 runs every LFO fast for the first 0.4 s, so the attack is drawn finely. Oscillator 5, two octaves down, plays the hammer's thud and knocks, and below E4 a faint ring of the fundamental after the dampers, which stays on very quietly while a key is held. Not matched: the stereo image, the hammer's noise above about four times the note, a low thud near 90 Hz in the C5 sample, and the weakest partials' beating exactly. Within a pitch set the knocks follow the key, where a piano's stay put. The blended sets are not matched to any recording.",
+ "notes": "Matched to three samples of one piano, C3, C4 and C5, each held about 2 s and played at its sample's level. C3 and every key below play the C3 match, B3 to C#4 the C4 match (the default), and C5 and every key above the C5 match. Between them, ten pitch sets of two keys each play blends of the neighbouring samples' measurements, so the tone, level and decay change in small steps from key to key. Every set is built the same way. Oscillator 1 is the fundamental alone, its level drawn on LFO 1, let go in two stages when the dampers land. Oscillators 2, 3, 4 and 6 play the other partials, each tuned sharp as the piano's stiff strings are; seven partials are drawn on LFOs 2 to 8 and the others follow those curves, many as two or three components a fraction of a hertz apart so they beat. Env 4 runs every LFO fast for the first 0.4 s, so the attack is drawn finely. Oscillator 5, two octaves down, plays the hammer's thud and knocks, and below E4 a faint ring of the fundamental after the dampers, which stays on very quietly while a key is held. Not matched: the stereo image, the hammer's noise above about four times the note, a low thud near 90 Hz in the C5 sample, and the weakest partials' beating exactly. Within a pitch set the knocks follow the key, where a piano's stay put. The blended sets are not matched to any recording. As a factory preset, Env 1 moves the volume by 0.75 rather than 1, 5 dB quieter than the samples, so a loud five-note chord doesn't clip.",
  "parameters": {
   "volume": 0.0,
   "osc1Level": 0.35113,
@@ -4545,7 +4545,7 @@
   {
    "target": "volume",
    "source": "Env 1",
-   "range": 1.0
+   "range": 0.75
   },
   {
    "target": "osc1Level",
@@ -9473,7 +9473,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -14435,7 +14435,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -19293,7 +19293,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -24063,7 +24063,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -28850,7 +28850,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -33654,7 +33654,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -38371,7 +38371,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -43011,7 +43011,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -47640,7 +47640,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -52260,7 +52260,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -56885,7 +56885,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",
@@ -61504,7 +61504,7 @@
     {
      "target": "volume",
      "source": "Env 1",
-     "range": 1.0
+     "range": 0.75
     },
     {
      "target": "osc1Level",

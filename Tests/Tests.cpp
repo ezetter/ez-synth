@@ -5506,14 +5506,15 @@ namespace
                            + juce::String (synth.getNumPitchSets()) + " pitch sets");
         }
 
-        // A single note at full velocity leaves headroom, anywhere on the keyboard, and a softer one is quieter.
+        // A single note at full velocity leaves headroom for chords, anywhere on the keyboard, and a softer one is
+        // quieter.
         auto peakRight = true, softerRight = true, dampedRight = true;
 
         for (const auto note : { 36, 48, 60, 72, 84 })
         {
             const auto hard = play (synth, note, 1.0, 1.6, 1.0f);
             const auto soft = play (synth, note, 1.0, 1.6, 0.3f);
-            peakRight = peakRight && decibels (peakOf (hard)) < -3.0;
+            peakRight = peakRight && decibels (peakOf (hard)) < -8.0;
             softerRight = softerRight && decibels (loudness (soft, 0.0, 0.3) / loudness (hard, 0.0, 0.3)) < -3.0;
 
             // Letting go of the key damps the strings.
@@ -5521,9 +5522,14 @@ namespace
                        && decibels (loudness (hard, 1.55, 1.6) / loudness (hard, 0.9, 0.95)) < -35.0;
         }
 
-        check (peakRight, "...a note at full velocity peaks below -3 dB, from C2 to C6");
+        check (peakRight, "...a note at full velocity peaks below -8 dB, from C2 to C6");
         check (softerRight, "...a soft note is quieter than a hard one");
         check (dampedRight, "...and the dampers bring it down 25 dB within a third of a second of letting go, and 35 dB within 0.6 s");
+
+        // Even a loud five-note chord, struck all at once, doesn't clip.
+        const auto chord = playNotes (synth, { { 0.0, 48 }, { 0.0, 60 }, { 0.0, 64 }, { 0.0, 67 }, { 0.0, 72 } }, 2.0);
+        check (peakOf (chord) < juce::Decibels::decibelsToGain (-0.5f),
+               "...and a five-note chord at full velocity peaks at " + juce::String (decibels (peakOf (chord)), 1) + " dB, without clipping");
     }
 
     /** An LFO as fast as 100 Hz swings a control as fully as a slow one does, or nearly so: the swing of the level,
