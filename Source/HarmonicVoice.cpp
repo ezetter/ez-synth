@@ -254,6 +254,7 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (int i = 0; i < numOscillators; ++i)
     {
         const auto& oscillator = patch->oscillators[(size_t) i];
+        targets.pans[(size_t) i] = juce::jlimit (0.0f, 1.0f, oscillator.pan);
 
         // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on. Its zoom
         // sets how far modulation moves it.
@@ -387,6 +388,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         sines = targets.sines;
         harmonicTunes = targets.harmonicTunes;
         noiseLevels = targets.noiseLevels;
+        pans = targets.pans;
         std::copy (targets.tunes.begin(), targets.tunes.end(), tunes.begin());
         gain.setCurrentAndTargetValue (targets.gain);
 
@@ -502,6 +504,52 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         noises[numNoises++] = { noiseLevels[i], (float) ((targets.noiseLevels[i] - noiseLevels[i]) / glideSamples), i };
     }
 
+    // Each oscillator's pan glides to where it's set within 20 ms, its gains either side moving evenly through the
+    // chunk. While every oscillator sounding is panned alike, which it is unless they've been panned apart, the
+    // sound is worked out once, filtered once and then panned, as cheaply as in mono.
+    std::array<float, modulation::numOscillators> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
+    const auto panShare = std::min (1.0, numSamples / (0.02 * sampleRate));
+    auto sounding = std::array<bool, modulation::numOscillators> {};
+
+    for (size_t i = 0; i < numPlaying; ++i)
+        sounding[playing[i].oscillator] = true;
+
+    for (size_t i = 0; i < numNoises; ++i)
+        sounding[noises[i].oscillator] = true;
+
+    auto panned = false;
+    auto firstSounding = -1;
+
+    for (size_t i = 0; i < pans.size(); ++i)
+    {
+        const auto from = pans[i];
+        pans[i] += (float) ((targets.pans[i] - from) * panShare);
+
+        if (std::abs (targets.pans[i] - pans[i]) < 1.0e-4f)
+            pans[i] = targets.pans[i];
+
+        leftGains[i] = Patch::Oscillator::panToLeftGain (from);
+        rightGains[i] = Patch::Oscillator::panToRightGain (from);
+        leftSteps[i] = (Patch::Oscillator::panToLeftGain (pans[i]) - leftGains[i]) / (float) numSamples;
+        rightSteps[i] = (Patch::Oscillator::panToRightGain (pans[i]) - rightGains[i]) / (float) numSamples;
+
+        if (! sounding[i])
+            continue;
+
+        const auto first = (size_t) firstSounding;
+
+        if (firstSounding < 0)
+            firstSounding = (int) i;
+        else if (! juce::exactlyEqual (leftGains[i], leftGains[first]) || ! juce::exactlyEqual (rightGains[i], rightGains[first])
+                 || ! juce::exactlyEqual (leftSteps[i], leftSteps[first]) || ! juce::exactlyEqual (rightSteps[i], rightSteps[first]))
+            panned = true;
+    }
+
+    const auto stereo = panned && output.getNumChannels() > 1;
+    const auto shared = (size_t) std::max (0, firstSounding);
+    auto sharedLeft = leftGains[shared], sharedRight = rightGains[shared];
+    std::array<float, modulation::numOscillators> values {};
+
     // A filter that's out starts afresh when it's switched back in.
     std::array<bool, modulation::numFilters> filterActive {};
 
@@ -520,7 +568,12 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         for (size_t i = 0; i < numPlaying; ++i)
         {
             auto& harmonic = playing[i];
-            value += harmonic.bandLimit * (harmonic.cosine * (float) harmonic.x + harmonic.sine * (float) harmonic.y);
+            const auto contribution = harmonic.bandLimit * (harmonic.cosine * (float) harmonic.x + harmonic.sine * (float) harmonic.y);
+
+            if (stereo)
+                values[harmonic.oscillator] += contribution;
+            else
+                value += contribution;
 
             const auto nextX = harmonic.x * harmonic.turnX - harmonic.y * harmonic.turnY;
             harmonic.y = harmonic.x * harmonic.turnY + harmonic.y * harmonic.turnX;
@@ -538,7 +591,12 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             noiseState ^= noiseState >> 17;
             noiseState ^= noiseState << 5;
             const auto white = (float) (std::int32_t) noiseState * (1.0f / 2147483648.0f);
-            value += noise.level * white;
+
+            if (stereo)
+                values[noise.oscillator] += noise.level * white;
+            else
+                value += noise.level * white;
+
             noise.level += noise.step;
             recentNoise[noise.oscillator][recentNoisePosition] = white;
         }
@@ -546,14 +604,47 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         if (numNoises > 0)
             recentNoisePosition = (recentNoisePosition + 1) % recentNoise[0].size();
 
-        for (size_t i = 0; i < filters.size(); ++i)
-            if (filterActive[i])
-                value = filters[i].process (value);
+        auto left = 0.0f, right = 0.0f;
 
-        const auto sample = value * noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
+        if (stereo)
+        {
+            for (size_t i = 0; i < values.size(); ++i)
+            {
+                left += values[i] * leftGains[i];
+                right += values[i] * rightGains[i];
+                values[i] = 0.0f;
+                leftGains[i] += leftSteps[i];
+                rightGains[i] += rightSteps[i];
+            }
 
-        for (int channel = 0; channel < output.getNumChannels(); ++channel)
-            output.addSample (channel, startSample + s, sample);
+            for (size_t i = 0; i < filters.size(); ++i)
+                if (filterActive[i])
+                    filters[i].process (left, right);
+        }
+        else
+        {
+            for (size_t i = 0; i < filters.size(); ++i)
+                if (filterActive[i])
+                    value = filters[i].process (value);
+
+            left = value * sharedLeft;
+            right = value * sharedRight;
+            sharedLeft += leftSteps[shared];
+            sharedRight += rightSteps[shared];
+        }
+
+        const auto level = noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
+
+        // In mono, both sides together.
+        if (output.getNumChannels() == 1)
+        {
+            output.addSample (0, startSample + s, 0.5f * (left + right) * level);
+        }
+        else
+        {
+            output.addSample (0, startSample + s, left * level);
+            output.addSample (1, startSample + s, right * level);
+        }
 
         if (! ownEnvelope.isActive())
         {

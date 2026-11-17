@@ -58,6 +58,17 @@ TuneSlider::TuneSlider()
 
     addAndMakeVisible (slider);
 
+    panSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    panSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    panSlider.setRange (0.0, 1.0);
+    panSlider.setColour (juce::Slider::trackColourId, colours::dimText);
+    panSlider.setDoubleClickReturnValue (true, 0.5);
+    panSlider.setMouseClickGrabsKeyboardFocus (false);
+    panSlider.setWantsKeyboardFocus (false);
+    panSlider.setTitle ("Pan");
+    panSlider.onValueChange = [this] { repaint (panValueArea); };
+    addAndMakeVisible (panSlider);
+
     zoomSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     zoomSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     zoomSlider.setRange (0.0, 1.0);
@@ -91,12 +102,14 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
 {
     const auto name = "Osc " + juce::String (oscillator + 1);
     slider.setTitle (name + " tune");
+    panSlider.setTitle (name + " pan");
     zoomSlider.setTitle (name + " tune zoom");
     glideMode.setTitle (name + " glide");
     glideTimeSlider.setTitle (name + " glide time");
     modulatable::setTarget (slider, modulation::oscillatorTuneTarget (oscillator));
 
     attachment.reset();
+    panAttachment.reset();
     zoomAttachment.reset();
     glideModeAttachment.reset();
     glideTimeAttachment.reset();
@@ -104,6 +117,9 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     attachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneId (oscillator)),
                                                               [this] (float semitones) { showTune (semitones); });
     attachment->sendInitialUpdate();
+    panAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::panId (oscillator)),
+                                                                       panSlider);
+    panSlider.setDoubleClickReturnValue (true, 0.5);
     zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneZoomId (oscillator)),
                                                                         zoomSlider);
 
@@ -121,6 +137,19 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
                                                                              glideTimeSlider);
     glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
     moveWindow();
+}
+
+void TuneSlider::setPanOnly (bool shouldBePanOnly)
+{
+    if (panOnly == shouldBePanOnly)
+        return;
+
+    panOnly = shouldBePanOnly;
+
+    for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider })
+        component->setVisible (! panOnly);
+
+    repaint();
 }
 
 int TuneSlider::getGlideMode() const noexcept
@@ -168,12 +197,20 @@ double TuneSlider::getSnapDistance() const
 void TuneSlider::resized()
 {
     auto area = getLocalBounds();
+
+    auto panRow = area.removeFromTop (16);
+    panCaptionArea = panRow.removeFromLeft (48);
+    panValueArea = panRow.removeFromRight (86);
+    panRow.removeFromRight (8);
+    panSlider.setBounds (panRow);
+    area.removeFromTop (3);
+
     captionArea = area.removeFromTop (16);
     area.removeFromTop (3);
 
     auto zoomRow = area.removeFromTop (16);
     zoomCaptionArea = zoomRow.removeFromLeft (48);
-    zoomValueArea = zoomRow.removeFromRight (56);
+    zoomValueArea = zoomRow.removeFromRight (86);
     zoomRow.removeFromRight (8);
     zoomSlider.setBounds (zoomRow);
     area.removeFromTop (3);
@@ -197,6 +234,15 @@ void TuneSlider::paint (juce::Graphics& g)
 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
+    g.drawText ("PAN", panCaptionArea, juce::Justification::centredLeft);
+
+    g.setFont (fonts::body (12.0f));
+    g.drawText (SynthProcessor::panToText ((float) panSlider.getValue()), panValueArea, juce::Justification::centredRight);
+
+    if (panOnly)
+        return;
+
+    g.setFont (fonts::caption());
     g.drawText ("TUNE", captionArea, juce::Justification::centredLeft);
     g.drawText ("ZOOM", zoomCaptionArea, juce::Justification::centredLeft);
     g.drawText ("GLIDE", glideCaptionArea, juce::Justification::centredLeft);

@@ -191,7 +191,12 @@ namespace
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); })),
                 std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::noiseId (i), 1 }, name + " Noise", false)));
+                    juce::ParameterID { SynthProcessor::noiseId (i), 1 }, name + " Noise", false),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::panId (i), 1 }, name + " Pan",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float pan, int) { return SynthProcessor::panToText (pan); }))));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -337,6 +342,21 @@ juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (osc
 juce::String SynthProcessor::glideId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Glide"; }
 juce::String SynthProcessor::glideTimeId (int oscillator)   { return glideId (oscillator) + "Time"; }
 juce::String SynthProcessor::noiseId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Noise"; }
+juce::String SynthProcessor::panId (int oscillator)         { return "osc" + juce::String (oscillator + 1) + "Pan"; }
+
+juce::String SynthProcessor::panToText (float pan)
+{
+    const auto right = juce::roundToInt (juce::jlimit (0.0f, 1.0f, pan) * 100.0f);
+    const auto left = 100 - right;
+
+    if (right == 0)
+        return "L 100%";
+
+    if (left == 0)
+        return "R 100%";
+
+    return "L " + juce::String (left) + "%" + juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + "R " + juce::String (right) + "%";
+}
 
 juce::StringArray SynthProcessor::getGlideNames()   { return { "Off", "Glide", "Legato" }; }
 
@@ -472,7 +492,7 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
     for (int i = 0; i < numOscillators; ++i)
         set.oscillators[(size_t) i] = { find (onId (i)), find (levelId (i)), find (harmonicsId (i)), find (tuneId (i)),
                                         find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)),
-                                        find (noiseId (i)) };
+                                        find (noiseId (i)), find (panId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -1152,6 +1172,7 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.glide = (Patch::Glide) juce::jlimit (0, 2, juce::roundToInt (source.glide->load()));
         oscillator.glideSeconds = source.glideTime->load();
         oscillator.noise = source.noise->load() >= 0.5f;
+        oscillator.pan = source.pan->load();
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)

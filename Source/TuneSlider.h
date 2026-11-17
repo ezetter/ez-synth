@@ -9,6 +9,9 @@
 /** Tunes an oscillator away from the note, from two octaves below it to two octaves above, with the intervals from
     the 2nd to the 15th, two octaves, marked along it either way. Dragging it snaps to whole semitones, unless Option is held.
 
+    Above it all, where the oscillator's panned, from all the way left to all the way right, 50% each side to begin
+    with. Double-clicking it puts it back in the middle.
+
     The zoom slider above it shows less of the scale, down to a semitone either side, so small tunings are easy to
     set. Zoomed in, it shows the part around the whole semitone nearest the tuning, which stays put while the tune is
     dragged. Like the other controls, the tune can be right-clicked to have an LFO, envelope, velocity or the mod wheel
@@ -30,6 +33,10 @@ public:
     void setZoom (float zoom);
     float getZoom() const;
 
+    /** Shows only the pan, for an oscillator playing noise, which has no tune or glide. */
+    void setPanOnly (bool);
+    bool isPanOnly() const noexcept   { return panOnly; }
+
     /** Which glide button is chosen: 0 for Off, 1 for Glide, 2 for Legato. */
     int getGlideMode() const noexcept;
 
@@ -39,7 +46,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    static constexpr int preferredHeight = 104;
+    static constexpr int preferredHeight = 123;
 
 private:
     void showTune (float semitones);
@@ -47,18 +54,19 @@ private:
     double getSnapDistance() const;
 
     ModulatableSlider slider;
-    juce::Slider zoomSlider;
+    juce::Slider panSlider, zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
     ChoiceButtons glideMode { { "Off", "Glide", "Legato" } };
     juce::Slider glideTimeSlider;
 
     // After the sliders, so they're let go of before the sliders go.
-    std::unique_ptr<juce::SliderParameterAttachment> zoomAttachment, glideTimeAttachment;
+    std::unique_ptr<juce::SliderParameterAttachment> panAttachment, zoomAttachment, glideTimeAttachment;
     std::unique_ptr<juce::ParameterAttachment> glideModeAttachment;
     float tune = 0.0f;
     tuning::Window window;
     bool dragging = false;
-    juce::Rectangle<int> captionArea, zoomCaptionArea, zoomValueArea, tickArea, glideCaptionArea, glideValueArea;
+    bool panOnly = false;
+    juce::Rectangle<int> panCaptionArea, panValueArea, captionArea, zoomCaptionArea, zoomValueArea, tickArea, glideCaptionArea, glideValueArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TuneSlider)
 };

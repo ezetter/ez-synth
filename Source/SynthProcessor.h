@@ -60,6 +60,14 @@ public:
     /** The ID of whether an oscillator plays white noise rather than its harmonics. */
     static juce::String noiseId (int oscillator);
 
+    /** The ID of where an oscillator is panned, from 0, all the way left, to 1, all the way right. In the middle,
+        where it starts, it's 50% left and 50% right, and plays at its full level on both sides.
+    */
+    static juce::String panId (int oscillator);
+
+    /** Where a pan sends the sound, as its shares either way, such as "L 50% · R 50%", "L 25% · R 75%" or "L 100%". */
+    static juce::String panToText (float pan);
+
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
         low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
@@ -678,6 +686,7 @@ private:
         std::atomic<float>* glide = nullptr;
         std::atomic<float>* glideTime = nullptr;
         std::atomic<float>* noise = nullptr;
+        std::atomic<float>* pan = nullptr;
     };
 
     struct FilterParameters

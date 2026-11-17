@@ -36,6 +36,15 @@ struct Patch
         /** Whether it plays white noise rather than its harmonics, at its level. */
         bool noise = false;
 
+        /** Where it's panned, from 0, all the way left, to 1, all the way right. */
+        float pan = 0.5f;
+
+        /** How loud it plays panned this far, on the left and on the right: each side at its full level as far as
+            the middle, and fading out beyond it, so a sound in the middle plays as it does in mono.
+        */
+        static float panToLeftGain (float pan)    { return juce::jlimit (0.0f, 1.0f, 2.0f * (1.0f - pan)); }
+        static float panToRightGain (float pan)   { return juce::jlimit (0.0f, 1.0f, 2.0f * pan); }
+
         /** Each harmonic's amplitude, its phase, and the sine and cosine of its phase. */
         std::array<float, waveform::maxHarmonics> amplitudes {}, phases {}, phaseSines {}, phaseCosines {};
 

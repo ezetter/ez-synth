@@ -503,7 +503,9 @@ void SynthEditor::refresh()
         harmonicSelector.setVisible (harmonicsShown);
         randomizeButton.setVisible (harmonicsShown);
         harmonicSliders.setVisible (harmonicsShown);
-        tuneSlider.setVisible (harmonicsShown);
+        // A noise oscillator has no tune or glide, but it's still panned.
+        tuneSlider.setVisible (! editingLfo);
+        tuneSlider.setPanOnly (! harmonicsShown);
         lfoPanel.setVisible (editingLfo);
         grid.setNoise (editingLfo ? std::nullopt : std::optional (now.noise[(size_t) edited]));
 

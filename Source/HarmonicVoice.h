@@ -93,6 +93,9 @@ private:
 
         /** How loud each oscillator playing white noise is, or 0 for one playing harmonics. */
         std::array<float, modulation::numOscillators> noiseLevels {};
+
+        /** Where each oscillator is panned, from 0, left, to 1, right. */
+        std::array<float, modulation::numOscillators> pans {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
 
@@ -133,6 +136,9 @@ private:
     // How loud each oscillator's white noise is, gliding towards its target, the noise's generator, and the last
     // samples of it each oscillator played, in a ring that's written at the position given.
     std::array<float, modulation::numOscillators> noiseLevels {};
+
+    // Where each oscillator is panned, gliding quickly to where it's set, so moving it doesn't click.
+    std::array<float, modulation::numOscillators> pans {};
     std::uint32_t noiseState = 0x9e3779b9u;
     std::array<std::array<float, (size_t) recentNoiseLength>, modulation::numOscillators> recentNoise {};
     size_t recentNoisePosition = 0;

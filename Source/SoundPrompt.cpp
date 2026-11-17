@@ -180,6 +180,9 @@ oscillator's tune.
   wind, cymbals and the attack of drums, shaped with the filters (a mid pass for a band of noise) and with an
   envelope on its level. Noise has no harmonics, so the compare command's harmonic measurements won't show it,
   except as a lower harmonic share.
+- `oscNPan`, from 0 (all the way left) to 1 (all the way right), 0.5 to begin with, pans the oscillator. In the
+  middle it plays at its full level on both sides; panned away from it, the far side fades out. The sound tool
+  measures both sides together, as it does a stereo sample, so leave pans in the middle to match a sample.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
 - The wave can be given as one of the presets, `"wave": "Sine"`, `"Sawtooth"`, `"Square"` or `"Triangle"`, with its

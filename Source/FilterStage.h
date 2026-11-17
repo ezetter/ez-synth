@@ -86,6 +86,11 @@ public:
     /** Filters a sample, moving the settings one sample along their glides. */
     float process (float input);
 
+    /** Filters a sample on each side, moving the settings one sample along their glides. The right side has its own
+        memory of the sound, which follows the left's while it's filtered in mono, so it can go on from there.
+    */
+    void process (float& left, float& right);
+
     /** Clears the filter's memory of the sound, as when it's switched out. */
     void reset();
 
@@ -100,6 +105,9 @@ private:
     double sampleRate = 44100.0;
 
     // The state variable filter: its two integrators, and its coefficients.
-    float s1 = 0.0f, s2 = 0.0f;
+    float s1 = 0.0f, s2 = 0.0f, rightS1 = 0.0f, rightS2 = 0.0f;
+
+    /** Filters a sample through one side's memory, with the settings and fades as they are. */
+    float filter (float input, float& integrator1, float& integrator2, float cut, float typeShare, float wet) const;
     float g = 0.0f, r2 = 1.0f, h = 1.0f;
 };

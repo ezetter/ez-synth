@@ -176,17 +176,42 @@ float FilterStage::process (float input)
         updateCoefficients();
     }
 
-    const auto highPass = (input - (r2 + g) * s1 - s2) * h;
-    const auto bandPass = g * highPass + s1;
-    s1 = g * highPass + bandPass;
-    const auto lowPass = g * bandPass + s2;
-    s2 = g * bandPass + lowPass;
+    const auto cut = notchCut.getNextValue();
+    const auto typeShare = typeMix.getNextValue();
+    const auto output = filter (input, s1, s2, cut, typeShare, mix.getNextValue());
+    rightS1 = s1;
+    rightS2 = s2;
+    return output;
+}
+
+void FilterStage::process (float& left, float& right)
+{
+    if (cutoff.isSmoothing() || q.isSmoothing())
+    {
+        cutoff.getNextValue();
+        q.getNextValue();
+        updateCoefficients();
+    }
+
+    const auto cut = notchCut.getNextValue();
+    const auto typeShare = typeMix.getNextValue();
+    const auto wet = mix.getNextValue();
+    left = filter (left, s1, s2, cut, typeShare, wet);
+    right = filter (right, rightS1, rightS2, cut, typeShare, wet);
+}
+
+float FilterStage::filter (float input, float& integrator1, float& integrator2, float cut, float typeShare, float wet) const
+{
+    const auto highPass = (input - (r2 + g) * integrator1 - integrator2) * h;
+    const auto bandPass = g * highPass + integrator1;
+    integrator1 = g * highPass + bandPass;
+    const auto lowPass = g * bandPass + integrator2;
+    integrator2 = g * bandPass + lowPass;
 
     // The band is scaled down by its Q, so a mid pass lets its middle through at the level it came in, however
     // narrow it is, rather than boosting it. A notch takes that band away from the sound, all of it at full depth,
     // which leaves the low and high passes added together: the standard notch, (s² + 1) / (s² + s / Q + 1).
     const auto band = r2 * bandPass;
-    const auto cut = notchCut.getNextValue();
 
     const auto output = [&] (FilterType outputType)
     {
@@ -201,14 +226,13 @@ float FilterStage::process (float input)
         return lowPass;
     };
 
-    const auto typeShare = typeMix.getNextValue();
     const auto filtered = typeShare >= 1.0f ? output (type) : output (previousType) + typeShare * (output (type) - output (previousType));
 
     // Switching the filter in or out fades between the filtered sound and the sound as it was.
-    return input + mix.getNextValue() * (filtered - input);
+    return input + wet * (filtered - input);
 }
 
 void FilterStage::reset()
 {
-    s1 = s2 = 0.0f;
+    s1 = s2 = rightS1 = rightS2 = 0.0f;
 }

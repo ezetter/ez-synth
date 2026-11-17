@@ -391,8 +391,19 @@ namespace analysis
             block.clear();
             instrument.processBlock (block, midi);
 
+            // Both sides together, as a sample's are, so a panned sound is heard whole. In the middle, both sides
+            // are the same.
+            const auto channels = juce::jmin (2, block.getNumChannels());
+
             for (int i = 0; i < blockSize && start + i < total; ++i)
-                audio.samples[(size_t) (start + i)] = block.getSample (0, i);
+            {
+                auto sum = 0.0f;
+
+                for (int channel = 0; channel < channels; ++channel)
+                    sum += block.getSample (channel, i);
+
+                audio.samples[(size_t) (start + i)] = sum / (float) channels;
+            }
         }
 
         instrument.releaseResources();

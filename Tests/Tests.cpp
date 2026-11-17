@@ -3477,6 +3477,138 @@ namespace
         synth.randomizeAsTriggered();
     }
 
+    /** Plays a note, as play() does, and returns both channels, from a buffer of as many as given. */
+    std::pair<std::vector<float>, std::vector<float>> playSides (SynthProcessor& synth, int note, double holdSeconds, double totalSeconds,
+                                                                 int channels = 2)
+    {
+        synth.prepareToPlay (sampleRate, blockSize);
+        synth.restartLfos();
+
+        juce::AudioBuffer<float> buffer (channels, blockSize);
+        std::vector<float> left, right;
+        const auto holdSamples = (int) (holdSeconds * sampleRate);
+        const auto totalSamples = (int) (totalSeconds * sampleRate);
+
+        for (int start = 0; start < totalSamples; start += blockSize)
+        {
+            juce::MidiBuffer midi;
+
+            if (start == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+
+            if (start <= holdSamples && holdSamples < start + blockSize)
+                midi.addEvent (juce::MidiMessage::noteOff (1, note), holdSamples - start);
+
+            synth.processBlock (buffer, midi);
+            left.insert (left.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            right.insert (right.end(), buffer.getReadPointer (channels - 1), buffer.getReadPointer (channels - 1) + blockSize);
+        }
+
+        return { left, right };
+    }
+
+    void testPan()
+    {
+        std::cout << "Pan" << std::endl;
+
+        const auto sine = []
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            return synth;
+        };
+
+        {
+            auto synth = sine();
+            const auto [left, right] = playSides (*synth, 69, 0.5, 0.8);
+            check (left == right && peakOf (left) > 0.1f, "an oscillator starts in the middle, the same on both sides");
+            check (SynthProcessor::panToText (0.5f) == juce::String (juce::CharPointer_UTF8 ("L 50% \xc2\xb7 R 50%"))
+                     && SynthProcessor::panToText (0.0f) == "L 100%" && SynthProcessor::panToText (1.0f) == "R 100%",
+                   "...shown as 50% each side, and 100% when it's all the way over");
+        }
+
+        {
+            auto middle = sine();
+            const auto centred = peakOf (playSides (*middle, 69, 0.5, 0.8).first);
+
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::panId (0), 0.0f);
+            const auto [left, right] = playSides (*synth, 69, 0.5, 0.8);
+            check (peakOf (right) < 1.0e-6f && isNear (peakOf (left), centred, 0.01), "panned all the way left, it's only on the left, as loud");
+
+            setParameter (*synth, SynthProcessor::panId (0), 0.75f);
+            const auto [quieter, louder] = playSides (*synth, 69, 0.5, 0.8);
+            check (isNear (peakOf (louder), centred, 0.01) && isNear (peakOf (quieter), centred / 2.0, 0.02),
+                   "panned 75% right, the left is at half its level");
+
+            setParameter (*synth, SynthProcessor::panId (0), 0.0f);
+            const auto mono = playSides (*synth, 69, 0.5, 0.8, 1).first;
+            check (isNear (peakOf (mono), centred / 2.0, 0.02), "in mono, both sides are played together");
+        }
+
+        // Two oscillators an octave apart, panned apart, through a filter, which then filters each side by itself.
+        {
+            auto synth = sine();
+            setPreset (*synth, 1, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::onId (1), 1.0f);
+            setParameter (*synth, SynthProcessor::tuneId (1), 12.0f);
+            setParameter (*synth, SynthProcessor::panId (0), 0.0f);
+            setParameter (*synth, SynthProcessor::panId (1), 1.0f);
+            setFilter (*synth, SynthProcessor::filterIds (0), true, 5000.0f);
+
+            const auto [left, right] = playSides (*synth, 69, 0.6, 0.8);
+            const auto steadyLeft = slice (left, 0.2, 0.5), steadyRight = slice (right, 0.2, 0.5);
+            check (amplitudeAt (steadyLeft, 440.0) > 0.1 && amplitudeAt (steadyLeft, 880.0) < 0.001
+                     && amplitudeAt (steadyRight, 880.0) > 0.1 && amplitudeAt (steadyRight, 440.0) < 0.001,
+                   "oscillators panned apart each play on their own side, filtered");
+
+            // Moving a pan while the note plays glides it there, without a click.
+            synth->prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> moved;
+
+            for (int block = 0; block < 40; ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+                if (block == 20)
+                    setParameter (*synth, SynthProcessor::panId (1), 0.0f);
+
+                synth->processBlock (buffer, midi);
+                moved.insert (moved.end(), buffer.getReadPointer (1), buffer.getReadPointer (1) + blockSize);
+            }
+
+            auto biggestJump = 0.0f;
+
+            for (size_t i = 1; i < moved.size(); ++i)
+                biggestJump = std::max (biggestJump, std::abs (moved[i] - moved[i - 1]));
+
+            check (biggestJump < 0.1f && peakOf (slice (moved, (double) moved.size() / sampleRate - 0.02, (double) moved.size() / sampleRate)) < 1.0e-4f,
+                   "...and one moved while the note plays glides across, without a click");
+        }
+
+        // A preset saved before there was pan, as the factory presets were, plays in the middle.
+        {
+            SynthProcessor synth;
+            setParameter (synth, SynthProcessor::panId (0), 0.1f);
+            check (synth.loadFactoryPreset ("Acid Bass") && isNear (synth.parameters.getRawParameterValue (SynthProcessor::panId (0))->load(), 0.5, 1.0e-6),
+                   "a preset saved before there was pan plays in the middle");
+        }
+
+        // The pan is saved with the sound, and in a description.
+        {
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::panId (2), 0.25f);
+            SynthProcessor loaded;
+            const auto result = sound::load (loaded, sound::toJson (*synth, true));
+            check (result.loaded && isNear (loaded.parameters.getRawParameterValue (SynthProcessor::panId (2))->load(), 0.25, 1.0e-4),
+                   "a pan is kept in a sound's description");
+        }
+    }
+
     void testNoise()
     {
         std::cout << "Noise" << std::endl;
@@ -3675,8 +3807,8 @@ namespace
 
             grid->onNoiseChange (true);
             synthEditor.refresh();
-            check (shown.isNoise (0) && grid->isNoise() && ! sliders->isVisible() && ! tune->isVisible(),
-                   "the grid's Noise switch makes it play noise, and hides the harmonics and tune");
+            check (shown.isNoise (0) && grid->isNoise() && ! sliders->isVisible() && tune->isVisible() && tune->isPanOnly(),
+                   "the grid's Noise switch makes it play noise, and hides the harmonics and tune, leaving the pan");
 
             shown.editedSource = 1;
             synthEditor.refresh();
@@ -3686,7 +3818,7 @@ namespace
             synthEditor.refresh();
             grid->onNoiseChange (false);
             synthEditor.refresh();
-            check (! shown.isNoise (0) && ! grid->isNoise() && sliders->isVisible(), "switching Noise off brings them back");
+            check (! shown.isNoise (0) && ! grid->isNoise() && sliders->isVisible() && ! tune->isPanOnly(), "switching Noise off brings them back");
             shown.editorBeingDeleted (editor.get());
         }
     }
@@ -6241,6 +6373,7 @@ int main (int argc, char* argv[])
     testTuning();
     testGlide();
     testNoise();
+    testPan();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

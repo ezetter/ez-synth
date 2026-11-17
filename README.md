@@ -39,6 +39,13 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the interval, such as *+7 st · perfect 5th* or *−7 st · perfect 5th below*, and the interval's number
   lights up. Double-click it to put it back in tune. An oscillator that's tuned shows how far on its card,
   and the harmonics' frequencies beside the sliders are its own.
+- **Pan an oscillator** with the **Pan** slider at the top of the tune panel, from all the way left to all the
+  way right; the figure beside it gives the share each side, **L 50% · R 50%** to begin with. In the middle,
+  the oscillator plays at its full level on both sides, as it always did, so sounds made before there was pan
+  play as they did; panned to one side, the far side fades out, reaching silence all the way over. Pan two
+  oscillators apart for a wide sound. Double-click the slider to put it back in the middle. Each oscillator
+  has its own, saved with the sound, and a noise oscillator keeps its pan when its other controls go. In mono,
+  as in a mono track in a host, the two sides are played together.
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
   to zoom right out. The figure beside it says how far either side of the middle the scale reaches. Zoomed
@@ -68,7 +75,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Noise.** The **Noise** switch at the top of the grid, left of the preset waves, makes the oscillator play
   white noise instead of its harmonics: every frequency at once, a new random value from −1 to 1 every
   sample. The preset waves and the drawing controls go, and so do the harmonics, the tune and the glide,
-  which noise has no use for; its level and switch still count, as do the LFOs and envelopes on them, and
+  which noise has no use for, leaving its pan; its level and switch still count, as do the LFOs and envelopes on them, and
   the filters shape it. The grid shows the noise itself, the last 10 ms or so the newest note played, moving
   as it plays and marked **As played**, or faint sample noise while no note plays it; the oscillator's card
   shows it too. Each note plays noise of its own, so a chord's notes don't play the same noise. Each pitch set
@@ -746,6 +753,11 @@ save pictures of the window showing several waves.
   each voice, at its level, gliding as levels do, so switching to noise mid-note fades across. Each voice keeps
   the last 512 samples of each oscillator's noise, which the newest note's are copied from after each block for
   the window to show.
+- **Panning.** Each voice keeps each oscillator's sound apart only while oscillators that are sounding are
+  panned differently: then each oscillator's sound goes to each side at its pan's gain, min(1, 2 × (1 − pan))
+  on the left and min(1, 2 × pan) on the right, and each side goes through the filters with its own memory.
+  Otherwise, as in every sound panned in the middle, the oscillators are added up and filtered once, then
+  panned, as cheaply as in mono. A pan glides to where it's moved within 20 ms, so moving it doesn't click.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
@@ -796,7 +808,7 @@ save pictures of the window showing several waves.
 | `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
-| `Source/TuneSlider.*` | The tune slider, with its intervals marked, and the zoom slider above it |
+| `Source/TuneSlider.*` | The tune slider, with its intervals marked, the zoom slider above it, and the pan slider above that |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
