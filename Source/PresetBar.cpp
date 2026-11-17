@@ -173,6 +173,8 @@ void PresetBar::showMenu()
     // Each category's presets, the factory ones and then the user's own, the category of the one loaded ticked.
     const auto listed = listPresets();
 
+    menu.addSectionHeader ("Factory");
+
     for (const auto& category : SynthProcessor::getPresetCategories())
     {
         juce::PopupMenu presets;
@@ -214,6 +216,18 @@ void PresetBar::showMenu()
 
         menu.addSubMenu (category, presets, true, nullptr, holdsCurrent);
     }
+
+    // The user's own presets are listed in full here too, whatever their category, so they're one click away.
+    menu.addSeparator();
+    menu.addSectionHeader ("Your presets");
+
+    const auto saved = SynthProcessor::findPresets();
+
+    if (saved.isEmpty())
+        menu.addItem ("No saved presets yet", false, false, nullptr);
+
+    for (const auto& file : saved)
+        menu.addItem (file.getFileNameWithoutExtension(), true, file == current, [this, file] { load (file); });
 
     // The preset shown can be moved to another category, unless it's a factory preset. A sound not saved yet is
     // saved in the category chosen.
