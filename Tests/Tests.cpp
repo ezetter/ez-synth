@@ -5687,6 +5687,18 @@ namespace
             check (saving.savePreset (chosen, "Not a category") && SynthProcessor::getPresetCategory (chosen) == "Pads",
                    "...keeping its own category if the one given isn't one");
 
+            check (SynthProcessor::getPresetLabel (chosen) == SynthProcessor::customLabel, "a preset saved without a label is labelled Custom");
+            check (saving.savePreset (chosen, "Pads", "  Live set & \"B\" ") && SynthProcessor::getPresetLabel (chosen) == "Live set & \"B\""
+                     && SynthProcessor::getPresetCategory (chosen) == "Pads",
+                   "...and one saved with a label keeps it, trimmed, in its file");
+
+            SynthProcessor labelled;
+            juce::MemoryBlock labelledState;
+            const auto loadedLabelled = labelled.loadPreset (chosen);
+            labelled.getStateInformation (labelledState);
+            check (loadedLabelled && ! labelledState.toString().contains ("presetLabel"),
+                   "...without it becoming part of the sound");
+
             own.undo();
             check (own.getPresetCategory() == "Leads", "undoing a change to the sound doesn't move the preset back");
 

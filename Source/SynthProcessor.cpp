@@ -260,15 +260,38 @@ namespace
         return name.compareNatural (other) < 0;
     }
 
-    /** A preset's category, from the start of its XML, where its outermost element's attributes are, without
-        reading the rest, which can be long. Other if it has none, or one that isn't a category any more.
+    /** One of a preset's attributes, from the start of its XML, where its outermost element's attributes are,
+        without reading the rest, which can be long. Empty if it hasn't got it.
     */
-    juce::String findCategory (const juce::String& xmlStart)
+    juce::String findAttribute (const juce::String& xmlStart, const juce::String& attribute)
     {
         const auto element = xmlStart.fromFirstOccurrenceOf ("<EZSynth", false, false).upToFirstOccurrenceOf (">", false, false);
-        const auto category = element.fromFirstOccurrenceOf ("presetCategory=\"", false, false).upToFirstOccurrenceOf ("\"", false, false);
-        const auto unescaped = category.replace ("&amp;", "&").replace ("&quot;", "\"").replace ("&lt;", "<").replace ("&gt;", ">");
-        return SynthProcessor::getPresetCategories().contains (unescaped) ? unescaped : juce::String (SynthProcessor::otherCategory);
+
+        if (! element.contains (" " + attribute + "=\""))
+            return {};
+
+        const auto value = element.fromFirstOccurrenceOf (" " + attribute + "=\"", false, false).upToFirstOccurrenceOf ("\"", false, false);
+        return value.replace ("&quot;", "\"").replace ("&apos;", "'").replace ("&lt;", "<").replace ("&gt;", ">").replace ("&amp;", "&");
+    }
+
+    /** A preset's category, from the start of its XML. Other if it has none, or one that isn't a category any more. */
+    juce::String findCategory (const juce::String& xmlStart)
+    {
+        const auto category = findAttribute (xmlStart, "presetCategory");
+        return SynthProcessor::getPresetCategories().contains (category) ? category : juce::String (SynthProcessor::otherCategory);
+    }
+
+    /** The start of a file, enough for its outermost element's attributes. */
+    juce::String readStart (const juce::File& file)
+    {
+        juce::FileInputStream stream (file);
+
+        if (! stream.openedOk())
+            return {};
+
+        juce::MemoryBlock start;
+        stream.readIntoMemoryBlock (start, 4096);
+        return start.toString();
     }
 
     /** A factory preset: its name, its category, and its XML, which is built into EZ Synth. */
@@ -2134,6 +2157,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
     state.removeProperty ("presetCategory", nullptr);
+    state.removeProperty ("presetLabel", nullptr);
 
     if (! getPresetCategories().contains (category))
         category = otherCategory;
@@ -2217,6 +2241,7 @@ void SynthProcessor::loadState (juce::ValueTree state)
 void SynthProcessor::loadSoundState (juce::ValueTree state)
 {
     state.removeProperty ("presetCategory", nullptr);
+    state.removeProperty ("presetLabel", nullptr);
     state.removeProperty ("presetName", nullptr);
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
@@ -2607,7 +2632,7 @@ juce::Array<juce::File> SynthProcessor::findPresets (const juce::File& folder)
     return presets;
 }
 
-bool SynthProcessor::savePreset (const juce::File& file, const juce::String& category)
+bool SynthProcessor::savePreset (const juce::File& file, const juce::String& category, const juce::String& label)
 {
     const auto named = file.withFileExtension (presetExtension);
     const auto keptCategory = presetCategory;
@@ -2621,7 +2646,10 @@ bool SynthProcessor::savePreset (const juce::File& file, const juce::String& cat
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
 
-    const auto xml = state.createXml();
+    auto xml = state.createXml();
+
+    if (xml != nullptr && label.trim().isNotEmpty())
+        xml->setAttribute ("presetLabel", label.trim());
 
     if (xml == nullptr || ! named.getParentDirectory().createDirectory() || ! xml->writeTo (named))
     {
@@ -2702,14 +2730,13 @@ bool SynthProcessor::setPresetCategory (const juce::String& category)
 
 juce::String SynthProcessor::getPresetCategory (const juce::File& file)
 {
-    juce::FileInputStream stream (file);
+    return findCategory (readStart (file));
+}
 
-    if (! stream.openedOk())
-        return otherCategory;
-
-    juce::MemoryBlock start;
-    stream.readIntoMemoryBlock (start, 4096);
-    return findCategory (start.toString());
+juce::String SynthProcessor::getPresetLabel (const juce::File& file)
+{
+    const auto label = findAttribute (readStart (file), "presetLabel").trim();
+    return label.isNotEmpty() ? label : juce::String (customLabel);
 }
 
 juce::String SynthProcessor::getFactoryPresetCategory (const juce::String& name)

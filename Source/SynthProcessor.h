@@ -416,10 +416,10 @@ public:
     static juce::Array<juce::File> findPresets (const juce::File& folder = getPresetFolder());
 
     /** Saves the whole sound as a preset named after the file, which is given the preset extension if it hasn't
-        got it, in a category, one of getPresetCategories(), or the preset's own if none is given. Returns false if
-        the file couldn't be written.
+        got it, in a category, one of getPresetCategories(), or the preset's own if none is given, and with a label
+        the menu shows after its name, or Custom if none is given. Returns false if the file couldn't be written.
     */
-    bool savePreset (const juce::File&, const juce::String& category = {});
+    bool savePreset (const juce::File&, const juce::String& category = {}, const juce::String& label = {});
 
     /** Loads a preset. Returns false, and leaves the sound alone, if the file isn't one. */
     bool loadPreset (const juce::File&);
@@ -472,6 +472,16 @@ public:
     /** The category a preset's file, or a factory preset, is in, read from its file without loading it. */
     static juce::String getPresetCategory (const juce::File&);
     static juce::String getFactoryPresetCategory (const juce::String& name);
+
+    /** The labels the menu shows after a preset's name: Factory for a factory preset, From AI for a sound from
+        Claude, and for one of the user's own, the label it was saved with, Custom if none.
+    */
+    static constexpr auto factoryLabel = "Factory";
+    static constexpr auto customLabel = "Custom";
+    static constexpr auto aiLabel = "From AI";
+
+    /** The label a preset's file was saved with, read from its file without loading it, or Custom. */
+    static juce::String getPresetLabel (const juce::File&);
 
     //==============================================================================
     // Pitch sets: every setting of the sound, set differently for a range of keys. There's always the default pitch

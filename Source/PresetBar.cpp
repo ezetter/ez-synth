@@ -134,27 +134,54 @@ void PresetBar::mouseExit (const juce::MouseEvent&)
 
 std::vector<PresetBar::Listed> PresetBar::listPresets()
 {
-    std::vector<Listed> listed;
-    const auto factory = SynthProcessor::getFactoryPresetNames();
-    const auto saved = SynthProcessor::findPresets();
+    std::vector<Listed> all;
 
-    juce::StringArray savedCategories;
+    for (const auto& name : SynthProcessor::getFactoryPresetNames())
+        all.push_back ({ SynthProcessor::getFactoryPresetCategory (name), name, SynthProcessor::factoryLabel, {}, false });
 
-    for (const auto& file : saved)
-        savedCategories.add (SynthProcessor::getPresetCategory (file));
+    for (const auto& file : SynthProcessor::findPresets())
+        all.push_back ({ SynthProcessor::getPresetCategory (file), file.getFileNameWithoutExtension(),
+                         SynthProcessor::getPresetLabel (file), file, false });
 
-    for (const auto& category : SynthProcessor::getPresetCategories())
+    for (const auto& file : sound::findClaudeSounds())
+        all.push_back ({ SynthProcessor::otherCategory, file.getFileNameWithoutExtension(), SynthProcessor::aiLabel, file, true });
+
+    // Category by category, and in each, by name, numbers counted as numbers, then by label.
+    const auto categories = SynthProcessor::getPresetCategories();
+
+    std::stable_sort (all.begin(), all.end(), [&categories] (const Listed& a, const Listed& b)
     {
-        for (const auto& name : factory)
-            if (SynthProcessor::getFactoryPresetCategory (name) == category)
-                listed.push_back ({ category, name, {} });
+        if (a.category != b.category)
+            return categories.indexOf (a.category) < categories.indexOf (b.category);
 
-        for (int i = 0; i < saved.size(); ++i)
-            if (savedCategories[i] == category)
-                listed.push_back ({ category, saved[i].getFileNameWithoutExtension(), saved[i] });
-    }
+        if (const auto byName = a.name.compareNatural (b.name); byName != 0)
+            return byName < 0;
 
-    return listed;
+        return a.label.compareNatural (b.label) < 0;
+    });
+
+    return all;
+}
+
+bool PresetBar::isLoaded (const Listed& preset) const
+{
+    if (preset.fromAI)
+        return preset.file == loadedClaudeSound && synthProcessor.getPresetVersion() == loadedClaudeVersion;
+
+    if (preset.file == juce::File())
+        return synthProcessor.isFactoryPreset() && preset.name == synthProcessor.getPresetName();
+
+    return preset.file == synthProcessor.getPresetFile();
+}
+
+void PresetBar::loadListed (const Listed& preset)
+{
+    if (preset.fromAI)
+        loadFromClaude (preset.file);
+    else if (preset.file == juce::File())
+        loadFactory (preset.name);
+    else
+        load (preset.file);
 }
 
 void PresetBar::showMenu()
@@ -170,45 +197,23 @@ void PresetBar::showMenu()
 
     menu.addSeparator();
 
-    // Each category's presets, the factory ones and then the user's own, the category of the one loaded ticked.
+    // Each category's presets, factory, the user's own and Claude's together, each labelled, the category of the
+    // one loaded ticked.
     const auto listed = listPresets();
-
-    menu.addSectionHeader ("Factory");
 
     for (const auto& category : SynthProcessor::getPresetCategories())
     {
         juce::PopupMenu presets;
-        auto holdsCurrent = false, factoryDone = false, anyFactory = false;
+        auto holdsCurrent = false;
 
         for (const auto& preset : listed)
         {
             if (preset.category != category)
                 continue;
 
-            const auto isFactory = preset.file == juce::File();
-
-            if (isFactory)
-            {
-                anyFactory = true;
-            }
-            else if (! factoryDone)
-            {
-                factoryDone = true;
-
-                if (anyFactory)
-                    presets.addSeparator();
-
-                presets.addSectionHeader ("Your presets");
-            }
-
-            const auto ticked = isFactory ? synthProcessor.isFactoryPreset() && preset.name == synthProcessor.getPresetName()
-                                          : preset.file == current;
+            const auto ticked = isLoaded (preset);
             holdsCurrent = holdsCurrent || ticked;
-
-            if (isFactory)
-                presets.addItem (preset.name, true, ticked, [this, name = preset.name] { loadFactory (name); });
-            else
-                presets.addItem (preset.name, true, ticked, [this, file = preset.file] { load (file); });
+            presets.addItem (preset.name + " (" + preset.label + ")", true, ticked, [this, preset] { loadListed (preset); });
         }
 
         if (presets.getNumItems() == 0)
@@ -217,25 +222,9 @@ void PresetBar::showMenu()
         menu.addSubMenu (category, presets, true, nullptr, holdsCurrent);
     }
 
-    // The user's own presets are listed in full here too, whatever their category, so they're one click away.
+    // How to ask Claude for a sound to match a sample, which is listed in Other. Experimental.
     menu.addSeparator();
-    menu.addSectionHeader ("Your presets");
-
-    const auto saved = SynthProcessor::findPresets();
-
-    if (saved.isEmpty())
-        menu.addItem ("No saved presets yet", false, false, nullptr);
-
-    for (const auto& file : saved)
-        menu.addItem (file.getFileNameWithoutExtension(), true, file == current, [this, file] { load (file); });
-
-    // Sounds Claude has made to match a sample, and how to ask it for one. Experimental.
-    menu.addSeparator();
-    menu.addSectionHeader ("From Claude (experimental)");
-
-    for (const auto& file : sound::findClaudeSounds())
-        menu.addItem (file.getFileNameWithoutExtension(), [this, file] { loadFromClaude (file); });
-
+    menu.addSectionHeader ("Sounds from Claude (experimental)");
     menu.addItem ("Copy the prompt for Claude", [] { copyPrompt(); });
     menu.addItem ("Paste a sound from Claude", [this] { pasteFromClaude(); });
     menu.addItem ("Show the From Claude folder", []
@@ -270,23 +259,13 @@ void PresetBar::step (int direction)
     auto index = -1;
 
     for (int i = 0; i < count; ++i)
-    {
-        const auto& preset = listed[(size_t) i];
-
-        if (preset.file == juce::File() ? synthProcessor.isFactoryPreset() && preset.name == synthProcessor.getPresetName()
-                                        : preset.file == synthProcessor.getPresetFile())
+        if (isLoaded (listed[(size_t) i]))
             index = i;
-    }
 
     // From Init, or a preset that isn't among them, stepping starts at one end of the list.
     const auto nextIndex = index < 0 ? (direction > 0 ? 0 : count - 1)
                                      : (index + direction + count) % count;
-    const auto& chosen = listed[(size_t) nextIndex];
-
-    if (chosen.file == juce::File())
-        loadFactory (chosen.name);
-    else
-        load (chosen.file);
+    loadListed (listed[(size_t) nextIndex]);
 }
 
 void PresetBar::load (const juce::File& file)
@@ -317,7 +296,7 @@ void PresetBar::copyPrompt()
         "  The sample is ~/Music/cello.wav\n\n"
         "It's saved too, as " + file.getFullPathName() + ", so you can tell Claude to read that instead.\n\n"
         "Claude saves the sound it makes in " + file.getParentDirectory().getFullPathName()
-        + ", and it's listed in this menu, under From Claude.");
+        + ", and it's listed in this menu, under Other, labelled " + SynthProcessor::aiLabel + ".");
 }
 
 void PresetBar::showLoadResult (const sound::LoadResult& result, const juce::String& from)
@@ -336,6 +315,8 @@ void PresetBar::showLoadResult (const sound::LoadResult& result, const juce::Str
 void PresetBar::loadFromClaude (const juce::File& file)
 {
     showLoadResult (sound::loadFile (synthProcessor, file), file.getFileName());
+    loadedClaudeSound = file;
+    loadedClaudeVersion = synthProcessor.getPresetVersion();
 }
 
 void PresetBar::pasteFromClaude()
@@ -364,7 +345,7 @@ void PresetBar::open()
 
 void PresetBar::save()
 {
-    // Saving suggests the current preset's name and category, so saving again over it is quick. Init isn't saved
+    // Saving suggests the current preset's name, category and label, so saving again over it is quick. Init isn't saved
     // over, and a factory preset is saved as a copy among the user's own, under its name and in its category.
     const auto name = shownName == SynthProcessor::initPresetName ? juce::String ("New preset") : shownName;
     const auto categories = SynthProcessor::getPresetCategories();
@@ -374,6 +355,9 @@ void PresetBar::save()
     saveWindow->addComboBox ("category", categories, "Category");
     saveWindow->getComboBoxComponent ("category")->setSelectedItemIndex (juce::jmax (0, categories.indexOf (synthProcessor.getPresetCategory())),
                                                                          juce::dontSendNotification);
+    const auto presetFile = synthProcessor.getPresetFile();
+    saveWindow->addTextEditor ("label", presetFile.existsAsFile() ? SynthProcessor::getPresetLabel (presetFile)
+                                                                  : juce::String (SynthProcessor::customLabel), "Label");
     saveWindow->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
     saveWindow->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
@@ -387,22 +371,23 @@ void PresetBar::save()
     {
         const auto chosenName = juce::File::createLegalFileName (saveWindow->getTextEditorContents ("name").trim());
         const auto chosenCategory = saveWindow->getComboBoxComponent ("category")->getText();
+        const auto chosenLabel = saveWindow->getTextEditorContents ("label").trim();
         saveWindow.reset();
 
         if (result == 1 && chosenName.isNotEmpty())
-            saveAs (chosenName, chosenCategory);
+            saveAs (chosenName, chosenCategory, chosenLabel);
     }));
 }
 
-void PresetBar::saveAs (const juce::String& name, const juce::String& category)
+void PresetBar::saveAs (const juce::String& name, const juce::String& category, const juce::String& label)
 {
     const auto folder = SynthProcessor::getPresetFolder();
     folder.createDirectory();
     const auto file = folder.getChildFile (name + SynthProcessor::presetExtension);
 
-    const auto write = [this, file, category]
+    const auto write = [this, file, category, label]
     {
-        if (! synthProcessor.savePreset (file, category))
+        if (! synthProcessor.savePreset (file, category, label))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't save the preset",
                                                     "EZ Synth couldn't write " + file.getFullPathName() + ".");
 

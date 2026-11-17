@@ -446,11 +446,14 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 - **Save** in the header saves the whole sound as a preset: every oscillator's and LFO's wave and settings,
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
-  asks for the preset's name and its category, suggesting the current preset's, so saving again over it is
-  quick. It asks first before replacing a different preset of yours with the same name.
+  asks for the preset's name, its category and a label of your own, suggesting the current preset's, so
+  saving again over it is quick. The label is shown after the name in the menu, **Custom** if you leave it
+  out. It asks first before replacing a different preset of yours with the same name.
 - **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
   then a submenu for each category, **Bass**, **Brass and Winds**, **Drums**, **Keys**, **Leads**, **Pads**,
-  **Strings** and **Other**, holding its factory presets and then your own, then **Your presets**, all of your own in one list. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
+  **Strings** and **Other**, holding its factory presets, your own and, in Other, the sounds Claude has made, all together by name. Each
+  has its label after its name: **Factory**, **From AI**, or yours, **Custom** unless you gave it another, as in
+  *Acid Bass (Factory)*. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
   sawtooth with 3 harmonics each, only the sine on, every oscillator and harmonic in tune and every
   harmonic's phase as its wave has it, each wave drawn smoothly, the filters a low pass and a high pass, both
   off, the LFOs off and not random, the envelopes as they start, and nothing moved by an LFO or envelope.
@@ -462,7 +465,7 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
   one. Factory presets keep theirs. The category is kept in the
   preset's file, as its `presetCategory`, and with a host's project.
 - **The arrows** either side of the name step back and forth through the presets as the menu lists them,
-  category by category, the factory presets and then your own in each, by name.
+  category by category, and by name in each, the sounds from Claude among them.
 - A dot after the name means the sound has changed since the preset was loaded or saved.
 - Presets are kept in `~/Documents/EZ Synth/Presets`, as `.ezsynth` files. They're readable XML, so they
   can be copied, shared or renamed in Finder; a preset is named after its file.
@@ -603,14 +606,14 @@ plays its attempt, measures that against the sample, and refines it, then saves 
 How close it gets is an experiment: steady, pitched notes should come closest, and noisy or breathy ones least,
 as EZ Synth has no noise.
 
-1. Click the preset's name, and under **From Claude (experimental)** choose **Copy the prompt for Claude**. It
+1. Click the preset's name, and under **Sounds from Claude (experimental)** choose **Copy the prompt for Claude**. It
    copies a long prompt, made from EZ Synth itself, so it covers every control: how the synth makes sound,
    every parameter with its range, what can move what, the sound description format Claude answers in, and
    two factory presets as examples. It's saved too, as `~/Documents/EZ Synth/From Claude/Prompt for Claude.md`.
 2. Start a new Claude Code conversation, paste the prompt, and say where the sample is, such as *The sample
    is ~/Music/cello.wav*. Or tell Claude to read the saved prompt and match the sample.
 3. Claude saves its sound in `~/Documents/EZ Synth/From Claude` as a `.json` file. Click the preset's name, and
-   it's listed under **From Claude**, newest first; choose it to load it. **Save** keeps it as a preset.
+   it's listed under **Other**, labelled **From AI**; choose it to load it. **Save** keeps it as a preset.
    If Claude shows you the JSON instead, copy it and choose **Paste a sound from Claude**.
 
 **Several samples** of one instrument, such as at C2, C3 and C4, can be matched together: give Claude all of

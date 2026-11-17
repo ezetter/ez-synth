@@ -9,8 +9,9 @@
     opens a menu of them, and a button to save the sound as a preset. A dot after the name shows the sound has been
     changed since.
 
-    The menu lists the presets by category, each category a submenu of its factory presets and then the user's own,
-    then all the user's own. Saving asks for the preset's name and its category.
+    The menu lists the presets by category, each category a submenu of its factory presets, the user's own and the
+    sounds from Claude, together by name, each with its label after it. Saving asks for the preset's name, category
+    and label.
 */
 class PresetBar final : public juce::Component
 {
@@ -40,16 +41,19 @@ private:
 
     void showMenu();
 
-    /** Every preset, factory and the user's own, in the order the menu lists them: by category, and in each, the
-        factory presets and then the user's own, each by name.
+    /** Every preset, factory, the user's own and the sounds from Claude, in the order the menu lists them: by
+        category, and in each, by name and then label.
     */
     struct Listed
     {
-        juce::String category, name;
+        juce::String category, name, label;
         juce::File file;   // none for a factory preset
+        bool fromAI = false;
     };
 
     static std::vector<Listed> listPresets();
+    bool isLoaded (const Listed&) const;
+    void loadListed (const Listed&);
     void step (int direction);
     void load (const juce::File&);
     void loadFactory (const juce::String& name);
@@ -67,13 +71,17 @@ private:
         another preset.
     */
     void save();
-    void saveAs (const juce::String& name, const juce::String& category);
+    void saveAs (const juce::String& name, const juce::String& category, const juce::String& label);
 
     SynthProcessor& synthProcessor;
     StepButton previous { -1 }, next { 1 };
     juce::TextButton saveButton { "Save" };
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::AlertWindow> saveWindow;
+
+    // The sound from Claude loaded last, and the preset version it made, so the menu can tick it until another loads.
+    juce::File loadedClaudeSound;
+    int loadedClaudeVersion = -1;
 
     juce::Rectangle<int> nameArea;
     juce::String shownName;
