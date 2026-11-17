@@ -44,7 +44,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the oscillator plays at its full level on both sides, as it always did, so sounds made before there was pan
   play as they did; panned to one side, the far side fades out, reaching silence all the way over. Pan two
   oscillators apart for a wide sound. Double-click the slider to put it back in the middle. Each oscillator
-  has its own, saved with the sound, and a noise oscillator keeps its pan when its other controls go. In mono,
+  has its own, saved with the sound, and a noise oscillator keeps its pan when its other controls go. Like
+  the tune, it can be right-clicked to have an LFO, envelope, velocity or the mod wheel move it: an LFO swings
+  the oscillator from side to side, and the figure beside the slider follows where it's moved to. An envelope's
+  release brings it back to where it's set, rather than all the way left. In mono,
   as in a mono track in a host, the two sides are played together.
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -339,7 +342,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 *Right-clicking a control opens its modulation editor.*
 
-- **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level or tune,
+- **Right-click, or Control-click,** almost any control: the volume, an oscillator's switch, level, tune or pan,
   the number of harmonics, a harmonic's slider, tune or phase, or a filter's switch, cutoff, resonance, width, Q or depth, or an LFO's rate. A small window opens,
   in three parts. In the top part you pick an LFO or envelope to move the control; in the middle part you
   switch on **Velocity** to have how hard each key is played move it too; and in the bottom part you switch
@@ -757,7 +760,8 @@ save pictures of the window showing several waves.
   panned differently: then each oscillator's sound goes to each side at its pan's gain, min(1, 2 × (1 − pan))
   on the left and min(1, 2 × pan) on the right, and each side goes through the filters with its own memory.
   Otherwise, as in every sound panned in the middle, the oscillators are added up and filtered once, then
-  panned, as cheaply as in mono. A pan glides to where it's moved within 20 ms, so moving it doesn't click.
+  panned, as cheaply as in mono. A pan glides to where it's set within 20 ms, so dragging it doesn't click;
+  one an LFO, envelope, velocity or the mod wheel moves follows within 1.5 ms, as other moved controls do.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the

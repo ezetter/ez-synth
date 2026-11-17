@@ -67,6 +67,7 @@ TuneSlider::TuneSlider()
     panSlider.setWantsKeyboardFocus (false);
     panSlider.setTitle ("Pan");
     panSlider.onValueChange = [this] { repaint (panValueArea); };
+    panSlider.onLivePositionChange = [this] { repaint (panValueArea); };
     addAndMakeVisible (panSlider);
 
     zoomSlider.setSliderStyle (juce::Slider::LinearHorizontal);
@@ -103,6 +104,7 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     const auto name = "Osc " + juce::String (oscillator + 1);
     slider.setTitle (name + " tune");
     panSlider.setTitle (name + " pan");
+    modulatable::setTarget (panSlider, modulation::oscillatorPanTarget (oscillator));
     zoomSlider.setTitle (name + " tune zoom");
     glideMode.setTitle (name + " glide");
     glideTimeSlider.setTitle (name + " glide time");
@@ -237,7 +239,10 @@ void TuneSlider::paint (juce::Graphics& g)
     g.drawText ("PAN", panCaptionArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (12.0f));
-    g.drawText (SynthProcessor::panToText ((float) panSlider.getValue()), panValueArea, juce::Justification::centredRight);
+    const auto movedPan = modulatable::getLivePosition (panSlider);
+    g.setColour (movedPan.has_value() ? colours::text : colours::dimText);
+    g.drawText (SynthProcessor::panToText (movedPan.value_or ((float) panSlider.getValue())), panValueArea, juce::Justification::centredRight);
+    g.setColour (colours::dimText);
 
     if (panOnly)
         return;

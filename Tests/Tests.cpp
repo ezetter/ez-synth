@@ -3598,6 +3598,33 @@ namespace
                    "a preset saved before there was pan plays in the middle");
         }
 
+        // An LFO, envelope, velocity or the mod wheel can move the pan, as it does any control.
+        {
+            const auto target = modulation::oscillatorPanTarget (1);
+            check (modulation::getName (target) == "Osc 2 pan" && modulation::findTarget ("osc2Pan") == target
+                     && modulation::isParameter (target) && SynthProcessor::panId (1) == "osc2Pan",
+                   "each oscillator's pan is a control an LFO can move, by its parameter's ID");
+
+            // A sine LFO with a half-second period swings it all the way right a quarter of the way through, and all
+            // the way left at three quarters.
+            auto synth = sine();
+            setLfo (*synth, 0, 0.5f, false, waveform::Preset::sine);
+            synth->setAssignment (modulation::oscillatorPanTarget (0), { 0, 1.0f, false });
+            const auto [left, right] = playSides (*synth, 69, 0.9, 1.0);
+            check (loudness (right, 0.11, 0.14) > 10.0 * loudness (left, 0.11, 0.14) && loudness (left, 0.36, 0.39) > 10.0 * loudness (right, 0.36, 0.39),
+                   "an LFO on the pan swings the oscillator from side to side");
+
+            // An envelope's release brings the pan back to where it's set, not all the way left.
+            const modulation::Assignment byEnvelope { modulation::envelopeSource (0), 1.0f, false };
+            check (isNear (modulation::applyEnvelope (target, byEnvelope, 0.5f, { 1.0f, true, 1.0f, 0.0f }), 0.5, 1.0e-6)
+                     && isNear (modulation::applyEnvelope (target, byEnvelope, 0.5f, { 1.0f, false, 0.0f, 1.0f }), 1.0, 1.0e-6),
+                   "an envelope moves the pan, and its release brings it back to where it's set");
+
+            SynthProcessor loaded;
+            check (sound::load (loaded, sound::toJson (*synth, true)).loaded && loaded.getAssignment (modulation::oscillatorPanTarget (0)) == synth->getAssignment (modulation::oscillatorPanTarget (0)),
+                   "what moves a pan is kept in a sound's description");
+        }
+
         // The pan is saved with the sound, and in a description.
         {
             auto synth = sine();

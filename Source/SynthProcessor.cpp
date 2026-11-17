@@ -342,7 +342,7 @@ juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (osc
 juce::String SynthProcessor::glideId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Glide"; }
 juce::String SynthProcessor::glideTimeId (int oscillator)   { return glideId (oscillator) + "Time"; }
 juce::String SynthProcessor::noiseId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Noise"; }
-juce::String SynthProcessor::panId (int oscillator)         { return "osc" + juce::String (oscillator + 1) + "Pan"; }
+juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
 juce::String SynthProcessor::panToText (float pan)
 {

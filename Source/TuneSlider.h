@@ -10,7 +10,8 @@
     the 2nd to the 15th, two octaves, marked along it either way. Dragging it snaps to whole semitones, unless Option is held.
 
     Above it all, where the oscillator's panned, from all the way left to all the way right, 50% each side to begin
-    with. Double-clicking it puts it back in the middle.
+    with. Double-clicking it puts it back in the middle. Like the tune, it can be right-clicked to have an LFO,
+    envelope, velocity or the mod wheel move it, and the figure beside it then follows where it's moved to.
 
     The zoom slider above it shows less of the scale, down to a semitone either side, so small tunings are easy to
     set. Zoomed in, it shows the part around the whole semitone nearest the tuning, which stays put while the tune is
@@ -53,8 +54,8 @@ private:
     void moveWindow();
     double getSnapDistance() const;
 
-    ModulatableSlider slider;
-    juce::Slider panSlider, zoomSlider;
+    ModulatableSlider slider, panSlider;
+    juce::Slider zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
     ChoiceButtons glideMode { { "Off", "Glide", "Legato" } };
     juce::Slider glideTimeSlider;

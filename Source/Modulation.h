@@ -75,11 +75,14 @@ namespace modulation
         its threshold, either way.
     */
     constexpr int harmonicSwitchTarget (int oscillator, int harmonic) { return randomizeTarget (numOscillators) + oscillator * waveform::maxHarmonics + harmonic - 1; }
-    inline constexpr int numTargets = harmonicSwitchTarget (numOscillators, 1);
+
+    /** Where an oscillator's panned, from all the way left at the bottom of its travel to all the way right at the top. */
+    constexpr int oscillatorPanTarget (int oscillator)              { return harmonicSwitchTarget (numOscillators, 1) + oscillator; }
+    inline constexpr int numTargets = oscillatorPanTarget (numOscillators);
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
                       oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate, randomize,
-                      harmonicSwitch };
+                      harmonicSwitch, oscillatorPan };
 
     struct TargetInfo
     {

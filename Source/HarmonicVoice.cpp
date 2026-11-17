@@ -254,7 +254,11 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
     for (int i = 0; i < numOscillators; ++i)
     {
         const auto& oscillator = patch->oscillators[(size_t) i];
-        targets.pans[(size_t) i] = juce::jlimit (0.0f, 1.0f, oscillator.pan);
+        const auto panTarget = oscillatorPanTarget (i);
+        targets.pans[(size_t) i] = modulate (panTarget, juce::jlimit (0.0f, 1.0f, oscillator.pan));
+        targets.pansMoved[(size_t) i] = patch->assignments[(size_t) panTarget].isActive()
+                                     || patch->velocityAssignments[(size_t) panTarget].isActive()
+                                     || patch->modWheelAssignments[(size_t) panTarget].isActive();
 
         // Its tuning is followed even while it's off, so it doesn't slide into tune as it's switched on. Its zoom
         // sets how far modulation moves it.
@@ -504,11 +508,12 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         noises[numNoises++] = { noiseLevels[i], (float) ((targets.noiseLevels[i] - noiseLevels[i]) / glideSamples), i };
     }
 
-    // Each oscillator's pan glides to where it's set within 20 ms, its gains either side moving evenly through the
-    // chunk. While every oscillator sounding is panned alike, which it is unless they've been panned apart, the
+    // Each oscillator's pan glides to where it's set within 20 ms, so dragging it doesn't click, or where an LFO,
+    // envelope, velocity or the mod wheel moves it as quickly as they move other controls, its gains either side
+    // moving evenly through the chunk. While every oscillator sounding is panned alike, which it is unless they've been panned apart, the
     // sound is worked out once, filtered once and then panned, as cheaply as in mono.
     std::array<float, modulation::numOscillators> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
-    const auto panShare = std::min (1.0, numSamples / (0.02 * sampleRate));
+    const auto setPanShare = std::min (1.0, numSamples / (0.02 * sampleRate));
     auto sounding = std::array<bool, modulation::numOscillators> {};
 
     for (size_t i = 0; i < numPlaying; ++i)
@@ -523,7 +528,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     for (size_t i = 0; i < pans.size(); ++i)
     {
         const auto from = pans[i];
-        pans[i] += (float) ((targets.pans[i] - from) * panShare);
+        pans[i] += (float) ((targets.pans[i] - from) * (targets.pansMoved[i] ? glideShare : setPanShare));
 
         if (std::abs (targets.pans[i] - pans[i]) < 1.0e-4f)
             pans[i] = targets.pans[i];

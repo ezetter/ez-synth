@@ -94,8 +94,9 @@ private:
         /** How loud each oscillator playing white noise is, or 0 for one playing harmonics. */
         std::array<float, modulation::numOscillators> noiseLevels {};
 
-        /** Where each oscillator is panned, from 0, left, to 1, right. */
+        /** Where each oscillator is panned, from 0, left, to 1, right, as it's moved, and whether anything moves it. */
         std::array<float, modulation::numOscillators> pans {};
+        std::array<bool, modulation::numOscillators> pansMoved {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
 
