@@ -446,10 +446,11 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
 
 - **Save** in the header saves the whole sound as a preset: every oscillator's and LFO's wave and settings,
   the harmonics, the envelopes, the filters, the volume, and what the LFOs, envelopes and velocity move. It
-  suggests the current preset's name, so saving again over it is quick.
+  asks for the preset's name and its category, suggesting the current preset's, so saving again over it is
+  quick. It asks first before replacing a different preset of yours with the same name.
 - **The preset's name** opens a menu of the presets, to load one: **Init**, the sound EZ Synth starts with,
   then a submenu for each category, **Bass**, **Brass and Winds**, **Drums**, **Keys**, **Leads**, **Pads**,
-  **Strings** and **Other**, holding its factory presets and then your own. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
+  **Strings** and **Other**, holding its factory presets and then your own, then **Your presets**, all of your own in one list. The category of the preset loaded is ticked. Init puts every control back as it starts: a sine, a square and a
   sawtooth with 3 harmonics each, only the sine on, every oscillator and harmonic in tune and every
   harmonic's phase as its wave has it, each wave drawn smoothly, the filters a low pass and a high pass, both
   off, the LFOs off and not random, the envelopes as they start, and nothing moved by an LFO or envelope.
@@ -457,9 +458,8 @@ In a plugin, click in EZ Synth's window first so the keys come to it rather than
   to show the presets folder in Finder.
 - **Categories.** Every factory preset is in one. Your own presets go in **Other** to begin with, as do
   presets saved before there were categories, sounds from Claude and Init, except that a copy of a factory
-  preset is saved in its category. **Put "…" in**, in the menu, moves the preset loaded to another category:
-  a saved preset is moved in its file straight away, without saving any other changes to the sound, and one
-  not saved yet is saved in the category chosen. Factory presets keep theirs. The category is kept in the
+  preset is saved in its category. To move a preset of yours to another category, save it again and choose
+  one. Factory presets keep theirs. The category is kept in the
   preset's file, as its `presetCategory`, and with a host's project.
 - **The arrows** either side of the name step back and forth through the presets as the menu lists them,
   category by category, the factory presets and then your own in each, by name.
@@ -712,7 +712,7 @@ the grid shows harmonics where LFOs, envelopes and velocity have moved them, as 
 the standalone app plays from MIDI devices as they're plugged in and remembers those switched off, with a
 virtual MIDI keyboard's notes arriving through the Mac's own MIDI system, that
 presets save and load the whole sound, that every factory preset loads and plays a note that's heard without
-clipping, that every factory preset is in a category, that a preset of your own can be moved to another and keeps it, that the arrows step through the presets category by category, that the Grand Piano plays just as the description Claude
+clipping, that every factory preset is in a category, that a preset of your own can be moved to another, or saved in the one chosen, and keeps it, that the arrows step through the presets category by category, that the Grand Piano plays just as the description Claude
 matched to piano samples, leaves headroom, damps and answers velocity, that random LFOs stay smooth, joined up and natural,
 or spread their steps evenly, and play a new wave every cycle or key, that a click or a drag on the grid sets steps, and
 that each wave's way of drawing is saved, that high notes leave out harmonics too high to play cleanly, that changing the

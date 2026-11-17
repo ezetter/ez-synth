@@ -2607,9 +2607,13 @@ juce::Array<juce::File> SynthProcessor::findPresets (const juce::File& folder)
     return presets;
 }
 
-bool SynthProcessor::savePreset (const juce::File& file)
+bool SynthProcessor::savePreset (const juce::File& file, const juce::String& category)
 {
     const auto named = file.withFileExtension (presetExtension);
+    const auto keptCategory = presetCategory;
+
+    if (getPresetCategories().contains (category))
+        presetCategory = category;
 
     // The preset's name is its file's, so a preset renamed in Finder takes on the new name.
     auto state = createState();
@@ -2620,7 +2624,10 @@ bool SynthProcessor::savePreset (const juce::File& file)
     const auto xml = state.createXml();
 
     if (xml == nullptr || ! named.getParentDirectory().createDirectory() || ! xml->writeTo (named))
+    {
+        presetCategory = keptCategory;
         return false;
+    }
 
     // Saved, a factory preset becomes one of the user's own.
     presetName = named.getFileNameWithoutExtension();

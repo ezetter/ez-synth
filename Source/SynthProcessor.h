@@ -416,9 +416,10 @@ public:
     static juce::Array<juce::File> findPresets (const juce::File& folder = getPresetFolder());
 
     /** Saves the whole sound as a preset named after the file, which is given the preset extension if it hasn't
-        got it. Returns false if the file couldn't be written.
+        got it, in a category, one of getPresetCategories(), or the preset's own if none is given. Returns false if
+        the file couldn't be written.
     */
-    bool savePreset (const juce::File&);
+    bool savePreset (const juce::File&, const juce::String& category = {});
 
     /** Loads a preset. Returns false, and leaves the sound alone, if the file isn't one. */
     bool loadPreset (const juce::File&);

@@ -10,7 +10,7 @@
     changed since.
 
     The menu lists the presets by category, each category a submenu of its factory presets and then the user's own,
-    and lets the preset shown be moved to another category.
+    then all the user's own. Saving asks for the preset's name and its category.
 */
 class PresetBar final : public juce::Component
 {
@@ -63,12 +63,17 @@ private:
     static void copyPrompt();
     static juce::File savePrompt();
     void open();
+    /** Asks for the preset's name and category, and saves it among the user's own, asking first before saving over
+        another preset.
+    */
     void save();
+    void saveAs (const juce::String& name, const juce::String& category);
 
     SynthProcessor& synthProcessor;
     StepButton previous { -1 }, next { 1 };
     juce::TextButton saveButton { "Save" };
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::AlertWindow> saveWindow;
 
     juce::Rectangle<int> nameArea;
     juce::String shownName;

@@ -229,26 +229,6 @@ void PresetBar::showMenu()
     for (const auto& file : saved)
         menu.addItem (file.getFileNameWithoutExtension(), true, file == current, [this, file] { load (file); });
 
-    // The preset shown can be moved to another category, unless it's a factory preset. A sound not saved yet is
-    // saved in the category chosen.
-    {
-        juce::PopupMenu categories;
-        const auto movable = ! synthProcessor.isFactoryPreset();
-
-        for (const auto& category : SynthProcessor::getPresetCategories())
-            categories.addItem (category, movable, category == synthProcessor.getPresetCategory(), [this, category]
-            {
-                if (! synthProcessor.setPresetCategory (category))
-                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't move the preset",
-                                                            "EZ Synth couldn't write " + synthProcessor.getPresetFile().getFullPathName() + ".");
-
-                refresh();
-            });
-
-        menu.addSeparator();
-        menu.addSubMenu (movable ? "Put \"" + shownName + "\" in" : "Factory presets keep their category", categories, movable);
-    }
-
     // Sounds Claude has made to match a sample, and how to ask it for one. Experimental.
     menu.addSeparator();
     menu.addSectionHeader ("From Claude (experimental)");
@@ -384,32 +364,64 @@ void PresetBar::open()
 
 void PresetBar::save()
 {
+    // Saving suggests the current preset's name and category, so saving again over it is quick. Init isn't saved
+    // over, and a factory preset is saved as a copy among the user's own, under its name and in its category.
+    const auto name = shownName == SynthProcessor::initPresetName ? juce::String ("New preset") : shownName;
+    const auto categories = SynthProcessor::getPresetCategories();
+
+    saveWindow = std::make_unique<juce::AlertWindow> ("Save the sound as a preset", "", juce::MessageBoxIconType::NoIcon);
+    saveWindow->addTextEditor ("name", name, "Name");
+    saveWindow->addComboBox ("category", categories, "Category");
+    saveWindow->getComboBoxComponent ("category")->setSelectedItemIndex (juce::jmax (0, categories.indexOf (synthProcessor.getPresetCategory())),
+                                                                         juce::dontSendNotification);
+    saveWindow->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    saveWindow->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    if (auto* editor = saveWindow->getTextEditor ("name"))
+    {
+        editor->selectAll();
+        editor->grabKeyboardFocus();
+    }
+
+    saveWindow->enterModalState (true, juce::ModalCallbackFunction::create ([this] (int result)
+    {
+        const auto chosenName = juce::File::createLegalFileName (saveWindow->getTextEditorContents ("name").trim());
+        const auto chosenCategory = saveWindow->getComboBoxComponent ("category")->getText();
+        saveWindow.reset();
+
+        if (result == 1 && chosenName.isNotEmpty())
+            saveAs (chosenName, chosenCategory);
+    }));
+}
+
+void PresetBar::saveAs (const juce::String& name, const juce::String& category)
+{
     const auto folder = SynthProcessor::getPresetFolder();
     folder.createDirectory();
+    const auto file = folder.getChildFile (name + SynthProcessor::presetExtension);
 
-    // Saving suggests the current preset's name, so saving again over it is quick. Init isn't saved over, and a
-    // factory preset, which has no file, is saved as a copy among the user's own, under its name.
-    const auto name = shownName == SynthProcessor::initPresetName ? juce::String ("New preset") : shownName;
-    const auto suggested = synthProcessor.getPresetFile() != juce::File() ? synthProcessor.getPresetFile()
-                                                                          : folder.getChildFile (name + SynthProcessor::presetExtension);
+    const auto write = [this, file, category]
+    {
+        if (! synthProcessor.savePreset (file, category))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Couldn't save the preset",
+                                                    "EZ Synth couldn't write " + file.getFullPathName() + ".");
 
-    chooser = std::make_unique<juce::FileChooser> ("Save the sound as a preset", suggested,
-                                                   juce::String ("*") + SynthProcessor::presetExtension);
+        refresh();
+    };
 
-    chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this] (const juce::FileChooser& finished)
-                          {
-                              const auto file = finished.getResult();
+    // Saving over the preset loaded is what Save is for; saving over another one asks first.
+    if (! file.existsAsFile() || file == synthProcessor.getPresetFile())
+    {
+        write();
+        return;
+    }
 
-                              if (file == juce::File())
-                                  return;
-
-                              if (! synthProcessor.savePreset (file))
-                                  juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
-                                                                          "Couldn't save the preset",
-                                                                          "EZ Synth couldn't write " + file.getFullPathName() + ".");
-
-                              refresh();
-                          });
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Replace \"" + name + "\"?",
+                                        "You already have a preset called \"" + name + "\". Saving replaces it.",
+                                        "Replace", "Cancel", nullptr,
+                                        juce::ModalCallbackFunction::create ([write] (int result)
+                                        {
+                                            if (result == 1)
+                                                write();
+                                        }));
 }

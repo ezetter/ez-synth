@@ -5680,6 +5680,13 @@ namespace
                      && isNear (reloaded.parameters.getRawParameterValue (SynthProcessor::volumeId)->load(), 0.75, 1.0e-6),
                    "...without saving the sound's other changes");
 
+            const auto chosen = presets.getChildFile ("Chosen" + juce::String (SynthProcessor::presetExtension));
+            SynthProcessor saving;
+            check (saving.savePreset (chosen, "Pads") && SynthProcessor::getPresetCategory (chosen) == "Pads" && saving.getPresetCategory() == "Pads",
+                   "...and saving can put it in the category chosen in the Save dialog");
+            check (saving.savePreset (chosen, "Not a category") && SynthProcessor::getPresetCategory (chosen) == "Pads",
+                   "...keeping its own category if the one given isn't one");
+
             own.undo();
             check (own.getPresetCategory() == "Leads", "undoing a change to the sound doesn't move the preset back");
 
