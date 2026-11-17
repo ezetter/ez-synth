@@ -599,14 +599,14 @@ samples of one instrument, one for each part of the keyboard.
 
 ### Matching a sample with Claude (experimental)
 
-EZ Synth can hand Claude everything it needs to know to make a sound like a recording: a WAV, MP3 or other
+It's in the standalone app only, in the **Options** menu at the top of the window, under **AI**. EZ Synth
+can hand Claude everything it needs to know to make a sound like a recording: a WAV, MP3 or other
 audio file of one note, such as a cello, a bell or a synth from another record. Claude measures the sample,
 writes settings for every control, from each oscillator's 16 harmonics to the LFOs, envelopes and filters,
 plays its attempt, measures that against the sample, and refines it, then saves it where EZ Synth finds it.
-How close it gets is an experiment: steady, pitched notes should come closest, and noisy or breathy ones least,
-as EZ Synth has no noise.
+How close it gets is an experiment: steady, pitched notes should come closest, and noisy or breathy ones least.
 
-1. Click the preset's name, and under **Sounds from Claude (experimental)** choose **Copy the prompt for Claude**. It
+1. In the **Options** menu, under **AI**, choose **Copy the prompt for Claude**. It
    copies a long prompt, made from EZ Synth itself, so it covers every control: how the synth makes sound,
    every parameter with its range, what can move what, the sound description format Claude answers in, and
    two factory presets as examples. It's saved too, as `~/Documents/EZ Synth/From Claude/Prompt for Claude.md`.
@@ -614,7 +614,7 @@ as EZ Synth has no noise.
    is ~/Music/cello.wav*. Or tell Claude to read the saved prompt and match the sample.
 3. Claude saves its sound in `~/Documents/EZ Synth/From Claude` as a `.json` file. Click the preset's name, and
    it's listed under **Other**, labelled **From AI**; choose it to load it. **Save** keeps it as a preset.
-   If Claude shows you the JSON instead, copy it and choose **Paste a sound from Claude**.
+   If Claude shows you the JSON instead, copy it and choose **Paste a sound from Claude**, under **AI**.
 
 **Several samples** of one instrument, such as at C2, C3 and C4, can be matched together: give Claude all of
 them. It makes a pitch set for each, splitting the keyboard halfway between neighbouring samples' notes, and
@@ -622,7 +622,7 @@ matches each sample in its own pitch set, keeping their sounds alike so the inst
 ranges.
 
 If part of a sound can't be understood, such as a parameter that doesn't exist, the rest still loads, and EZ
-Synth says what was left out. **Show the From Claude folder** opens the folder in Finder.
+Synth says what was left out. **Show the From Claude folder**, under **AI**, opens the folder in Finder.
 
 **The sound description** is JSON: the parameters by ID, in their own units (hertz, seconds, or a choice's
 name), each oscillator's harmonics, each with an amplitude, phase, tune and switch, each LFO's wave as a preset

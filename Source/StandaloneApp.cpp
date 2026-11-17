@@ -1,6 +1,7 @@
 // EZ Synth's standalone app, which only the standalone build includes. It's JUCE's own standalone app, but it plays
 // from every MIDI device that's plugged in, as soon as it's plugged in, rather than waiting for each to be chosen in
-// the audio and MIDI settings, and its Options menu also opens the modulation overview. The plugins take their MIDI
+// the audio and MIDI settings, and its Options menu also opens the modulation overview and has the AI items, for asking
+// Claude for a sound to match a sample. The plugins take their MIDI
 // from their hosts.
 
 #include "MidiInputs.h"
@@ -19,14 +20,16 @@
 
 namespace
 {
-    /** JUCE's standalone window, whose Options menu also opens the screen listing everything that moves a control. */
+    /** JUCE's standalone window, whose Options menu also opens the screen listing everything that moves a control,
+        and has the AI items, for asking Claude for a sound.
+    */
     class SynthWindow final : public juce::StandaloneFilterWindow
     {
     public:
         using StandaloneFilterWindow::StandaloneFilterWindow;
 
     private:
-        enum MenuItem { audioSettings = 1, saveState, loadState, resetState, modulationOverview };
+        enum MenuItem { audioSettings = 1, saveState, loadState, resetState, modulationOverview, copyPrompt, pasteSound, showClaudeFolder };
 
         void buttonClicked (juce::Button* button) override
         {
@@ -34,6 +37,14 @@ namespace
 
             juce::PopupMenu menu;
             menu.addItem (modulationOverview, "Modulation Overview...", editor != nullptr, editor != nullptr && editor->isModulationOverviewShown());
+            menu.addSeparator();
+
+            // Experimental: a sound Claude makes to match a sample is listed among the presets, in Other, as From AI.
+            juce::PopupMenu ai;
+            ai.addItem (copyPrompt, "Copy the prompt for Claude");
+            ai.addItem (pasteSound, "Paste a sound from Claude", editor != nullptr);
+            ai.addItem (showClaudeFolder, "Show the From Claude folder");
+            menu.addSubMenu ("AI", ai);
             menu.addSeparator();
             menu.addItem (audioSettings, TRANS ("Audio/MIDI Settings..."));
             menu.addSeparator();
@@ -48,15 +59,24 @@ namespace
                                     if (safeThis == nullptr || result == 0)
                                         return;
 
-                                    if (result != modulationOverview)
+                                    if (result < modulationOverview)
                                     {
                                         safeThis->handleMenuResult (result);
                                         return;
                                     }
 
                                     auto* processor = safeThis->pluginHolder->processor.get();
+                                    auto* shown = dynamic_cast<SynthEditor*> (processor != nullptr ? processor->getActiveEditor() : nullptr);
 
-                                    if (auto* shown = dynamic_cast<SynthEditor*> (processor != nullptr ? processor->getActiveEditor() : nullptr))
+                                    if (result == copyPrompt)
+                                        PresetBar::copyPrompt();
+                                    else if (result == showClaudeFolder)
+                                        PresetBar::showClaudeFolder();
+                                    else if (shown == nullptr)
+                                        return;
+                                    else if (result == pasteSound)
+                                        shown->pasteSoundFromClaude();
+                                    else
                                         shown->showModulationOverview (! shown->isModulationOverviewShown());
                                 });
         }

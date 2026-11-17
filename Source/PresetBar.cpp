@@ -222,17 +222,6 @@ void PresetBar::showMenu()
         menu.addSubMenu (category, presets, true, nullptr, holdsCurrent);
     }
 
-    // How to ask Claude for a sound to match a sample, which is listed in Other. Experimental.
-    menu.addSeparator();
-    menu.addSectionHeader ("Sounds from Claude (experimental)");
-    menu.addItem ("Copy the prompt for Claude", [] { copyPrompt(); });
-    menu.addItem ("Paste a sound from Claude", [this] { pasteFromClaude(); });
-    menu.addItem ("Show the From Claude folder", []
-    {
-        savePrompt();
-        sound::getClaudeFolder().startAsProcess();
-    });
-
     menu.addSeparator();
     menu.addItem ("Open a preset file...", [this] { open(); });
     menu.addItem ("Show the presets folder", []
@@ -296,7 +285,7 @@ void PresetBar::copyPrompt()
         "  The sample is ~/Music/cello.wav\n\n"
         "It's saved too, as " + file.getFullPathName() + ", so you can tell Claude to read that instead.\n\n"
         "Claude saves the sound it makes in " + file.getParentDirectory().getFullPathName()
-        + ", and it's listed in this menu, under Other, labelled " + SynthProcessor::aiLabel + ".");
+        + ", and it's listed in the preset menu, under Other, labelled " + SynthProcessor::aiLabel + ".");
 }
 
 void PresetBar::showLoadResult (const sound::LoadResult& result, const juce::String& from)
@@ -317,6 +306,12 @@ void PresetBar::loadFromClaude (const juce::File& file)
     showLoadResult (sound::loadFile (synthProcessor, file), file.getFileName());
     loadedClaudeSound = file;
     loadedClaudeVersion = synthProcessor.getPresetVersion();
+}
+
+void PresetBar::showClaudeFolder()
+{
+    savePrompt();
+    sound::getClaudeFolder().startAsProcess();
 }
 
 void PresetBar::pasteFromClaude()

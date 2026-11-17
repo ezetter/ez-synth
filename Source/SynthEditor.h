@@ -57,6 +57,9 @@ public:
     void showModulationOverview (bool);
     bool isModulationOverviewShown() const   { return modulationOverview.isVisible(); }
 
+    /** Loads a sound Claude made from the clipboard, from the standalone app's Options menu. */
+    void pasteSoundFromClaude()   { presetBar.pasteFromClaude(); }
+
     /** Shows the screen listing the pitch sets, over the synth but for the keyboard, or hides it. */
     void showPitchSetScreen (bool);
     bool isPitchSetScreenShown() const   { return pitchSetScreen.isVisible(); }

@@ -21,6 +21,14 @@ public:
     /** Brings the preset's name, and whether it's been edited, up to date with the synth. */
     void refresh();
 
+    /** Asking Claude for a sound to match a sample, which the standalone app's Options menu offers, under AI.
+        Experimental. Copying the prompt also saves it in the From Claude folder; pasting loads a sound Claude made
+        from the clipboard, and says what it couldn't understand, if anything.
+    */
+    static void copyPrompt();
+    void pasteFromClaude();
+    static void showClaudeFolder();
+
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -58,13 +66,9 @@ private:
     void load (const juce::File&);
     void loadFactory (const juce::String& name);
 
-    /** Loads a sound Claude made, from a file or the clipboard, and says what it couldn't understand, if anything. */
+    /** Loads a sound Claude made from a file, and says what it couldn't understand, if anything. */
     void loadFromClaude (const juce::File&);
-    void pasteFromClaude();
     void showLoadResult (const sound::LoadResult&, const juce::String& from);
-
-    /** Copies the prompt for Claude, and saves it in the From Claude folder, which saving it returns. */
-    static void copyPrompt();
     static juce::File savePrompt();
     void open();
     /** Asks for the preset's name and category, and saves it among the user's own, asking first before saving over
