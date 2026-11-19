@@ -78,11 +78,18 @@ namespace modulation
 
     /** Where an oscillator's panned, from all the way left at the bottom of its travel to all the way right at the top. */
     constexpr int oscillatorPanTarget (int oscillator)              { return harmonicSwitchTarget (numOscillators, 1) + oscillator; }
-    inline constexpr int numTargets = oscillatorPanTarget (numOscillators);
+
+    /** An oscillator's unison: how many voices of it play, stacked, how far apart they're detuned, and how widely
+        they're spread from side to side.
+    */
+    constexpr int unisonVoicesTarget (int oscillator)               { return oscillatorPanTarget (numOscillators) + oscillator; }
+    constexpr int unisonDetuneTarget (int oscillator)               { return unisonVoicesTarget (numOscillators) + oscillator; }
+    constexpr int unisonSpreadTarget (int oscillator)               { return unisonDetuneTarget (numOscillators) + oscillator; }
+    inline constexpr int numTargets = unisonSpreadTarget (numOscillators);
 
     enum class Kind { volume, oscillatorOn, oscillatorLevel, oscillatorHarmonics, harmonic, filterOn, filterCutoff, filterResonance,
                       oscillatorTune, filterWidth, filterQ, filterDepth, harmonicTune, harmonicPhase, lfoRate, randomize,
-                      harmonicSwitch, oscillatorPan };
+                      harmonicSwitch, oscillatorPan, unisonVoices, unisonDetune, unisonSpread };
 
     struct TargetInfo
     {

@@ -12,6 +12,12 @@
 */
 struct Patch
 {
+    /** The most voices an oscillator's unison can stack. */
+    static constexpr int maxUnisonVoices = 8;
+
+    /** The furthest an oscillator's unison can detune its outermost voices, either way, in cents. */
+    static constexpr float mostUnisonDetune = 100.0f;
+
     /** Whether an oscillator slides into each note from the pitch of the note before: never, always, or only when
         played legato, while another key is still held.
     */
@@ -38,6 +44,14 @@ struct Patch
 
         /** Where it's panned, from 0, all the way left, to 1, all the way right. */
         float pan = 0.5f;
+
+        /** How many voices of it play, stacked, how far the outermost are detuned from its pitch, either way, in
+            cents, with the others evenly between them, and how widely they're spread either side of its pan, from 0
+            to 1, where the lowest is panned all the way left of it and the highest all the way right.
+        */
+        int unisonVoices = 1;
+        float unisonDetune = 20.0f;
+        float unisonSpread = 0.5f;
 
         /** Whether it's sent through each filter, or skips it, going straight on to the next. */
         std::array<bool, modulation::numFilters> filterSends { true, true, true, true };

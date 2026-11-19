@@ -184,6 +184,11 @@ oscillator's tune.
   middle it plays at its full level on both sides; panned away from it, the far side fades out. The sound tool
   measures both sides together, as it does a stereo sample, so leave pans in the middle to match a sample. Like
   any control, it can be moved, as `osc1Pan` in the modulation: an LFO on it swings the oscillator side to side.
+- `oscNUnison`, from 1 (off) to 8, stacks that many voices of the oscillator, detuned `oscNUnisonDetune` cents
+  either way at the outermost (0 to 100, 20 to begin with) and spread `oscNUnisonSpread` either side of its pan
+  (0 to 1, 0.5 to begin with), together about as loud as one voice. Use it for supersaws, string ensembles,
+  choirs and thick pads; a few voices and a few cents chorus a sound gently. Like any control, each can be moved
+  in the modulation by its key. Noise has no unison.
 - `oscNToFilterM`, true or false, true to begin with, sends oscillator N through filter M (1 to 4). The filters run
   in a chain, 1 to 4; an oscillator that isn't sent through one skips it, going straight on to the next. Use it to
   filter one part of a sound and not another, such as a low-passed body under an unfiltered noise attack.

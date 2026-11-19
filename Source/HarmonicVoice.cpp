@@ -95,7 +95,11 @@ void HarmonicVoice::startNote (int midiNoteNumber, float velocity, juce::Synthes
         glideLengths[i] = glides ? std::max (1.0, oscillator.glideSeconds * getSampleRate()) : 1.0;
     }
 
-    phases.fill (0.0);
+    // The first copy of each oscillator starts at the start of its cycle, as an oscillator without unison does. The
+    // others start spread through theirs, so they don't all peak together as the note starts.
+    for (auto& copies : phases)
+        for (size_t j = 0; j < copies.size(); ++j)
+            copies[j] = std::fmod ((double) j * 0.6180339887498949, 1.0);
     harmonicDrifts = {};
     noteVelocity = velocity;
 
@@ -269,6 +273,19 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
                                                                     tuning::getModulationScale (oscillator.tuneReach)))
                                   + (float) (getGlidingPitch (i) - noteNumber);
 
+        // Its unison, which white noise doesn't have. The number of voices moves along its slider's travel, from 1 to
+        // the most.
+        {
+            constexpr auto most = (float) (Patch::maxUnisonVoices - 1);
+            const auto voicesTarget = unisonVoicesTarget (i), spreadTarget = unisonSpreadTarget (i);
+            targets.unisonVoices[(size_t) i] = oscillator.noise ? 1
+                                             : 1 + juce::roundToInt (most * modulate (voicesTarget, (float) (oscillator.unisonVoices - 1) / most));
+            targets.unisonDetunes[(size_t) i] = modulate (unisonDetuneTarget (i), oscillator.unisonDetune / Patch::mostUnisonDetune)
+                                              * Patch::mostUnisonDetune / 100.0f;
+            targets.unisonSpreads[(size_t) i] = modulate (spreadTarget, oscillator.unisonSpread);
+            targets.unisonMoved[(size_t) i] = patch->isMoved (voicesTarget) || patch->isMoved (spreadTarget);
+        }
+
         // Its switch is triggered, switching it for every voice, rather than moved here.
         if (! oscillator.on)
             continue;
@@ -389,13 +406,35 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
     const auto targets = getTargets (startSample);
 
+    // Where each copy of each oscillator's heading: the copies evenly from the lowest, detuned down and panned
+    // left, to the highest, detuned up and panned right, and together as loud as one, by power, since they're out of
+    // step. A copy beyond the number playing fades out where it was.
+    std::array<std::array<float, maxCopies>, modulation::numOscillators> gainTargets {};
+    std::array<std::array<double, maxCopies>, modulation::numOscillators> detuneTargets = copyDetunes;
+    std::array<float, numUnits> panTargets = pans;
+
+    for (size_t i = 0; i < gainTargets.size(); ++i)
+    {
+        const auto count = (size_t) juce::jlimit (1, Patch::maxUnisonVoices, targets.unisonVoices[i]);
+
+        for (size_t j = 0; j < count; ++j)
+        {
+            const auto place = count > 1 ? 2.0f * (float) j / (float) (count - 1) - 1.0f : 0.0f;
+            gainTargets[i][j] = 1.0f / std::sqrt ((float) count);
+            detuneTargets[i][j] = place * targets.unisonDetunes[i];
+            panTargets[i * maxCopies + j] = juce::jlimit (0.0f, 1.0f, targets.pans[i] + 0.5f * place * targets.unisonSpreads[i]);
+        }
+    }
+
     if (startingNote)
     {
         cosines = targets.cosines;
         sines = targets.sines;
         harmonicTunes = targets.harmonicTunes;
         noiseLevels = targets.noiseLevels;
-        pans = targets.pans;
+        pans = panTargets;
+        copyGains = gainTargets;
+        copyDetunes = detuneTargets;
         sendLevels = targets.sends;
         laneMemories = {};
         previousLeads.fill (-1);
@@ -414,10 +453,16 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         filters[i].setTargets (targets.filters[i]);
 
     // Each chunk moves the harmonics and tunings its share of the way to their targets, so they follow smoothly
-    // however the targets move. A tuning holds steady through the chunk.
+    // however the targets move. A tuning holds steady through the chunk. Each copy of an oscillator plays at its
+    // tuning and its own detune.
     const auto glideSamples = std::max ((double) numSamples, glideSeconds * sampleRate);
     const auto glideShare = numSamples / glideSamples;
+    const auto setShare = std::min (1.0, numSamples / (0.02 * sampleRate));
     std::array<double, modulation::numOscillators> cyclesPerSample {};
+    std::array<std::array<double, maxCopies>, modulation::numOscillators> copyCyclesPerSample {};
+
+    // How loud each copy is at the start of the chunk, and at its end.
+    std::array<std::array<float, maxCopies>, modulation::numOscillators> gainsFrom = copyGains;
 
     for (size_t i = 0; i < tunes.size(); ++i)
     {
@@ -427,6 +472,23 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             tunes[i] = targets.tunes[i];
 
         cyclesPerSample[i] = frequency * tuning::toRatio (tunes[i]) / sampleRate;
+
+        for (size_t j = 0; j < maxCopies; ++j)
+        {
+            auto& detune = copyDetunes[i][j];
+            detune += (detuneTargets[i][j] - detune) * glideShare;
+
+            if (std::abs (detuneTargets[i][j] - detune) < 1.0e-5)
+                detune = detuneTargets[i][j];
+
+            copyCyclesPerSample[i][j] = frequency * tuning::toRatio (tunes[i] + detune) / sampleRate;
+
+            auto& copyGain = copyGains[i][j];
+            copyGain += (float) ((gainTargets[i][j] - copyGain) * (targets.unisonMoved[i] ? glideShare : setShare));
+
+            if (std::abs (gainTargets[i][j] - copyGain) < 1.0e-5f)
+                copyGain = gainTargets[i][j];
+        }
 
         for (size_t k = 2; k < harmonicTunes[i].size(); ++k)
         {
@@ -439,19 +501,11 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    // Each harmonic is a point going round a circle, turned by a fixed angle every sample, which is much cheaper
-    // than calling sin() every sample. The points are placed afresh from each oscillator's phase each chunk, so
-    // rounding errors can't build up. Only the harmonics that are playing, or gliding in or out, are worked out.
-    // A tuned harmonic turns at its own speed, k + tune times the fundamental's, and has drifted from where its
-    // whole number would be.
-    struct Playing
-    {
-        float cosine = 0.0f, sine = 0.0f, cosineStep = 0.0f, sineStep = 0.0f, bandLimit = 0.0f;
-        double x = 0.0, y = 0.0, turnX = 0.0, turnY = 0.0;
-        size_t oscillator = 0, harmonic = 1;
-    };
-
-    std::array<Playing, (size_t) (modulation::numOscillators * waveform::maxHarmonics)> playing;
+    // Each harmonic of each copy is a point going round a circle, turned by a fixed angle every sample, which is much
+    // cheaper than calling sin() every sample. The points are placed afresh from each copy's phase each chunk, so
+    // rounding errors can't build up. Only the harmonics that are playing, or gliding in or out, are worked out, of
+    // the copies that are playing or fading. A tuned harmonic turns at its own speed, k + tune times the
+    // fundamental's, and has drifted from where its whole number would be.
     size_t numPlaying = 0;
 
     for (size_t i = 0; i < cosines.size(); ++i)
@@ -474,26 +528,42 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                     continue;
             }
 
+            const auto cosineStep = (float) ((targetCosine - cosine) / glideSamples);
+            const auto sineStep = (float) ((targetSine - sine) / glideSamples);
+            const auto endCosine = cosine + (float) numSamples * cosineStep;
+            const auto endSine = sine + (float) numSamples * sineStep;
             const auto speed = (double) k + harmonicTunes[i][k];
-            const auto angle = twoPi * ((double) k * phases[i] + harmonicDrifts[i][k]);
-            const auto turn = twoPi * speed * cyclesPerSample[i];
 
-            auto& harmonic = playing[numPlaying++];
-            harmonic.cosine = cosine;
-            harmonic.sine = sine;
-            harmonic.cosineStep = (float) ((targetCosine - cosine) / glideSamples);
-            harmonic.sineStep = (float) ((targetSine - sine) / glideSamples);
-            harmonic.bandLimit = bandLimitGain (speed * cyclesPerSample[i] * sampleRate, sampleRate);
-            harmonic.x = std::cos (angle);
-            harmonic.y = std::sin (angle);
-            harmonic.turnX = std::cos (turn);
-            harmonic.turnY = std::sin (turn);
-            harmonic.oscillator = i;
-            harmonic.harmonic = k;
+            for (size_t j = 0; j < maxCopies; ++j)
+            {
+                const auto from = gainsFrom[i][j], to = copyGains[i][j];
+
+                if (from == 0.0f && to == 0.0f)
+                    continue;
+
+                const auto angle = twoPi * ((double) k * phases[i][j] + harmonicDrifts[i][k]);
+                const auto turn = twoPi * speed * copyCyclesPerSample[i][j];
+
+                auto& harmonic = playing[numPlaying++];
+                harmonic.cosine = from * cosine;
+                harmonic.sine = from * sine;
+                harmonic.cosineStep = (to * endCosine - from * cosine) / (float) numSamples;
+                harmonic.sineStep = (to * endSine - from * sine) / (float) numSamples;
+                harmonic.bandLimit = bandLimitGain (speed * copyCyclesPerSample[i][j] * sampleRate, sampleRate);
+                harmonic.x = std::cos (angle);
+                harmonic.y = std::sin (angle);
+                harmonic.turnX = std::cos (turn);
+                harmonic.turnY = std::sin (turn);
+                harmonic.unit = i * maxCopies + j;
+            }
+
+            cosine = endCosine;
+            sine = endSine;
         }
     }
 
-    // The oscillators playing white noise, or fading it out, each gliding to its level through the chunk.
+    // The oscillators playing white noise, or fading it out, each gliding to its level through the chunk. Noise has
+    // no unison, so it plays as the oscillator's first copy.
     struct Noise
     {
         float level = 0.0f, step = 0.0f;
@@ -514,33 +584,48 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         noises[numNoises++] = { noiseLevels[i], (float) ((targets.noiseLevels[i] - noiseLevels[i]) / glideSamples), i };
     }
 
-    // Each oscillator's pan glides to where it's set within 20 ms, so dragging it doesn't click, or where an LFO,
-    // envelope, velocity or the mod wheel moves it as quickly as they move other controls, its gains either side
-    // moving evenly through the chunk. So does each send to a filter, over 20 ms.
-    std::array<float, modulation::numOscillators> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
+    // Each copy's pan glides to where it's set within 20 ms, so dragging it doesn't click, or where an LFO,
+    // envelope, velocity or the mod wheel moves the oscillator's pan or its unison, as quickly as they move other
+    // controls, its gains either side moving evenly through the chunk. Each oscillator's send to a filter glides
+    // over 20 ms.
+    std::array<float, numUnits> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
     std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendFrom {}, sendSteps {};
-    const auto setShare = std::min (1.0, numSamples / (0.02 * sampleRate));
-    auto sounding = std::array<bool, modulation::numOscillators> {};
+    std::array<bool, numUnits> unitSounding {};
+    std::array<bool, modulation::numOscillators> sounding {};
 
     for (size_t i = 0; i < numPlaying; ++i)
-        sounding[playing[i].oscillator] = true;
+        unitSounding[playing[i].unit] = true;
 
     for (size_t i = 0; i < numNoises; ++i)
-        sounding[noises[i].oscillator] = true;
+        unitSounding[noises[i].oscillator * maxCopies] = true;
 
-    for (size_t i = 0; i < pans.size(); ++i)
+    std::array<size_t, numUnits> soundingUnits {};
+    size_t numSoundingUnits = 0;
+
+    for (size_t unit = 0; unit < numUnits; ++unit)
     {
-        const auto from = pans[i];
-        pans[i] += (float) ((targets.pans[i] - from) * (targets.pansMoved[i] ? glideShare : setShare));
+        const auto oscillator = unit / maxCopies;
+        const auto from = pans[unit];
+        const auto quick = targets.pansMoved[oscillator] || targets.unisonMoved[oscillator];
+        pans[unit] += (float) ((panTargets[unit] - from) * (quick ? glideShare : setShare));
 
-        if (std::abs (targets.pans[i] - pans[i]) < 1.0e-4f)
-            pans[i] = targets.pans[i];
+        if (std::abs (panTargets[unit] - pans[unit]) < 1.0e-4f)
+            pans[unit] = panTargets[unit];
 
-        leftGains[i] = Patch::Oscillator::panToLeftGain (from);
-        rightGains[i] = Patch::Oscillator::panToRightGain (from);
-        leftSteps[i] = (Patch::Oscillator::panToLeftGain (pans[i]) - leftGains[i]) / (float) numSamples;
-        rightSteps[i] = (Patch::Oscillator::panToRightGain (pans[i]) - rightGains[i]) / (float) numSamples;
+        leftGains[unit] = Patch::Oscillator::panToLeftGain (from);
+        rightGains[unit] = Patch::Oscillator::panToRightGain (from);
+        leftSteps[unit] = (Patch::Oscillator::panToLeftGain (pans[unit]) - leftGains[unit]) / (float) numSamples;
+        rightSteps[unit] = (Patch::Oscillator::panToRightGain (pans[unit]) - rightGains[unit]) / (float) numSamples;
 
+        if (unitSounding[unit])
+        {
+            soundingUnits[numSoundingUnits++] = unit;
+            sounding[oscillator] = true;
+        }
+    }
+
+    for (size_t i = 0; i < sendLevels.size(); ++i)
+    {
         for (size_t filter = 0; filter < sendLevels[i].size(); ++filter)
         {
             auto& send = sendLevels[i][filter];
@@ -563,31 +648,28 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         return true;
     };
 
-    // While every oscillator sounding is panned alike, which it is unless they've been panned apart, each lane's
-    // sound is worked out once, filtered once and then panned, as cheaply as in mono. Oscillators sent through the
-    // same filters, as they all are to begin with, share a lane.
+    // While every copy of every oscillator sounding is panned alike, which it is unless they've been panned or
+    // spread apart, each lane's sound is worked out once, filtered once and then panned, as cheaply as in mono.
+    // Oscillators sent through the same filters, as they all are to begin with, share a lane.
     auto panned = false;
-    auto firstSounding = -1;
+    const auto shared = numSoundingUnits > 0 ? soundingUnits[0] : (size_t) 0;
+
+    for (size_t n = 1; n < numSoundingUnits; ++n)
+    {
+        const auto unit = soundingUnits[n];
+
+        if (! juce::exactlyEqual (leftGains[unit], leftGains[shared]) || ! juce::exactlyEqual (rightGains[unit], rightGains[shared])
+            || ! juce::exactlyEqual (leftSteps[unit], leftSteps[shared]) || ! juce::exactlyEqual (rightSteps[unit], rightSteps[shared]))
+            panned = true;
+    }
+
     std::array<size_t, modulation::numOscillators> leads {}, laneOf {};
     size_t numLanes = 0;
 
-    for (size_t i = 0; i < pans.size(); ++i)
+    for (size_t i = 0; i < sounding.size(); ++i)
     {
         if (! sounding[i])
             continue;
-
-        if (firstSounding < 0)
-        {
-            firstSounding = (int) i;
-        }
-        else
-        {
-            const auto first = (size_t) firstSounding;
-
-            if (! juce::exactlyEqual (leftGains[i], leftGains[first]) || ! juce::exactlyEqual (rightGains[i], rightGains[first])
-                || ! juce::exactlyEqual (leftSteps[i], leftSteps[first]) || ! juce::exactlyEqual (rightSteps[i], rightSteps[first]))
-                panned = true;
-        }
 
         auto lane = numLanes;
 
@@ -619,15 +701,14 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
         previousLeads.fill (-1);
 
-        for (size_t i = 0; i < pans.size(); ++i)
+        for (size_t i = 0; i < sounding.size(); ++i)
             if (sounding[i])
                 previousLeads[i] = (int) leads[laneOf[i]];
     }
 
     const auto stereo = panned && output.getNumChannels() > 1;
-    const auto shared = (size_t) std::max (0, firstSounding);
     auto sharedLeft = leftGains[shared], sharedRight = rightGains[shared];
-    std::array<float, modulation::numOscillators> values {};
+    std::array<float, numUnits> values {};
 
     // A filter that's out, or that a lane isn't sent through, starts afresh when it's switched back in.
     std::array<bool, modulation::numFilters> filterActive {};
@@ -649,7 +730,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    // Each oscillator's sound is kept apart only when it has to be.
+    // Each copy's sound is kept apart only when it has to be.
     const auto apart = stereo || numLanes > 1;
     std::array<FilterStage::Step, modulation::numFilters> steps {};
 
@@ -663,7 +744,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             const auto contribution = harmonic.bandLimit * (harmonic.cosine * (float) harmonic.x + harmonic.sine * (float) harmonic.y);
 
             if (apart)
-                values[harmonic.oscillator] += contribution;
+                values[harmonic.unit] += contribution;
             else
                 value += contribution;
 
@@ -685,7 +766,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             const auto white = (float) (std::int32_t) noiseState * (1.0f / 2147483648.0f);
 
             if (apart)
-                values[noise.oscillator] += noise.level * white;
+                values[noise.oscillator * maxCopies] += noise.level * white;
             else
                 value += noise.level * white;
 
@@ -729,19 +810,21 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                 const auto lead = leads[l];
                 auto laneLeft = 0.0f, laneRight = 0.0f;
 
-                for (size_t i = 0; i < values.size(); ++i)
+                for (size_t n = 0; n < numSoundingUnits; ++n)
                 {
-                    if (! sounding[i] || laneOf[i] != l)
+                    const auto unit = soundingUnits[n];
+
+                    if (laneOf[unit / maxCopies] != l)
                         continue;
 
                     if (stereo)
                     {
-                        laneLeft += values[i] * leftGains[i];
-                        laneRight += values[i] * rightGains[i];
+                        laneLeft += values[unit] * leftGains[unit];
+                        laneRight += values[unit] * rightGains[unit];
                     }
                     else
                     {
-                        laneLeft += values[i];
+                        laneLeft += values[unit];
                     }
                 }
 
@@ -767,10 +850,11 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
             if (stereo)
             {
-                for (size_t i = 0; i < values.size(); ++i)
+                for (size_t n = 0; n < numSoundingUnits; ++n)
                 {
-                    leftGains[i] += leftSteps[i];
-                    rightGains[i] += rightSteps[i];
+                    const auto unit = soundingUnits[n];
+                    leftGains[unit] += leftSteps[unit];
+                    rightGains[unit] += rightSteps[unit];
                 }
             }
             else
@@ -783,7 +867,8 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                 sharedRight += rightSteps[shared];
             }
 
-            values.fill (0.0f);
+            for (size_t n = 0; n < numSoundingUnits; ++n)
+                values[soundingUnits[n]] = 0.0f;
         }
 
         const auto level = noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
@@ -809,16 +894,13 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     for (size_t i = 0; i < numNoises; ++i)
         noiseLevels[noises[i].oscillator] = noises[i].level;
 
-    for (size_t i = 0; i < numPlaying; ++i)
-    {
-        cosines[playing[i].oscillator][playing[i].harmonic] = playing[i].cosine;
-        sines[playing[i].oscillator][playing[i].harmonic] = playing[i].sine;
-    }
-
     for (size_t i = 0; i < phases.size(); ++i)
     {
-        phases[i] += numSamples * cyclesPerSample[i];
-        phases[i] -= std::floor (phases[i]);
+        for (size_t j = 0; j < maxCopies; ++j)
+        {
+            phases[i][j] += numSamples * copyCyclesPerSample[i][j];
+            phases[i][j] -= std::floor (phases[i][j]);
+        }
 
         for (size_t k = 2; k < harmonicDrifts[i].size(); ++k)
         {

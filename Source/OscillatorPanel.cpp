@@ -1,4 +1,4 @@
-#include "TuneSlider.h"
+#include "OscillatorPanel.h"
 
 #include "Modulation.h"
 #include "SynthProcessor.h"
@@ -12,7 +12,7 @@ namespace
     constexpr double snapPixels = 3.0;
 }
 
-TuneSlider::TuneSlider()
+OscillatorPanel::OscillatorPanel()
 {
     slider.setSliderStyle (juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
@@ -66,9 +66,23 @@ TuneSlider::TuneSlider()
     panSlider.setMouseClickGrabsKeyboardFocus (false);
     panSlider.setWantsKeyboardFocus (false);
     panSlider.setTitle ("Pan");
-    panSlider.onValueChange = [this] { repaint (panValueArea); };
-    panSlider.onLivePositionChange = [this] { repaint (panValueArea); };
+    panSlider.onValueChange = [this] { repaint (panCaptionArea); };
+    panSlider.onLivePositionChange = [this] { repaint (panCaptionArea); };
     addAndMakeVisible (panSlider);
+
+    // The unison's sliders, the number of voices in whole steps. The detune and spread are dimmed while there's only
+    // one voice, when they do nothing unless something moves the number up.
+    for (auto* unisonSlider : { &voicesSlider, &detuneSlider, &spreadSlider })
+    {
+        unisonSlider->setSliderStyle (juce::Slider::LinearHorizontal);
+        unisonSlider->setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        unisonSlider->setColour (juce::Slider::trackColourId, colours::dimText);
+        unisonSlider->setMouseClickGrabsKeyboardFocus (false);
+        unisonSlider->setWantsKeyboardFocus (false);
+        unisonSlider->onValueChange = [this] { showUnison(); };
+        unisonSlider->onLivePositionChange = [this] { showUnison(); };
+        addAndMakeVisible (*unisonSlider);
+    }
 
     zoomSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     zoomSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
@@ -109,12 +123,18 @@ TuneSlider::TuneSlider()
     moveWindow();
 }
 
-void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, int oscillator)
+void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& parameters, int oscillator)
 {
     const auto name = "Osc " + juce::String (oscillator + 1);
     slider.setTitle (name + " tune");
     panSlider.setTitle (name + " pan");
     modulatable::setTarget (panSlider, modulation::oscillatorPanTarget (oscillator));
+    voicesSlider.setTitle (name + " unison voices");
+    modulatable::setTarget (voicesSlider, modulation::unisonVoicesTarget (oscillator));
+    detuneSlider.setTitle (name + " unison detune");
+    modulatable::setTarget (detuneSlider, modulation::unisonDetuneTarget (oscillator));
+    spreadSlider.setTitle (name + " unison spread");
+    modulatable::setTarget (spreadSlider, modulation::unisonSpreadTarget (oscillator));
     zoomSlider.setTitle (name + " tune zoom");
     glideMode.setTitle (name + " glide");
     glideTimeSlider.setTitle (name + " glide time");
@@ -122,6 +142,9 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
 
     attachment.reset();
     panAttachment.reset();
+    voicesAttachment.reset();
+    detuneAttachment.reset();
+    spreadAttachment.reset();
     zoomAttachment.reset();
     glideModeAttachment.reset();
     glideTimeAttachment.reset();
@@ -135,6 +158,16 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     panAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::panId (oscillator)),
                                                                        panSlider);
     panSlider.setDoubleClickReturnValue (true, 0.5);
+    voicesAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::unisonVoicesId (oscillator)),
+                                                                          voicesSlider);
+    voicesSlider.setDoubleClickReturnValue (true, 1.0);
+    detuneAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::unisonDetuneId (oscillator)),
+                                                                          detuneSlider);
+    detuneSlider.setDoubleClickReturnValue (true, 20.0);
+    spreadAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::unisonSpreadId (oscillator)),
+                                                                          spreadSlider);
+    spreadSlider.setDoubleClickReturnValue (true, 0.5);
+    showUnison();
     zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneZoomId (oscillator)),
                                                                         zoomSlider);
 
@@ -170,37 +203,38 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     moveWindow();
 }
 
-void TuneSlider::setPanOnly (bool shouldBePanOnly)
+void OscillatorPanel::setPanOnly (bool shouldBePanOnly)
 {
     if (panOnly == shouldBePanOnly)
         return;
 
     panOnly = shouldBePanOnly;
 
-    for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider })
+    for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider,
+                                                                     &voicesSlider, &detuneSlider, &spreadSlider })
         component->setVisible (! panOnly);
 
     resized();
     repaint();
 }
 
-int TuneSlider::getGlideMode() const noexcept
+int OscillatorPanel::getGlideMode() const noexcept
 {
     return glideMode.getChosen();
 }
 
-void TuneSlider::setZoom (float zoom)
+void OscillatorPanel::setZoom (float zoom)
 {
     zoomSlider.setValue (zoom, juce::sendNotificationSync);
     moveWindow();
 }
 
-float TuneSlider::getZoom() const
+float OscillatorPanel::getZoom() const
 {
     return (float) zoomSlider.getValue();
 }
 
-void TuneSlider::showTune (float semitones)
+void OscillatorPanel::showTune (float semitones)
 {
     tune = semitones;
 
@@ -213,7 +247,7 @@ void TuneSlider::showTune (float semitones)
     repaint();
 }
 
-void TuneSlider::moveWindow()
+void OscillatorPanel::moveWindow()
 {
     window = tuning::getWindow (tune, tuning::zoomToReach (getZoom()));
     slider.setRange (window.low, window.high);
@@ -221,72 +255,134 @@ void TuneSlider::moveWindow()
     repaint();
 }
 
-double TuneSlider::getSnapDistance() const
+double OscillatorPanel::getSnapDistance() const
 {
     return snapPixels * (window.high - window.low) / std::max (1, slider.getWidth());
 }
 
-void TuneSlider::resized()
+void OscillatorPanel::showUnison()
 {
-    auto area = getLocalBounds();
+    const auto voices = juce::roundToInt (voicesSlider.getValue());
+    const auto moved = modulatable::getLivePosition (voicesSlider).has_value();
 
-    auto panRow = area.removeFromTop (16);
-    panCaptionArea = panRow.removeFromLeft (48);
-    panValueArea = panRow.removeFromRight (86);
-    panRow.removeFromRight (8);
-    panSlider.setBounds (panRow);
-    area.removeFromTop (3);
+    for (auto* unisonSlider : { &detuneSlider, &spreadSlider })
+        unisonSlider->setAlpha (voices > 1 || moved ? 1.0f : 0.4f);
 
-    captionArea = area.removeFromTop (16);
-    area.removeFromTop (3);
-
-    auto zoomRow = area.removeFromTop (16);
-    zoomCaptionArea = zoomRow.removeFromLeft (48);
-    zoomValueArea = zoomRow.removeFromRight (86);
-    zoomRow.removeFromRight (8);
-    zoomSlider.setBounds (zoomRow);
-    area.removeFromTop (3);
-
-    slider.setBounds (area.removeFromTop (22));
-    tickArea = area.removeFromTop (16);
-    area.removeFromTop (6);
-
-    // The routing comes straight under the pan when that's all there is, as for an oscillator playing noise.
-    auto routingRow = panOnly ? area.removeFromTop (22) : area.removeFromBottom (22);
-    routingCaptionArea = routingRow.removeFromLeft (70);
-    filtersButton.setBounds (routingRow.removeFromLeft (86));
-    routingRow.removeFromLeft (10);
-    routingValueArea = routingRow;
-
-    if (panOnly)
-        return;
-
-    area.removeFromBottom (8);
-
-    auto glideRow = area.removeFromTop (22);
-    glideCaptionArea = glideRow.removeFromLeft (48);
-    glideMode.setBounds (glideRow.removeFromLeft (156));
-    glideRow.removeFromLeft (10);
-    glideValueArea = glideRow.removeFromRight (56);
-    glideRow.removeFromRight (8);
-    glideTimeSlider.setBounds (glideRow);
+    repaint();
 }
 
-void TuneSlider::paint (juce::Graphics& g)
+void OscillatorPanel::resized()
+{
+    auto area = getLocalBounds();
+    dividers.clear();
+
+    constexpr auto captionHeight = 14, sliderHeight = 16, rowGap = 4;
+
+    // A caption, with its figure at the right, over a slider.
+    const auto captionedSlider = [&area] (juce::Rectangle<int>& caption, juce::Slider& sliderUnder)
+    {
+        caption = area.removeFromTop (captionHeight);
+        area.removeFromTop (1);
+        sliderUnder.setBounds (area.removeFromTop (sliderHeight));
+    };
+
+    // The sections fit in the least height, and spread apart in more, with a line between each two.
+    const auto numSections = panOnly ? 2 : 5;
+    constexpr auto panHeight = captionHeight + 1 + sliderHeight;
+    constexpr auto unisonHeight = captionHeight + 3 * (panHeight + rowGap);
+    constexpr auto tuneHeight = captionHeight + 2 + panHeight + 2 + 20 + 16;
+    constexpr auto glideHeight = 22 + rowGap + sliderHeight;
+    constexpr auto routingHeight = 22;
+    const auto content = panOnly ? panHeight + routingHeight : panHeight + unisonHeight + tuneHeight + glideHeight + routingHeight;
+    const auto gap = juce::jlimit (12, 36, (area.getHeight() - content) / (numSections - 1));
+
+    const auto divide = [&area, gap, this]
+    {
+        area.removeFromTop (gap / 2);
+        dividers.push_back (area.removeFromTop (1));
+        area.removeFromTop (gap - gap / 2 - 1);
+    };
+
+    captionedSlider (panCaptionArea, panSlider);
+    divide();
+
+    // The routing comes straight under the pan when that's all there is, as for an oscillator playing noise.
+    const auto layOutRouting = [this, &area]
+    {
+        auto routingRow = area.removeFromTop (22);
+        routingCaptionArea = routingRow.removeFromLeft (70);
+        filtersButton.setBounds (routingRow.removeFromLeft (76));
+        routingRow.removeFromLeft (8);
+        routingValueArea = routingRow;
+    };
+
+    if (panOnly)
+    {
+        layOutRouting();
+        return;
+    }
+
+    unisonCaptionArea = area.removeFromTop (captionHeight);
+
+    for (auto [caption, unisonSlider] : { std::pair (&voicesCaptionArea, &voicesSlider), std::pair (&detuneCaptionArea, &detuneSlider),
+                                          std::pair (&spreadCaptionArea, &spreadSlider) })
+    {
+        area.removeFromTop (rowGap);
+        auto row = area.removeFromTop (panHeight);
+        *caption = row.removeFromTop (captionHeight);
+        row.removeFromTop (1);
+        unisonSlider->setBounds (row.withTrimmedLeft (12));
+        caption->setLeft (caption->getX() + 12);
+    }
+
+    divide();
+
+    captionArea = area.removeFromTop (captionHeight);
+    area.removeFromTop (2);
+    captionedSlider (zoomCaptionArea, zoomSlider);
+    area.removeFromTop (2);
+    slider.setBounds (area.removeFromTop (20));
+    tickArea = area.removeFromTop (16);
+    divide();
+
+    auto glideRow = area.removeFromTop (22);
+    glideCaptionArea = glideRow.removeFromLeft (52);
+    glideMode.setBounds (glideRow.removeFromLeft (juce::jmin (156, glideRow.getWidth())));
+    area.removeFromTop (rowGap);
+    auto timeRow = area.removeFromTop (sliderHeight);
+    glideValueArea = timeRow.removeFromRight (64);
+    timeRow.removeFromRight (8);
+    glideTimeSlider.setBounds (timeRow);
+    divide();
+
+    layOutRouting();
+}
+
+void OscillatorPanel::paint (juce::Graphics& g)
 {
     const auto whole = tuning::toWholeSemitones (tune);
 
-    g.setFont (fonts::caption());
-    g.setColour (colours::dimText);
-    g.drawText ("PAN", panCaptionArea, juce::Justification::centredLeft);
+    g.setColour (colours::outline);
 
-    g.setFont (fonts::body (12.0f));
+    for (const auto& divider : dividers)
+        g.fillRect (divider);
+
+    // A caption, with a figure at the right, brighter when something's moved the control it's for.
+    const auto drawCaption = [&g] (const juce::String& caption, const juce::String& figure, juce::Rectangle<int> area, bool moved)
+    {
+        g.setFont (fonts::caption());
+        g.setColour (colours::dimText);
+        g.drawText (caption, area, juce::Justification::centredLeft);
+        g.setFont (fonts::body (12.0f));
+        g.setColour (moved ? colours::text : colours::dimText);
+        g.drawText (figure, area, juce::Justification::centredRight);
+    };
+
     const auto movedPan = modulatable::getLivePosition (panSlider);
-    g.setColour (movedPan.has_value() ? colours::text : colours::dimText);
-    g.drawText (SynthProcessor::panToText (movedPan.value_or ((float) panSlider.getValue())), panValueArea, juce::Justification::centredRight);
-    g.setColour (colours::dimText);
+    drawCaption ("PAN", SynthProcessor::panToText (movedPan.value_or ((float) panSlider.getValue())), panCaptionArea, movedPan.has_value());
 
     // The routing: which filters the oscillator's sent through.
+    g.setColour (colours::dimText);
     g.setFont (fonts::caption());
     g.drawText ("ROUTING", routingCaptionArea, juce::Justification::centredLeft);
 
@@ -305,9 +401,26 @@ void TuneSlider::paint (juce::Graphics& g)
     if (panOnly)
         return;
 
+    // The unison, its figures following where something moves them.
     g.setFont (fonts::caption());
+    g.setColour (colours::dimText);
+    g.drawText ("UNISON", unisonCaptionArea, juce::Justification::centredLeft);
+
+    const auto movedVoices = modulatable::getLivePosition (voicesSlider);
+    const auto voices = movedVoices.has_value() ? 1 + juce::roundToInt (*movedVoices * (float) (Patch::maxUnisonVoices - 1))
+                                                : juce::roundToInt (voicesSlider.getValue());
+    const auto movedDetune = modulatable::getLivePosition (detuneSlider);
+    const auto movedSpread = modulatable::getLivePosition (spreadSlider);
+    drawCaption ("VOICES", SynthProcessor::unisonVoicesToText (voices), voicesCaptionArea, movedVoices.has_value());
+    drawCaption ("DETUNE", SynthProcessor::unisonDetuneToText (movedDetune.has_value() ? *movedDetune * Patch::mostUnisonDetune
+                                                                                       : (float) detuneSlider.getValue()),
+                 detuneCaptionArea, movedDetune.has_value());
+    drawCaption ("SPREAD", SynthProcessor::unisonSpreadToText (movedSpread.value_or ((float) spreadSlider.getValue())),
+                 spreadCaptionArea, movedSpread.has_value());
+
+    g.setFont (fonts::caption());
+    g.setColour (colours::dimText);
     g.drawText ("TUNE", captionArea, juce::Justification::centredLeft);
-    g.drawText ("ZOOM", zoomCaptionArea, juce::Justification::centredLeft);
     g.drawText ("GLIDE", glideCaptionArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
@@ -316,9 +429,7 @@ void TuneSlider::paint (juce::Graphics& g)
                 captionArea, juce::Justification::centredRight);
 
     // How far either side the scale reaches.
-    g.setFont (fonts::body (12.0f));
-    g.setColour (colours::dimText);
-    g.drawText (tuning::reachToText ((window.high - window.low) / 2.0f), zoomValueArea, juce::Justification::centredRight);
+    drawCaption ("ZOOM", tuning::reachToText ((window.high - window.low) / 2.0f), zoomCaptionArea, false);
     g.setColour (colours::dimText.withAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f));
     g.drawText (SynthProcessor::glideTimeToText ((float) glideTimeSlider.getValue()), glideValueArea, juce::Justification::centredRight);
 

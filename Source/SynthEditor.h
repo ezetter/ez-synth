@@ -16,7 +16,7 @@
 #include "SourceCard.h"
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
-#include "TuneSlider.h"
+#include "OscillatorPanel.h"
 #include "WaveGrid.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -126,7 +126,7 @@ private:
     CardStrip filterStrip { 2 };
     WaveGrid grid;
     HarmonicSliders harmonicSliders;
-    TuneSlider tuneSlider;
+    OscillatorPanel oscillatorPanel;
     LfoPanel lfoPanel;
     std::array<std::unique_ptr<FilterPanel>, modulation::numFilters> filterPanels;
     std::array<std::unique_ptr<EnvelopePanel>, SynthProcessor::numEnvelopes> envelopePanels;
@@ -166,7 +166,7 @@ private:
     /** Names what's under the mouse, for controls that show a picture rather than a word, such as the filter types. */
     juce::TooltipWindow tooltipWindow { this, 500 };
 
-    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, tuneDivider, volumePanel, volumeCaption, volumeValue;
+    juce::Rectangle<int> titleArea, noteArea, sidePanel, harmonicsCaption, oscillatorPanelArea, oscillatorCaption, volumePanel, volumeCaption, volumeValue;
 
     Shown shown;
     std::array<SynthProcessor::LiveWave, SynthProcessor::numOscillators> liveWaves;

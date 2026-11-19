@@ -27,6 +27,12 @@ namespace modulation
 
         if (target == volumeTarget)
             info.kind = Kind::volume;
+        else if (target >= unisonSpreadTarget (0))
+            info = { Kind::unisonSpread, target - unisonSpreadTarget (0) };
+        else if (target >= unisonDetuneTarget (0))
+            info = { Kind::unisonDetune, target - unisonDetuneTarget (0) };
+        else if (target >= unisonVoicesTarget (0))
+            info = { Kind::unisonVoices, target - unisonVoicesTarget (0) };
         else if (target >= oscillatorPanTarget (0))
             info = { Kind::oscillatorPan, target - oscillatorPanTarget (0) };
         else if (target >= harmonicSwitchTarget (0, 1))
@@ -95,6 +101,9 @@ namespace modulation
             case Kind::randomize:            return oscillator + " randomize";
             case Kind::harmonicSwitch:       return oscillator + " harmonic " + juce::String (info.harmonic) + " switch";
             case Kind::oscillatorPan:        return oscillator + " pan";
+            case Kind::unisonVoices:         return oscillator + " unison voices";
+            case Kind::unisonDetune:         return oscillator + " unison detune";
+            case Kind::unisonSpread:         return oscillator + " unison spread";
         }
 
         return {};
@@ -126,6 +135,9 @@ namespace modulation
             case Kind::randomize:            return oscillator + "Randomize";
             case Kind::harmonicSwitch:       return oscillator + "Harmonic" + juce::String (info.harmonic) + "Switch";
             case Kind::oscillatorPan:        return oscillator + "Pan";
+            case Kind::unisonVoices:         return oscillator + "Unison";
+            case Kind::unisonDetune:         return oscillator + "UnisonDetune";
+            case Kind::unisonSpread:         return oscillator + "UnisonSpread";
         }
 
         return {};
@@ -291,13 +303,14 @@ namespace modulation
             return keepInTravel (target, position + scale * assignment.offset (envelope.level));
 
         // A control that goes round comes back to rest the shorter way, to its nearest whole turn. An LFO's rate
-        // comes back to where it's set, so the LFO carries on at its own rate, and so does a pan, rather than
-        // swinging all the way left as the note fades.
+        // comes back to where it's set, so the LFO carries on at its own rate, and so do a pan, rather than
+        // swinging all the way left as the note fades, and an oscillator's unison.
         const auto atKeyUp = position + scale * assignment.offset (envelope.releaseFrom);
         const auto kind = describe (target).kind;
         const auto rest = goesRound (target) ? std::round (atKeyUp)
-                        : kind == Kind::lfoRate || kind == Kind::oscillatorPan ? position
-                                                                               : getRestPosition (target);
+                        : kind == Kind::lfoRate || kind == Kind::oscillatorPan || kind == Kind::unisonVoices
+                              || kind == Kind::unisonDetune || kind == Kind::unisonSpread ? position
+                                                                                          : getRestPosition (target);
         const auto from = goesRound (target) ? atKeyUp : juce::jlimit (0.0f, 1.0f, atKeyUp);
         return keepInTravel (target, rest + (from - rest) * juce::jlimit (0.0f, 1.0f, envelope.releaseLeft));
     }

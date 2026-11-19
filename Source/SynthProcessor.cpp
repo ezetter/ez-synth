@@ -204,7 +204,21 @@ namespace
                 std::make_unique<juce::AudioParameterBool> (
                     juce::ParameterID { SynthProcessor::filterSendId (i, 2), 1 }, name + " to Filter 3", true),
                 std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::filterSendId (i, 3), 1 }, name + " to Filter 4", true)));
+                    juce::ParameterID { SynthProcessor::filterSendId (i, 3), 1 }, name + " to Filter 4", true),
+                std::make_unique<juce::AudioParameterInt> (
+                    juce::ParameterID { SynthProcessor::unisonVoicesId (i), 1 }, name + " Unison Voices", 1, Patch::maxUnisonVoices, 1,
+                    juce::AudioParameterIntAttributes()
+                        .withStringFromValueFunction ([] (int voices, int) { return SynthProcessor::unisonVoicesToText (voices); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::unisonDetuneId (i), 1 }, name + " Unison Detune",
+                    juce::NormalisableRange<float> (0.0f, Patch::mostUnisonDetune), 20.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float cents, int) { return SynthProcessor::unisonDetuneToText (cents); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::unisonSpreadId (i), 1 }, name + " Unison Spread",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); }))));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -359,6 +373,25 @@ juce::String SynthProcessor::filterSendId (int oscillator, int filter)
 
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
+juce::String SynthProcessor::unisonVoicesId (int oscillator)   { return modulation::getKey (modulation::unisonVoicesTarget (oscillator)); }
+juce::String SynthProcessor::unisonDetuneId (int oscillator)   { return modulation::getKey (modulation::unisonDetuneTarget (oscillator)); }
+juce::String SynthProcessor::unisonSpreadId (int oscillator)   { return modulation::getKey (modulation::unisonSpreadTarget (oscillator)); }
+
+juce::String SynthProcessor::unisonVoicesToText (int voices)
+{
+    return voices <= 1 ? juce::String ("Off") : juce::String (voices) + " voices";
+}
+
+juce::String SynthProcessor::unisonDetuneToText (float cents)
+{
+    return juce::String (juce::CharPointer_UTF8 ("\xc2\xb1 ")) + juce::String (juce::roundToInt (cents)) + " cents";
+}
+
+juce::String SynthProcessor::unisonSpreadToText (float spread)
+{
+    return juce::String (juce::roundToInt (juce::jlimit (0.0f, 1.0f, spread) * 100.0f)) + "%";
+}
+
 juce::String SynthProcessor::panToText (float pan)
 {
     const auto right = juce::roundToInt (juce::jlimit (0.0f, 1.0f, pan) * 100.0f);
@@ -509,7 +542,8 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
                                         find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)),
                                         find (noiseId (i)), find (panId (i)),
                                         { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
-                                          find (filterSendId (i, 3)) } };
+                                          find (filterSendId (i, 3)) },
+                                        find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -1190,6 +1224,9 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.glideSeconds = source.glideTime->load();
         oscillator.noise = source.noise->load() >= 0.5f;
         oscillator.pan = source.pan->load();
+        oscillator.unisonVoices = juce::jlimit (1, Patch::maxUnisonVoices, juce::roundToInt (source.unisonVoices->load()));
+        oscillator.unisonDetune = source.unisonDetune->load();
+        oscillator.unisonSpread = source.unisonSpread->load();
 
         for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
             oscillator.filterSends[filter] = source.filterSends[filter]->load() >= 0.5f;

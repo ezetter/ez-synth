@@ -16,7 +16,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 - **The window** has two rows of cards across the top, the grid under them, and the volume, envelopes and filters
   under that. Down the right, from the cards to the filters, is a tall panel with the chosen oscillator's
-  harmonics, with big dials, or what the chosen LFO moves. The window can be resized, down to 1420 by 900.
+  harmonics, with big dials, or what the chosen LFO moves. Left of the grid is the oscillator's own panel, with
+  its pan, unison, tune, glide and routing, from top to bottom. The window can be resized, down to 1420 by 900.
 - **Choose an oscillator or LFO.** Across the top are the oscillators' cards, then the LFOs'. Three of the
   six oscillators show at a time: swipe sideways on the trackpad over the row, turn a mouse wheel, or drag the
   thin scroll bar under it to see the others, as with the LFOs. Click a card to show its wave on the grid; its
@@ -29,7 +30,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   off.
 - **Set each oscillator's level** with the dial on its card, from 0 to 100% of its full amplitude.
   Double-click a dial to reset it to 100%.
-- **Tune an oscillator** with the **Tune** slider at the foot of the panel beside the grid, anywhere from
+- **Tune an oscillator** with the **Tune** slider in the oscillator's panel, left of the grid, anywhere from
   two octaves below the note to two octaves above. The middle of the slider, marked with a longer tick, is in
   tune. Ticks mark each semitone, and the major and perfect intervals are marked either way, 2 to 15: a
   major 2nd, 3rd, 6th and 7th, a perfect 4th and 5th, and the octave, then the same an octave further, the
@@ -39,7 +40,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the interval, such as *+7 st · perfect 5th* or *−7 st · perfect 5th below*, and the interval's number
   lights up. Double-click it to put it back in tune. An oscillator that's tuned shows how far on its card,
   and the harmonics' frequencies beside the sliders are its own.
-- **Pan an oscillator** with the **Pan** slider at the top of the tune panel, from all the way left to all the
+- **Pan an oscillator** with the **Pan** slider at the top of the oscillator's panel, from all the way left to all the
   way right; the figure beside it gives the share each side, **L 50% · R 50%** to begin with. In the middle,
   the oscillator plays at its full level on both sides, as it always did, so sounds made before there was pan
   play as they did; panned to one side, the far side fades out, reaching silence all the way over. Pan two
@@ -49,8 +50,18 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the oscillator from side to side, and the figure beside the slider follows where it's moved to. An envelope's
   release brings it back to where it's set, rather than all the way left. In mono,
   as in a mono track in a host, the two sides are played together.
+- **Unison** stacks voices of an oscillator, for a thick, wide sound, with the three sliders under the pan.
+  **Voices** sets how many play, from **Off**, one, as to begin with, up to 8. **Detune** sets how far apart
+  they're tuned, as the cents the lowest and highest are from the oscillator's pitch, either way, up to 100,
+  with the rest evenly between; 20 cents to begin with. **Spread** sets how widely they're spread from side to
+  side either side of the oscillator's pan: the lowest to the left, the highest to the right, all the way out
+  at 100%; 50% to begin with. The voices start out of step with each other, so they don't all peak together,
+  and play together about as loud as one. Detune and Spread are dimmed while there's only one voice. Like the
+  pan, each can be right-clicked to have an LFO, envelope, velocity or the mod wheel move it, such as an LFO
+  swinging the spread, or velocity adding voices to harder notes; the figures beside them follow. Voices added
+  or taken away fade in or out over 20 ms, so changing them mid-note doesn't click. Noise has no unison.
 - **Route an oscillator through the filters** you choose: click **Filters**, on the **Routing** row at the
-  foot of the oscillator's panel, below the glide. A screen opens over the synth, with buttons along the top
+  foot of the oscillator's panel, left of the grid, below the glide. A screen opens over the synth, with buttons along the top
   to choose the oscillator, and a switch for each filter, beside its type and cutoff. The filters run in a
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
@@ -89,10 +100,10 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   can glide while another jumps straight to the note, or two can glide at different speeds.
 - **Noise.** The **Noise** switch at the top of the grid, left of the preset waves, makes the oscillator play
   white noise instead of its harmonics: every frequency at once, a new random value from −1 to 1 every
-  sample. The preset waves and the drawing controls go, and so do the harmonics, the tune and the glide,
-  which noise has no use for, leaving its pan; its level and switch still count, as do the LFOs and envelopes on them, and
+  sample. The preset waves and the drawing controls go, and so do the harmonics, the unison, the tune and the
+  glide, which noise has no use for, leaving its pan and routing; its level and switch still count, as do the LFOs and envelopes on them, and
   the filters shape it. The grid shows the noise itself, the last 10 ms or so the newest note played, moving
-  as it plays and marked **As played**, or faint sample noise while no note plays it; the oscillator's card
+  as it plays, or faint sample noise while no note plays it; the oscillator's card
   shows it too. Each note plays noise of its own, so a chord's notes don't play the same noise. Each pitch set
   can switch it separately, as with every setting.
 
@@ -412,8 +423,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   moves, with each one's range, phase and polarity. Click one to change it, or its cross to stop the LFO
   moving it.
 - **Watch the wave change.** While anything moves an oscillator's harmonics, or how many it has, the grid
-  draws its sine waves, and their sum, where they've been moved to, many times a second, and says
-  **As played** in light blue. The drawn wave stays as you drew it, so you can see how far the sound has
+  draws its sine waves, and their sum, where they've been moved to, many times a second. The drawn wave stays as you drew it, so you can see how far the sound has
   moved from it. The oscillator's card above follows along too. The grid stretches to fit a harmonic
   raised beyond it, and holds that scale while the harmonics swing, so the picture doesn't jump.
 
@@ -774,6 +784,14 @@ save pictures of the window showing several waves.
   Otherwise, as in every sound panned in the middle, the oscillators are added up and filtered once, then
   panned, as cheaply as in mono. A pan glides to where it's set within 20 ms, so dragging it doesn't click;
   one an LFO, envelope, velocity or the mod wheel moves follows within 1.5 ms, as other moved controls do.
+- **Unison.** Each oscillator's unison voices are copies of its harmonics, each turning at its own detuned
+  speed from its own phase, the first from the start of its cycle and the others spread through theirs by the
+  golden ratio. N voices sit evenly from −detune to +detune and, pan ± spread / 2, from left to right, each at
+  1/√N, so together they're as loud as one, by power, being out of step. A copy beyond the number playing fades
+  out over 20 ms where it was, and one coming in fades in, quicker when something moves the number. Each copy
+  is panned on its own, so voices spread apart keep the sound apart, as panned oscillators do; with no spread
+  they're added up and filtered once. Unison multiplies the harmonics worked out, so 8 voices of 16 harmonics
+  cost as much as 8 oscillators.
 - **Routing.** Oscillators sent through the same filters share a lane, which is filtered once; all of them
   do to begin with, so routing costs nothing until an oscillator's routed differently. Each lane has its own
   memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
@@ -829,7 +847,7 @@ save pictures of the window showing several waves.
 | `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
-| `Source/TuneSlider.*` | The tune slider, with its intervals marked, the zoom slider above it, the pan slider above that, and the glide and routing rows below |
+| `Source/OscillatorPanel.*` | The oscillator's panel left of the grid: its pan, its unison's voices, detune and spread, its tune slider, with its intervals marked, and the zoom slider above it, then its glide and routing rows |
 | `Source/RoutingScreen.*` | The routing screen, setting which filters each oscillator's sent through |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |

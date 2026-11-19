@@ -3218,18 +3218,18 @@ namespace
         // Zooming in on the tune slider never changes the tune, even one beyond the part of the scale shown.
         {
             SynthProcessor zoomed;
-            TuneSlider tuneSlider;
-            tuneSlider.setBounds (0, 0, 340, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (zoomed.parameters, 0);
-            const auto shows = [&tuneSlider] (float from, float to)
+            OscillatorPanel oscillatorPanel;
+            oscillatorPanel.setBounds (0, 0, 340, OscillatorPanel::preferredHeight);
+            oscillatorPanel.setOscillator (zoomed.parameters, 0);
+            const auto shows = [&oscillatorPanel] (float from, float to)
             {
-                return juce::exactlyEqual (tuneSlider.getWindow().low, from) && juce::exactlyEqual (tuneSlider.getWindow().high, to);
+                return juce::exactlyEqual (oscillatorPanel.getWindow().low, from) && juce::exactlyEqual (oscillatorPanel.getWindow().high, to);
             };
 
             check (shows (-24.0f, 24.0f), "the tune slider starts zoomed right out, two octaves either side");
 
             setParameter (zoomed, SynthProcessor::tuneId (0), 7.0f);
-            tuneSlider.setZoom (1.0f);
+            oscillatorPanel.setZoom (1.0f);
             check (shows (6.0f, 8.0f) && isNear (zoomed.getTune (0), 7.0, 1.0e-6),
                    "zoomed right in, it shows the semitone either side of the tune, and leaves the tune as it was");
 
@@ -3237,19 +3237,19 @@ namespace
             check (shows (-1.0f, 1.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5),
                    "a tune set from elsewhere, beyond the part shown, moves the scale to it without changing it");
 
-            tuneSlider.setZoom (0.0f);
+            oscillatorPanel.setZoom (0.0f);
             check (shows (-24.0f, 24.0f) && isNear (zoomed.getTune (0), -0.2, 1.0e-5), "zooming out shows the whole range again");
 
             // The zoom is the oscillator's own control, saved with the sound: setting it from elsewhere, as undoing
             // or loading a sound does, zooms the slider.
-            tuneSlider.setZoom (0.5f);
+            oscillatorPanel.setZoom (0.5f);
             check (isNear (zoomed.parameters.getParameter (SynthProcessor::tuneZoomId (0))->getValue(), 0.5, 1.0e-6),
                    "zooming the tune slider sets the oscillator's zoom");
             setParameter (zoomed, SynthProcessor::tuneZoomId (0), 1.0f);
-            check (shows (-1.0f, 1.0f) && isNear (tuneSlider.getZoom(), 1.0, 1.0e-6), "setting the oscillator's zoom zooms the slider");
+            check (shows (-1.0f, 1.0f) && isNear (oscillatorPanel.getZoom(), 1.0, 1.0e-6), "setting the oscillator's zoom zooms the slider");
 
             setParameter (zoomed, SynthProcessor::tuneZoomId (1), 0.0f);
-            tuneSlider.setOscillator (zoomed.parameters, 1);
+            oscillatorPanel.setOscillator (zoomed.parameters, 1);
             check (shows (-24.0f, 24.0f), "each oscillator has a zoom of its own");
         }
 
@@ -3437,12 +3437,12 @@ namespace
         {
             // The tune slider's Glide row sets the oscillator's glide.
             SynthProcessor shown;
-            TuneSlider tuneSlider;
-            tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (shown.parameters, 2);
-            check (tuneSlider.getGlideMode() == 0, "the tune slider shows the oscillator's glide");
+            OscillatorPanel oscillatorPanel;
+            oscillatorPanel.setBounds (0, 0, 348, OscillatorPanel::preferredHeight);
+            oscillatorPanel.setOscillator (shown.parameters, 2);
+            check (oscillatorPanel.getGlideMode() == 0, "the tune slider shows the oscillator's glide");
             setParameter (shown, SynthProcessor::glideId (2), 2.0f);
-            check (tuneSlider.getGlideMode() == 2, "...and follows it as it's set from elsewhere");
+            check (oscillatorPanel.getGlideMode() == 2, "...and follows it as it's set from elsewhere");
 
             // The number of harmonics is set with a slider from 1 to 16, which follows the oscillator it's switched to.
             HarmonicSelector selector (*shown.parameters.getParameter (SynthProcessor::harmonicsId (0)));
@@ -3636,6 +3636,141 @@ namespace
         }
     }
 
+    void testUnison()
+    {
+        std::cout << "Unison" << std::endl;
+
+        const auto sine = []
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            return synth;
+        };
+
+        const auto rms = [] (const std::vector<float>& signal)
+        {
+            auto sum = 0.0;
+
+            for (const auto value : signal)
+                sum += (double) value * value;
+
+            return std::sqrt (sum / (double) std::max ((size_t) 1, signal.size()));
+        };
+
+        const auto low = 440.0 * std::pow (2.0, -0.5 / 12.0), high = 440.0 * std::pow (2.0, 0.5 / 12.0);
+
+        {
+            SynthProcessor synth;
+            check (juce::approximatelyEqual (synth.parameters.getRawParameterValue (SynthProcessor::unisonVoicesId (0))->load(), 1.0f)
+                     && SynthProcessor::unisonVoicesToText (1) == "Off" && SynthProcessor::unisonVoicesToText (4) == "4 voices"
+                     && SynthProcessor::unisonDetuneToText (20.0f) == juce::String (juce::CharPointer_UTF8 ("\xc2\xb1 20 cents"))
+                     && SynthProcessor::unisonSpreadToText (0.5f) == "50%",
+                   "an oscillator starts with its unison off, one voice, 20 cents of detune and a 50% spread");
+        }
+
+        // Three voices detuned 50 cents either way play the note and a quarter tone either side of it, all in the
+        // middle with no spread, about as loud together as one.
+        {
+            auto single = sine();
+            const auto alone = playSides (*single, 69, 0.8, 0.9).first;
+
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::unisonVoicesId (0), 3.0f);
+            setParameter (*synth, SynthProcessor::unisonDetuneId (0), 50.0f);
+            setParameter (*synth, SynthProcessor::unisonSpreadId (0), 0.0f);
+            const auto [left, right] = playSides (*synth, 69, 0.8, 0.9);
+            const auto steady = slice (left, 0.2, 0.7);
+            check (amplitudeAt (steady, low) > 0.03 && amplitudeAt (steady, 440.0) > 0.03 && amplitudeAt (steady, high) > 0.03,
+                   "unison voices play detuned either side of the note, and at it");
+            check (left == right, "...in the middle with no spread");
+            const auto ratio = rms (steady) / rms (slice (alone, 0.2, 0.7));
+            check (ratio > 0.6 && ratio < 1.5, "...about as loud together as one voice alone");
+        }
+
+        // Two voices spread all the way play the lower on the left and the higher on the right.
+        {
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::unisonVoicesId (0), 2.0f);
+            setParameter (*synth, SynthProcessor::unisonDetuneId (0), 50.0f);
+            setParameter (*synth, SynthProcessor::unisonSpreadId (0), 1.0f);
+            const auto [left, right] = playSides (*synth, 69, 0.8, 0.9);
+            const auto steadyLeft = slice (left, 0.2, 0.7), steadyRight = slice (right, 0.2, 0.7);
+            check (amplitudeAt (steadyLeft, low) > 10.0 * amplitudeAt (steadyRight, low)
+                     && amplitudeAt (steadyRight, high) > 10.0 * amplitudeAt (steadyLeft, high),
+                   "a full spread plays the lowest voice on the left and the highest on the right");
+        }
+
+        // Changing the number of voices while a note plays fades them in, without a click.
+        {
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::unisonDetuneId (0), 30.0f);
+            synth->prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> played;
+
+            for (int block = 0; block < 40; ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+                if (block == 20)
+                    setParameter (*synth, SynthProcessor::unisonVoicesId (0), 8.0f);
+
+                synth->processBlock (buffer, midi);
+                played.insert (played.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            auto biggestJump = 0.0f;
+
+            for (size_t i = 1; i < played.size(); ++i)
+                biggestJump = std::max (biggestJump, std::abs (played[i] - played[i - 1]));
+
+            check (biggestJump < 0.1f, "voices added while a note plays fade in, without a click");
+        }
+
+        // An LFO, envelope, velocity or the mod wheel can move the number of voices, the detune and the spread.
+        {
+            check (modulation::getName (modulation::unisonVoicesTarget (1)) == "Osc 2 unison voices"
+                     && modulation::getName (modulation::unisonDetuneTarget (1)) == "Osc 2 unison detune"
+                     && modulation::getName (modulation::unisonSpreadTarget (1)) == "Osc 2 unison spread"
+                     && SynthProcessor::unisonVoicesId (1) == "osc2Unison" && SynthProcessor::unisonDetuneId (1) == "osc2UnisonDetune"
+                     && SynthProcessor::unisonSpreadId (1) == "osc2UnisonSpread"
+                     && modulation::findTarget ("osc2UnisonSpread") == modulation::unisonSpreadTarget (1)
+                     && modulation::isParameter (modulation::unisonVoicesTarget (1)),
+                   "each oscillator's unison voices, detune and spread are controls an LFO can move, by their parameters' IDs");
+
+            auto synth = sine();
+            setParameter (*synth, SynthProcessor::unisonVoicesId (0), 2.0f);
+            setParameter (*synth, SynthProcessor::unisonDetuneId (0), 50.0f);
+            setParameter (*synth, SynthProcessor::unisonSpreadId (0), 0.5f);
+            setLfo (*synth, 0, 0.5f, false, waveform::Preset::sine);
+            synth->setAssignment (modulation::unisonSpreadTarget (0), { 0, 1.0f, false });
+            const auto [left, right] = playSides (*synth, 69, 0.9, 1.0);
+            // How different the two sides are, which they aren't with no spread.
+            const auto apartAt = [&left, &right, &rms] (double from)
+            {
+                const auto leftPart = slice (left, from, from + 0.04), rightPart = slice (right, from, from + 0.04);
+                std::vector<float> difference;
+
+                for (size_t i = 0; i < leftPart.size(); ++i)
+                    difference.push_back (leftPart[i] - rightPart[i]);
+
+                return rms (difference) / rms (leftPart);
+            };
+            check (apartAt (0.105) > 0.5 && apartAt (0.355) < 0.05,
+                   "an LFO on the spread swings the voices apart and back together");
+
+            SynthProcessor loaded;
+            check (sound::load (loaded, sound::toJson (*synth, true)).loaded
+                     && loaded.getAssignment (modulation::unisonSpreadTarget (0)) == synth->getAssignment (modulation::unisonSpreadTarget (0))
+                     && juce::approximatelyEqual (loaded.parameters.getRawParameterValue (SynthProcessor::unisonVoicesId (0))->load(), 2.0f)
+                     && isNear (loaded.parameters.getRawParameterValue (SynthProcessor::unisonDetuneId (0))->load(), 50.0, 1.0e-3),
+                   "the unison, and what moves it, are kept in a sound's description");
+        }
+    }
+
     void testFilterRouting()
     {
         std::cout << "Filter routing" << std::endl;
@@ -3758,7 +3893,7 @@ namespace
             shown.editedSource = 2;
             synthEditor.refresh();
 
-            auto* tune = findChild<TuneSlider> (*editor);
+            auto* tune = findChild<OscillatorPanel> (*editor);
             check (tune != nullptr && tune->onShowFilterRouting != nullptr, "under the glide, a Filters button opens the routing");
             tune->onShowFilterRouting();
 
@@ -3968,7 +4103,7 @@ namespace
             auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
             auto* grid = findChild<WaveGrid> (*editor);
             auto* sliders = findChild<HarmonicSliders> (*editor);
-            auto* tune = findChild<TuneSlider> (*editor);
+            auto* tune = findChild<OscillatorPanel> (*editor);
             shown.editedSource = 0;
             synthEditor.refresh();
             check (grid != nullptr && ! grid->isNoise() && sliders->isVisible() && tune->isVisible(),
@@ -6437,18 +6572,18 @@ namespace
         {
             SynthProcessor tuned;
             SynthLookAndFeel lookAndFeel;
-            TuneSlider tuneSlider;
-            tuneSlider.setLookAndFeel (&lookAndFeel);
-            tuneSlider.setBounds (0, 0, 348, TuneSlider::preferredHeight);
-            tuneSlider.setOscillator (tuned.parameters, 0);
+            OscillatorPanel oscillatorPanel;
+            oscillatorPanel.setLookAndFeel (&lookAndFeel);
+            oscillatorPanel.setBounds (0, 0, 348, OscillatorPanel::preferredHeight);
+            oscillatorPanel.setOscillator (tuned.parameters, 0);
 
-            const auto saveTuneSlider = [&folder, &tuneSlider] (const juce::String& name)
+            const auto saveOscillatorPanel = [&folder, &oscillatorPanel] (const juce::String& name)
             {
-                juce::Image image (juce::Image::ARGB, tuneSlider.getWidth() * 2 + 64, tuneSlider.getHeight() * 2 + 48, true);
+                juce::Image image (juce::Image::ARGB, oscillatorPanel.getWidth() * 2 + 64, oscillatorPanel.getHeight() * 2 + 48, true);
                 juce::Graphics g (image);
                 g.fillAll (colours::panel);
                 g.addTransform (juce::AffineTransform::scale (2.0f).translated (32.0f, 24.0f));
-                tuneSlider.paintEntireComponent (g, false);
+                oscillatorPanel.paintEntireComponent (g, false);
 
                 const auto file = folder.getChildFile (name + ".png");
                 file.deleteFile();
@@ -6457,20 +6592,20 @@ namespace
             };
 
             setParameter (tuned, SynthProcessor::tuneId (0), -7.0f);
-            saveTuneSlider ("13-tune-zoomed-out");
+            saveOscillatorPanel ("13-tune-zoomed-out");
 
             setParameter (tuned, SynthProcessor::tuneId (0), 0.15f);
-            tuneSlider.setZoom (1.0f);
-            modulatable::setLivePosition (*tuneSlider.getChildComponent (0), tuning::toPosition (-0.32f));
-            saveTuneSlider ("13a-tune-zoomed-in");
+            oscillatorPanel.setZoom (1.0f);
+            modulatable::setLivePosition (*oscillatorPanel.getChildComponent (0), tuning::toPosition (-0.32f));
+            saveOscillatorPanel ("13a-tune-zoomed-in");
 
             setParameter (tuned, SynthProcessor::tuneId (0), 7.0f);
-            tuneSlider.setZoom (0.5f);
+            oscillatorPanel.setZoom (0.5f);
             setParameter (tuned, SynthProcessor::glideId (0), 2.0f);
             setParameter (tuned, SynthProcessor::glideTimeId (0), 0.35f);
-            modulatable::setLivePosition (*tuneSlider.getChildComponent (0), std::nullopt);
-            saveTuneSlider ("13b-tune-zoomed-partway-legato");
-            tuneSlider.setLookAndFeel (nullptr);
+            modulatable::setLivePosition (*oscillatorPanel.getChildComponent (0), std::nullopt);
+            saveOscillatorPanel ("13b-tune-zoomed-partway-legato");
+            oscillatorPanel.setLookAndFeel (nullptr);
         }
 
         // The standalone app's window, playing from a MIDI keyboard, as a note arrives.
@@ -6554,6 +6689,7 @@ int main (int argc, char* argv[])
     testNoise();
     testPan();
     testFilterRouting();
+    testUnison();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

@@ -73,6 +73,19 @@ public:
     /** Where a pan sends the sound, as its shares either way, such as "L 50% · R 50%", "L 25% · R 75%" or "L 100%". */
     static juce::String panToText (float pan);
 
+    /** The IDs of an oscillator's unison: how many voices of it play, stacked, from 1, as it starts, to 8, how far the
+        outermost are detuned from its pitch, either way, in cents, and how widely they're spread from side to side,
+        from 0, all where the oscillator's panned, to 1, from all the way left of it to all the way right.
+    */
+    static juce::String unisonVoicesId (int oscillator);
+    static juce::String unisonDetuneId (int oscillator);
+    static juce::String unisonSpreadId (int oscillator);
+
+    /** How the unison's voices, detune and spread are shown, such as "4 voices", "± 20 cents" and "50%". */
+    static juce::String unisonVoicesToText (int voices);
+    static juce::String unisonDetuneToText (float cents);
+    static juce::String unisonSpreadToText (float spread);
+
     /** The IDs of a filter's parameters: whether it's on, its type, its cutoff frequency in hertz, its resonance, as a
         low or high pass, its width in octaves, as a mid pass, and its Q and depth in decibels, as a notch.
     */
@@ -693,6 +706,9 @@ private:
         std::atomic<float>* noise = nullptr;
         std::atomic<float>* pan = nullptr;
         std::array<std::atomic<float>*, modulation::numFilters> filterSends {};
+        std::atomic<float>* unisonVoices = nullptr;
+        std::atomic<float>* unisonDetune = nullptr;
+        std::atomic<float>* unisonSpread = nullptr;
     };
 
     struct FilterParameters

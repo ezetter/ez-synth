@@ -75,7 +75,7 @@ target_sources(EZSynth
         Source/SynthLookAndFeel.cpp
         Source/SynthProcessor.cpp
         Source/Tuning.cpp
-        Source/TuneSlider.cpp
+        Source/OscillatorPanel.cpp
         Source/WaveGrid.cpp
         Source/Waveform.cpp)
 

@@ -95,7 +95,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
 
     addAndMakeVisible (grid);
     addChildComponent (harmonicSliders);
-    addChildComponent (tuneSlider);
+    addChildComponent (oscillatorPanel);
     addChildComponent (harmonicSelector);
     addChildComponent (lfoPanel);
 
@@ -183,7 +183,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     routingScreen.onClose = [this] { showRoutingScreen (false); };
     routingScreen.onOscillatorChosen = [this] (int oscillator) { editSource (oscillator); };
     addChildComponent (routingScreen);
-    tuneSlider.onShowFilterRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource); };
+    oscillatorPanel.onShowFilterRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource); };
 
     pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
     pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
@@ -223,7 +223,7 @@ void SynthEditor::paint (juce::Graphics& g)
     g.setFont (fonts::body (13.0f));
     g.drawText ("Draw a wave. Hear its harmonics.", title, juce::Justification::topLeft);
 
-    for (const auto& panel : { sidePanel, volumePanel })
+    for (const auto& panel : { sidePanel, oscillatorPanelArea, volumePanel })
     {
         g.setColour (colours::panel);
         g.fillRoundedRectangle (panel.toFloat(), 10.0f);
@@ -249,9 +249,18 @@ void SynthEditor::paint (juce::Graphics& g)
     else if (! SynthProcessor::isLfo (edited))
     {
         g.drawText ("OSC " + juce::String (edited + 1) + " HARMONICS", harmonicsCaption, juce::Justification::centredLeft);
-        g.setColour (colours::outline);
-        g.fillRect (tuneDivider);
-        g.setColour (colours::dimText);
+    }
+
+    // Beside the wave, the oscillator's pan, unison, tune, glide and routing, which an LFO doesn't have, so it says so.
+    g.setFont (fonts::caption());
+    g.setColour (colours::dimText);
+
+    if (SynthProcessor::isLfo (edited))
+    {
+        g.drawText ("LFO " + juce::String (edited - SynthProcessor::numOscillators + 1), oscillatorCaption, juce::Justification::centredLeft);
+        g.setFont (fonts::body (13.0f));
+        g.drawFittedText ("An LFO has no pan, unison, tune, glide or routing. Choose an oscillator's card to set its own.",
+                          oscillatorPanelArea.reduced (14).withTop (oscillatorCaption.getBottom() + 10), juce::Justification::topLeft, 6);
     }
 
     g.drawText ("VOLUME", volumeCaption, juce::Justification::centred);
@@ -326,7 +335,7 @@ void SynthEditor::resized()
 
     // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
     // tall enough for big dials.
-    sidePanel = area.removeFromRight (juce::jlimit (400, 460, area.getWidth() * 3 / 10));
+    sidePanel = area.removeFromRight (juce::jlimit (380, 460, area.getWidth() * 27 / 100));
     area.removeFromRight (14);
 
     // The oscillators, then the LFOs, with a wider gap between the two. Three of each show at a time, each row
@@ -364,7 +373,18 @@ void SynthEditor::resized()
     volumeKnob.setBounds (volume);
 
     area.removeFromBottom (14);
+
+    // Beside the wave, the chosen oscillator's pan, unison, tune, glide and routing, leaving the wave room for the
+    // controls along its top.
+    constexpr auto gridRoom = 716;
+    oscillatorPanelArea = area.removeFromLeft (juce::jlimit (256, 360, area.getWidth() - 14 - gridRoom));
+    area.removeFromLeft (14);
     grid.setBounds (area);
+
+    // The panel's sections, which say which oscillator they're for no more than the wave beside them does.
+    const auto oscillatorSide = oscillatorPanelArea.reduced (14, 12);
+    oscillatorCaption = oscillatorSide.withHeight (18);
+    oscillatorPanel.setBounds (oscillatorSide);
 
     auto side = sidePanel.reduced (16, 14);
     lfoPanel.setBounds (side);
@@ -373,12 +393,6 @@ void SynthEditor::resized()
     side.removeFromTop (6);
     harmonicSelector.setBounds (side.removeFromTop (HarmonicSelector::preferredHeight));
     side.removeFromTop (10);
-
-    // The oscillator's tune, at the foot of the panel.
-    tuneSlider.setBounds (side.removeFromBottom (TuneSlider::preferredHeight));
-    side.removeFromBottom (8);
-    tuneDivider = side.removeFromBottom (1);
-    side.removeFromBottom (7);
     harmonicSliders.setBounds (side);
 }
 
@@ -511,8 +525,8 @@ void SynthEditor::refresh()
         randomizeButton.setVisible (harmonicsShown);
         harmonicSliders.setVisible (harmonicsShown);
         // A noise oscillator has no tune or glide, but it's still panned.
-        tuneSlider.setVisible (! editingLfo);
-        tuneSlider.setPanOnly (! harmonicsShown);
+        oscillatorPanel.setVisible (! editingLfo);
+        oscillatorPanel.setPanOnly (! harmonicsShown);
         lfoPanel.setVisible (editingLfo);
         grid.setNoise (editingLfo ? std::nullopt : std::optional (now.noise[(size_t) edited]));
 
@@ -532,7 +546,7 @@ void SynthEditor::refresh()
                 harmonicSelector.setOscillator (edited);
                 harmonicSliders.setOscillator (edited);
                 modulatable::setTarget (randomizeButton, modulation::randomizeTarget (edited));
-                tuneSlider.setOscillator (synthProcessor.parameters, edited);
+                oscillatorPanel.setOscillator (synthProcessor.parameters, edited);
             }
 
             const auto harmonics = getPlayedHarmonics (edited);
@@ -566,6 +580,7 @@ void SynthEditor::refresh()
         }
 
         repaint (sidePanel);
+        repaint (oscillatorPanelArea);
         shown = now;
 
         // Controls may now set other targets, such as the harmonic sliders when another oscillator is chosen.

@@ -258,13 +258,13 @@ void WaveGrid::resized()
 {
     // How the wave is drawn, at the right of the header.
     auto header = getHeaderArea().toNearestInt();
-    stepCount.setBounds (header.removeFromRight (80).withSizeKeepingCentre (80, 22));
+    stepCount.setBounds (header.removeFromRight (72).withSizeKeepingCentre (72, 22));
     header.removeFromRight (8);
-    drawMode.setBounds (header.removeFromRight (132).withSizeKeepingCentre (132, 22));
+    drawMode.setBounds (header.removeFromRight (116).withSizeKeepingCentre (116, 22));
 
     // The preset waves to the left of the drawing's caption, then an LFO's random switch.
-    header.removeFromRight (64);
-    presetButtons.setBounds (header.removeFromRight (288).withSizeKeepingCentre (288, 22));
+    header.removeFromRight (56);
+    presetButtons.setBounds (header.removeFromRight (264).withSizeKeepingCentre (264, 22));
     header.removeFromRight (10);
     randomSwitch.setBounds (header.removeFromRight (84).withSizeKeepingCentre (84, 22));
     noiseSwitch.setBounds (randomSwitch.getBounds());
@@ -452,30 +452,22 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
     const auto header = getHeaderArea();
     const auto name = (lfoPeriod.has_value() ? "LFO " : "OSC ") + juce::String (sourceNumber);
 
-    // The caption, in full if it fits before the controls, or just the source's name.
+    // The caption, in full if it fits before the controls, or just the source's name. An oscillator's is just its
+    // name, leaving the controls room.
     const auto controlsLeft = (float) (randomSwitch.isVisible() ? randomSwitch.getX()
                                      : noiseSwitch.isVisible() ? noiseSwitch.getX() : presetButtons.getX());
-    const auto movedShown = noise ? noisePlayed : movedPartials.has_value() && ! lfoPeriod.has_value();
-    const auto fullCaption = name + "  " + dot + "  " + (lfoPeriod.has_value() ? "ONE PERIOD" : noise ? "WHITE NOISE" : "ONE WAVELENGTH");
+    const auto fullCaption = lfoPeriod.has_value() ? name + "  " + dot + "  ONE PERIOD"
+                           : noise                 ? name + "  " + dot + "  WHITE NOISE"
+                                                   : name;
     const auto fits = [&] (const juce::String& text)
     {
-        return juce::GlyphArrangement::getStringWidth (fonts::caption(), text + (movedShown ? "  " + dot + "  AS PLAYED" : juce::String()))
-               <= controlsLeft - header.getX() - 16.0f;
+        return juce::GlyphArrangement::getStringWidth (fonts::caption(), text) <= controlsLeft - header.getX() - 16.0f;
     };
     const auto caption = fits (fullCaption) ? fullCaption : name;
 
     g.setFont (fonts::caption());
     g.setColour (colours::dimText);
     g.drawText (caption, header, juce::Justification::centredLeft);
-
-    // Says when the harmonics are shown where something has moved them, in the colour of anything moving controls.
-    if (movedShown)
-    {
-        const auto captionWidth = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  ");
-        g.setColour (colours::modulation);
-        g.drawText (dot + "  AS PLAYED", header.withTrimmedLeft (captionWidth), juce::Justification::centredLeft);
-        g.setColour (colours::dimText);
-    }
 
     // How the wave is drawn, with its caption.
     if (! noise)
@@ -486,7 +478,7 @@ void WaveGrid::paintHeader (juce::Graphics& g) const
 
     // Between the caption and the controls, a hint for drawing, or that the source is off: the longest that fits.
     // Noise has no controls to its right, so its hint goes there.
-    const auto captionRight = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption + "  " + dot + "  AS PLAYED") + 20.0f;
+    const auto captionRight = juce::GlyphArrangement::getStringWidth (fonts::caption(), caption) + 20.0f;
     const auto hintArea = noise && on ? header.withLeft ((float) noiseSwitch.getRight() + 20.0f)
                                       : header.withRight (controlsLeft - 20.0f).withTrimmedLeft (captionRight);
     const auto sourceName = name.toLowerCase().replace ("osc", "Osc").replace ("lfo", "LFO");

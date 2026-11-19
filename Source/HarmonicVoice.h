@@ -98,6 +98,13 @@ private:
         std::array<float, modulation::numOscillators> pans {};
         std::array<bool, modulation::numOscillators> pansMoved {};
 
+        /** How many voices of each oscillator's unison play, how far the outermost are detuned, in semitones, and how
+            widely they're spread, from 0 to 1, and whether anything moves the number or the spread.
+        */
+        std::array<int, modulation::numOscillators> unisonVoices {};
+        std::array<float, modulation::numOscillators> unisonDetunes {}, unisonSpreads {};
+        std::array<bool, modulation::numOscillators> unisonMoved {};
+
         /** How much of each oscillator is sent through each filter: 1 if it is, 0 if it skips it. */
         std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sends {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
@@ -155,8 +162,16 @@ private:
     // samples of it each oscillator played, in a ring that's written at the position given.
     std::array<float, modulation::numOscillators> noiseLevels {};
 
-    // Where each oscillator is panned, gliding quickly to where it's set, so moving it doesn't click.
-    std::array<float, modulation::numOscillators> pans {};
+    // Each oscillator plays as many voices as its unison has, each a copy of its harmonics, detuned and panned
+    // apart from the others. Each copy is a unit, numbered from the oscillator's first. A copy fades in or out as
+    // the number of voices changes, and glides to its detune.
+    static constexpr size_t maxCopies = (size_t) Patch::maxUnisonVoices;
+    static constexpr size_t numUnits = (size_t) modulation::numOscillators * maxCopies;
+    std::array<std::array<double, maxCopies>, modulation::numOscillators> copyDetunes {};
+    std::array<std::array<float, maxCopies>, modulation::numOscillators> copyGains {};
+
+    // Where each copy of each oscillator is panned, gliding quickly to where it's set, so moving it doesn't click.
+    std::array<float, numUnits> pans {};
     std::uint32_t noiseState = 0x9e3779b9u;
     std::array<std::array<float, (size_t) recentNoiseLength>, modulation::numOscillators> recentNoise {};
     size_t recentNoisePosition = 0;
@@ -173,7 +188,18 @@ private:
         has its own of, when it carries on from where it was as the note started, at the note's own rate.
     */
     std::array<double, modulation::numLfos> lfoPeriods {};
-    std::array<double, modulation::numOscillators> phases {};   // how far through its wave's cycle each oscillator is, from 0 to 1
+    // How far through its wave's cycle each copy of each oscillator is, from 0 to 1.
+    std::array<std::array<double, maxCopies>, modulation::numOscillators> phases {};
+
+    /** A harmonic of a copy of an oscillator that's playing, or gliding in or out, as a chunk plays it. */
+    struct Playing
+    {
+        float cosine = 0.0f, sine = 0.0f, cosineStep = 0.0f, sineStep = 0.0f, bandLimit = 0.0f;
+        double x = 0.0, y = 0.0, turnX = 0.0, turnY = 0.0;
+        size_t unit = 0;
+    };
+
+    std::array<Playing, numUnits * (size_t) waveform::maxHarmonics> playing;
     double frequency = 440.0;
 
     /** How far below or above the note, in semitones, each oscillator started as it glides into it, and how long
