@@ -3636,6 +3636,148 @@ namespace
         }
     }
 
+    void testFilterRouting()
+    {
+        std::cout << "Filter routing" << std::endl;
+
+        {
+            SynthProcessor fresh;
+            auto allSent = true;
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                for (int filter = 0; filter < modulation::numFilters; ++filter)
+                    allSent = allSent && fresh.parameters.getRawParameterValue (SynthProcessor::filterSendId (i, filter))->load() >= 0.5f;
+
+            check (allSent && SynthProcessor::filterSendId (1, 2) == "osc2ToFilter3", "to start with, every oscillator is sent through every filter");
+        }
+
+        // Two oscillators an octave apart, A4 and A5, with the first filter a low pass at 300 Hz.
+        const auto twoOctaves = []
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            setPreset (*synth, 1, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::onId (1), 1.0f);
+            setParameter (*synth, SynthProcessor::tuneId (1), 12.0f);
+            setFilter (*synth, SynthProcessor::filterIds (0), true, 300.0f);
+            return synth;
+        };
+
+        {
+            auto synth = twoOctaves();
+            const auto both = slice (play (*synth, 69, 0.6, 0.8), 0.2, 0.5);
+            check (amplitudeAt (both, 880.0) < 0.3 * amplitudeAt (both, 440.0), "sent through a low pass, both oscillators are filtered");
+
+            setParameter (*synth, SynthProcessor::filterSendId (1, 0), 0.0f);
+            const auto skipped = slice (play (*synth, 69, 0.6, 0.8), 0.2, 0.5);
+            check (amplitudeAt (skipped, 880.0) > 5.0 * amplitudeAt (both, 880.0) && amplitudeAt (skipped, 880.0) > 2.0 * amplitudeAt (skipped, 440.0)
+                     && isNear (amplitudeAt (skipped, 440.0), amplitudeAt (both, 440.0), 0.05),
+                   "an oscillator that isn't sent through it skips it, and the other's still filtered as it was");
+
+            setParameter (*synth, SynthProcessor::filterSendId (1, 1), 0.0f);
+            setFilter (*synth, SynthProcessor::filterIds (1), true, 600.0f);
+            const auto afterSkipping = slice (play (*synth, 69, 0.6, 0.8), 0.2, 0.5);
+            setParameter (*synth, SynthProcessor::filterSendId (1, 1), 1.0f);
+            const auto throughSecond = slice (play (*synth, 69, 0.6, 0.8), 0.2, 0.5);
+            check (amplitudeAt (afterSkipping, 440.0) < 0.6 * amplitudeAt (skipped, 440.0)
+                     && isNear (amplitudeAt (afterSkipping, 880.0), amplitudeAt (skipped, 880.0), 0.02)
+                     && amplitudeAt (throughSecond, 880.0) < 0.95 * amplitudeAt (afterSkipping, 880.0),
+                   "...going straight on to the next filter, a high pass at 600 Hz, which still filters the other");
+        }
+
+        // Panned apart as well, each side has its own oscillator, filtered or not.
+        {
+            auto synth = twoOctaves();
+            setParameter (*synth, SynthProcessor::panId (0), 0.0f);
+            setParameter (*synth, SynthProcessor::panId (1), 1.0f);
+            setParameter (*synth, SynthProcessor::filterSendId (1, 0), 0.0f);
+
+            auto middle = twoOctaves();
+            setParameter (*middle, SynthProcessor::filterSendId (0, 0), 0.0f);
+            setParameter (*middle, SynthProcessor::onId (1), 0.0f);
+            const auto unfiltered = amplitudeAt (slice (play (*middle, 69, 0.6, 0.8), 0.2, 0.5), 440.0);
+
+            const auto [left, right] = playSides (*synth, 69, 0.6, 0.8);
+            check (amplitudeAt (slice (left, 0.2, 0.5), 440.0) < 0.5 * unfiltered && amplitudeAt (slice (left, 0.2, 0.5), 880.0) < 0.001
+                     && amplitudeAt (slice (right, 0.2, 0.5), 880.0) > 0.9 * unfiltered && amplitudeAt (slice (right, 0.2, 0.5), 440.0) < 0.001,
+                   "panned apart, the filtered oscillator's on the left and the one that skips the filter's on the right");
+        }
+
+        // Switching a send while a note plays fades it across, without a click.
+        {
+            auto synth = twoOctaves();
+            synth->prepareToPlay (sampleRate, blockSize);
+            juce::AudioBuffer<float> buffer (2, blockSize);
+            std::vector<float> switched;
+
+            for (int block = 0; block < 40; ++block)
+            {
+                juce::MidiBuffer midi;
+
+                if (block == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 69, 1.0f), 0);
+
+                if (block == 20)
+                    setParameter (*synth, SynthProcessor::filterSendId (1, 0), 0.0f);
+
+                synth->processBlock (buffer, midi);
+                switched.insert (switched.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + blockSize);
+            }
+
+            auto biggestJump = 0.0f;
+
+            for (size_t i = 1; i < switched.size(); ++i)
+                biggestJump = std::max (biggestJump, std::abs (switched[i] - switched[i - 1]));
+
+            const auto end = (double) switched.size() / sampleRate;
+            const auto after = slice (switched, end - 0.1, end);
+            check (biggestJump < 0.1f && amplitudeAt (after, 880.0) > 2.0 * amplitudeAt (after, 440.0),
+                   "switching a send while a note plays fades it across, without a click");
+        }
+
+        // Kept with the sound and in a description; a sound from before there were sends is sent through every filter.
+        {
+            auto synth = twoOctaves();
+            setParameter (*synth, SynthProcessor::filterSendId (2, 3), 0.0f);
+            SynthProcessor loaded;
+            check (sound::load (loaded, sound::toJson (*synth, true)).loaded
+                     && loaded.parameters.getRawParameterValue (SynthProcessor::filterSendId (2, 3))->load() < 0.5f
+                     && loaded.parameters.getRawParameterValue (SynthProcessor::filterSendId (2, 2))->load() >= 0.5f,
+                   "which filters an oscillator's sent through is kept in a sound's description");
+
+            setParameter (loaded, SynthProcessor::filterSendId (0, 0), 0.0f);
+            check (loaded.loadFactoryPreset ("Acid Bass") && loaded.parameters.getRawParameterValue (SynthProcessor::filterSendId (0, 0))->load() >= 0.5f,
+                   "a preset saved before there were sends sends every oscillator through every filter");
+        }
+
+        // The Filters button under the glide opens the routing screen, whose switches set the sends.
+        {
+            SynthProcessor shown;
+            std::unique_ptr<juce::AudioProcessorEditor> editor (shown.createEditorAndMakeActive());
+            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
+            shown.editedSource = 2;
+            synthEditor.refresh();
+
+            auto* tune = findChild<TuneSlider> (*editor);
+            check (tune != nullptr && tune->onShowFilterRouting != nullptr, "under the glide, a Filters button opens the routing");
+            tune->onShowFilterRouting();
+
+            auto& screen = synthEditor.getRoutingScreen();
+            check (synthEditor.isRoutingScreenShown() && screen.getOscillator() == 2, "...on a screen of its own, for the oscillator being edited");
+
+            screen.getSendSwitch (1).setToggleState (false, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::filterSendId (2, 1))->load() < 0.5f
+                     && shown.parameters.getRawParameterValue (SynthProcessor::filterSendId (2, 0))->load() >= 0.5f,
+                   "...where a filter's switch sets whether the oscillator's sent through it");
+
+            screen.showOscillator (4);
+            check (screen.getSendSwitch (1).getToggleState(), "...and another oscillator's switches are its own");
+
+            screen.doneButton.onClick();
+            check (! synthEditor.isRoutingScreenShown(), "Done closes it");
+        }
+    }
+
     void testNoise()
     {
         std::cout << "Noise" << std::endl;
@@ -6130,6 +6272,16 @@ namespace
         save ("10b-modulation-overview");
         synthEditor.showModulationOverview (false);
 
+        // The routing screen, for oscillator 2, sent through filters 1 and 3 but not 2 or 4.
+        setParameter (synth, SynthProcessor::filterSendId (1, 1), 0.0f);
+        setParameter (synth, SynthProcessor::filterSendId (1, 3), 0.0f);
+        synthEditor.showRoutingScreen (true, 1);
+        synthEditor.refresh();
+        save ("10f-routing");
+        synthEditor.showRoutingScreen (false);
+        setParameter (synth, SynthProcessor::filterSendId (1, 1), 1.0f);
+        setParameter (synth, SynthProcessor::filterSendId (1, 3), 1.0f);
+
         // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
         // added, waiting for its highest key.
         {
@@ -6401,6 +6553,7 @@ int main (int argc, char* argv[])
     testGlide();
     testNoise();
     testPan();
+    testFilterRouting();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

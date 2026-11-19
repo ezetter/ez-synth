@@ -65,6 +65,11 @@ public:
     */
     static juce::String panId (int oscillator);
 
+    /** The ID of whether an oscillator's sent through a filter, both numbered from 0, as they all are to begin with.
+        One that isn't skips that filter, going straight on to the next in the chain.
+    */
+    static juce::String filterSendId (int oscillator, int filter);
+
     /** Where a pan sends the sound, as its shares either way, such as "L 50% · R 50%", "L 25% · R 75%" or "L 100%". */
     static juce::String panToText (float pan);
 
@@ -687,6 +692,7 @@ private:
         std::atomic<float>* glideTime = nullptr;
         std::atomic<float>* noise = nullptr;
         std::atomic<float>* pan = nullptr;
+        std::array<std::atomic<float>*, modulation::numFilters> filterSends {};
     };
 
     struct FilterParameters

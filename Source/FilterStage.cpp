@@ -134,7 +134,6 @@ void FilterStage::jumpTo (const Settings& settings)
     type = previousType = settings.type;
 
     updateCoefficients();
-    reset();
 }
 
 void FilterStage::setTargets (const Settings& settings)
@@ -167,7 +166,7 @@ void FilterStage::updateCoefficients()
     h = 1.0f / (1.0f + r2 * g + g * g);
 }
 
-float FilterStage::process (float input)
+FilterStage::Step FilterStage::advance()
 {
     if (cutoff.isSmoothing() || q.isSmoothing())
     {
@@ -176,37 +175,20 @@ float FilterStage::process (float input)
         updateCoefficients();
     }
 
-    const auto cut = notchCut.getNextValue();
-    const auto typeShare = typeMix.getNextValue();
-    const auto output = filter (input, s1, s2, cut, typeShare, mix.getNextValue());
-    rightS1 = s1;
-    rightS2 = s2;
-    return output;
+    Step step;
+    step.cut = notchCut.getNextValue();
+    step.typeShare = typeMix.getNextValue();
+    step.wet = mix.getNextValue();
+    return step;
 }
 
-void FilterStage::process (float& left, float& right)
+float FilterStage::filter (float input, Memory& memory, const Step& step, float sent) const
 {
-    if (cutoff.isSmoothing() || q.isSmoothing())
-    {
-        cutoff.getNextValue();
-        q.getNextValue();
-        updateCoefficients();
-    }
-
-    const auto cut = notchCut.getNextValue();
-    const auto typeShare = typeMix.getNextValue();
-    const auto wet = mix.getNextValue();
-    left = filter (left, s1, s2, cut, typeShare, wet);
-    right = filter (right, rightS1, rightS2, cut, typeShare, wet);
-}
-
-float FilterStage::filter (float input, float& integrator1, float& integrator2, float cut, float typeShare, float wet) const
-{
-    const auto highPass = (input - (r2 + g) * integrator1 - integrator2) * h;
-    const auto bandPass = g * highPass + integrator1;
-    integrator1 = g * highPass + bandPass;
-    const auto lowPass = g * bandPass + integrator2;
-    integrator2 = g * bandPass + lowPass;
+    const auto highPass = (input - (r2 + g) * memory.s1 - memory.s2) * h;
+    const auto bandPass = g * highPass + memory.s1;
+    memory.s1 = g * highPass + bandPass;
+    const auto lowPass = g * bandPass + memory.s2;
+    memory.s2 = g * bandPass + lowPass;
 
     // The band is scaled down by its Q, so a mid pass lets its middle through at the level it came in, however
     // narrow it is, rather than boosting it. A notch takes that band away from the sound, all of it at full depth,
@@ -220,19 +202,16 @@ float FilterStage::filter (float input, float& integrator1, float& integrator2, 
             case FilterType::lowPass:   return lowPass;
             case FilterType::midPass:   return band;
             case FilterType::highPass:  return highPass;
-            case FilterType::notch:     return input - cut * band;
+            case FilterType::notch:     return input - step.cut * band;
         }
 
         return lowPass;
     };
 
-    const auto filtered = typeShare >= 1.0f ? output (type) : output (previousType) + typeShare * (output (type) - output (previousType));
+    const auto filtered = step.typeShare >= 1.0f ? output (type)
+                                                 : output (previousType) + step.typeShare * (output (type) - output (previousType));
 
-    // Switching the filter in or out fades between the filtered sound and the sound as it was.
-    return input + wet * (filtered - input);
-}
-
-void FilterStage::reset()
-{
-    s1 = s2 = rightS1 = rightS2 = 0.0f;
+    // Switching the filter in or out, or sending the sound through it, fades between the filtered sound and the sound
+    // as it was.
+    return input + step.wet * sent * (filtered - input);
 }

@@ -196,7 +196,15 @@ namespace
                     juce::ParameterID { SynthProcessor::panId (i), 1 }, name + " Pan",
                     juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f,
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float pan, int) { return SynthProcessor::panToText (pan); }))));
+                        .withStringFromValueFunction ([] (float pan, int) { return SynthProcessor::panToText (pan); })),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::filterSendId (i, 0), 1 }, name + " to Filter 1", true),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::filterSendId (i, 1), 1 }, name + " to Filter 2", true),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::filterSendId (i, 2), 1 }, name + " to Filter 3", true),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::filterSendId (i, 3), 1 }, name + " to Filter 4", true)));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -342,6 +350,13 @@ juce::String SynthProcessor::tuneZoomId (int oscillator)    { return tuneId (osc
 juce::String SynthProcessor::glideId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Glide"; }
 juce::String SynthProcessor::glideTimeId (int oscillator)   { return glideId (oscillator) + "Time"; }
 juce::String SynthProcessor::noiseId (int oscillator)       { return "osc" + juce::String (oscillator + 1) + "Noise"; }
+static_assert (modulation::numFilters == 4, "Each oscillator has a send parameter for each of the four filters");
+
+juce::String SynthProcessor::filterSendId (int oscillator, int filter)
+{
+    return "osc" + juce::String (oscillator + 1) + "ToFilter" + juce::String (filter + 1);
+}
+
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
 juce::String SynthProcessor::panToText (float pan)
@@ -492,7 +507,9 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
     for (int i = 0; i < numOscillators; ++i)
         set.oscillators[(size_t) i] = { find (onId (i)), find (levelId (i)), find (harmonicsId (i)), find (tuneId (i)),
                                         find (tuneZoomId (i)), find (glideId (i)), find (glideTimeId (i)),
-                                        find (noiseId (i)), find (panId (i)) };
+                                        find (noiseId (i)), find (panId (i)),
+                                        { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
+                                          find (filterSendId (i, 3)) } };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -1173,6 +1190,9 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.glideSeconds = source.glideTime->load();
         oscillator.noise = source.noise->load() >= 0.5f;
         oscillator.pan = source.pan->load();
+
+        for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
+            oscillator.filterSends[filter] = source.filterSends[filter]->load() >= 0.5f;
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ChoiceButtons.h"
+#include "Modulation.h"
 #include "ModulatableControls.h"
 #include "Tuning.h"
 
@@ -19,6 +20,9 @@
     move it. The zoom is the oscillator's own, saved with the sound, and sets how far they move it: at their full
     range, across as much of the scale as is shown.
 
+    At the foot, the oscillator's routing: buttons for screens setting where its sound goes, for now the Filters one,
+    which sets which filters it's sent through, with which those are beside it.
+
     Under it, the oscillator's glide: Off, Glide, to slide into every note from the pitch of the one before, or
     Legato, to slide only into notes played while another key's still held, and how long the slide takes.
 */
@@ -36,6 +40,9 @@ public:
 
     /** Shows only the pan, for an oscillator playing noise, which has no tune or glide. */
     void setPanOnly (bool);
+
+    /** Called when the Filters button's clicked, to show the screen setting which filters the oscillator's sent through. */
+    std::function<void()> onShowFilterRouting;
     bool isPanOnly() const noexcept   { return panOnly; }
 
     /** Which glide button is chosen: 0 for Off, 1 for Glide, 2 for Legato. */
@@ -47,7 +54,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    static constexpr int preferredHeight = 123;
+    static constexpr int preferredHeight = 153;
 
 private:
     void showTune (float semitones);
@@ -58,6 +65,9 @@ private:
     juce::Slider zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
     ChoiceButtons glideMode { { "Off", "Glide", "Legato" } };
+    juce::TextButton filtersButton { "Filters" };
+    std::array<std::unique_ptr<juce::ParameterAttachment>, modulation::numFilters> sendAttachments;
+    std::array<bool, modulation::numFilters> sends { true, true, true, true };
     juce::Slider glideTimeSlider;
 
     // After the sliders, so they're let go of before the sliders go.
@@ -67,7 +77,7 @@ private:
     tuning::Window window;
     bool dragging = false;
     bool panOnly = false;
-    juce::Rectangle<int> panCaptionArea, panValueArea, captionArea, zoomCaptionArea, zoomValueArea, tickArea, glideCaptionArea, glideValueArea;
+    juce::Rectangle<int> routingCaptionArea, routingValueArea, panCaptionArea, panValueArea, captionArea, zoomCaptionArea, zoomValueArea, tickArea, glideCaptionArea, glideValueArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TuneSlider)
 };

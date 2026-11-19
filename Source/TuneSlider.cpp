@@ -96,6 +96,16 @@ TuneSlider::TuneSlider()
     glideTimeSlider.onValueChange = [this] { repaint (glideValueArea); };
     addAndMakeVisible (glideTimeSlider);
 
+    filtersButton.setTooltip ("Choose which filters this oscillator is sent through");
+    filtersButton.setMouseClickGrabsKeyboardFocus (false);
+    filtersButton.setWantsKeyboardFocus (false);
+    filtersButton.onClick = [this]
+    {
+        if (onShowFilterRouting != nullptr)
+            onShowFilterRouting();
+    };
+    addAndMakeVisible (filtersButton);
+
     moveWindow();
 }
 
@@ -115,6 +125,9 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     zoomAttachment.reset();
     glideModeAttachment.reset();
     glideTimeAttachment.reset();
+
+    for (auto& sendAttachment : sendAttachments)
+        sendAttachment.reset();
 
     attachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneId (oscillator)),
                                                               [this] (float semitones) { showTune (semitones); });
@@ -138,6 +151,22 @@ void TuneSlider::setOscillator (juce::AudioProcessorValueTreeState& parameters, 
     glideTimeAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::glideTimeId (oscillator)),
                                                                              glideTimeSlider);
     glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
+
+    // Which filters it's sent through, shown beside the Filters button.
+    filtersButton.setTitle (name + " filters");
+
+    for (size_t filter = 0; filter < sendAttachments.size(); ++filter)
+    {
+        sendAttachments[filter] = std::make_unique<juce::ParameterAttachment> (
+            *parameters.getParameter (SynthProcessor::filterSendId (oscillator, (int) filter)),
+            [this, filter] (float value)
+            {
+                sends[filter] = value >= 0.5f;
+                repaint (routingValueArea);
+            });
+        sendAttachments[filter]->sendInitialUpdate();
+    }
+
     moveWindow();
 }
 
@@ -151,6 +180,7 @@ void TuneSlider::setPanOnly (bool shouldBePanOnly)
     for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider })
         component->setVisible (! panOnly);
 
+    resized();
     repaint();
 }
 
@@ -221,6 +251,18 @@ void TuneSlider::resized()
     tickArea = area.removeFromTop (16);
     area.removeFromTop (6);
 
+    // The routing comes straight under the pan when that's all there is, as for an oscillator playing noise.
+    auto routingRow = panOnly ? area.removeFromTop (22) : area.removeFromBottom (22);
+    routingCaptionArea = routingRow.removeFromLeft (70);
+    filtersButton.setBounds (routingRow.removeFromLeft (86));
+    routingRow.removeFromLeft (10);
+    routingValueArea = routingRow;
+
+    if (panOnly)
+        return;
+
+    area.removeFromBottom (8);
+
     auto glideRow = area.removeFromTop (22);
     glideCaptionArea = glideRow.removeFromLeft (48);
     glideMode.setBounds (glideRow.removeFromLeft (156));
@@ -243,6 +285,22 @@ void TuneSlider::paint (juce::Graphics& g)
     g.setColour (movedPan.has_value() ? colours::text : colours::dimText);
     g.drawText (SynthProcessor::panToText (movedPan.value_or ((float) panSlider.getValue())), panValueArea, juce::Justification::centredRight);
     g.setColour (colours::dimText);
+
+    // The routing: which filters the oscillator's sent through.
+    g.setFont (fonts::caption());
+    g.drawText ("ROUTING", routingCaptionArea, juce::Justification::centredLeft);
+
+    juce::StringArray sentTo;
+
+    for (size_t filter = 0; filter < sends.size(); ++filter)
+        if (sends[filter])
+            sentTo.add (juce::String ((int) filter + 1));
+
+    g.setFont (fonts::body (12.0f));
+    g.drawText (sentTo.size() == (int) sends.size() ? juce::String ("All filters")
+                : sentTo.isEmpty()                  ? juce::String ("No filters")
+                : (sentTo.size() == 1 ? "Filter " : "Filters ") + sentTo.joinIntoString (", "),
+                routingValueArea, juce::Justification::centredRight);
 
     if (panOnly)
         return;

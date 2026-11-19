@@ -97,6 +97,9 @@ private:
         /** Where each oscillator is panned, from 0, left, to 1, right, as it's moved, and whether anything moves it. */
         std::array<float, modulation::numOscillators> pans {};
         std::array<bool, modulation::numOscillators> pansMoved {};
+
+        /** How much of each oscillator is sent through each filter: 1 if it is, 0 if it skips it. */
+        std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sends {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
 
@@ -132,6 +135,20 @@ private:
     std::array<std::array<double, waveform::maxHarmonics + 1>, modulation::numOscillators> harmonicDrifts {};
 
     std::array<FilterStage, modulation::numFilters> filters;
+
+    // How much of each oscillator is sent through each filter, gliding over 20 ms when a send's switched, so it
+    // doesn't click. Oscillators sent alike are filtered together, in a lane led by the first of them, with the
+    // lead's memories of the sound, left and right, in each filter. Each oscillator's lead last chunk, or -1 if it
+    // wasn't sounding, lets a lane that's led by another oscillator now carry on from the memories it had.
+    std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendLevels {};
+
+    struct LaneMemory
+    {
+        FilterStage::Memory left, right;
+    };
+
+    std::array<std::array<LaneMemory, modulation::numFilters>, modulation::numOscillators> laneMemories {};
+    std::array<int, modulation::numOscillators> previousLeads {};
     juce::SmoothedValue<float> gain;
 
     // How loud each oscillator's white noise is, gliding towards its target, the noise's generator, and the last

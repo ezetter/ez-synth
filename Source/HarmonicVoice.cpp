@@ -256,6 +256,9 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
         const auto& oscillator = patch->oscillators[(size_t) i];
         const auto panTarget = oscillatorPanTarget (i);
         targets.pans[(size_t) i] = modulate (panTarget, juce::jlimit (0.0f, 1.0f, oscillator.pan));
+
+        for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
+            targets.sends[(size_t) i][filter] = oscillator.filterSends[filter] ? 1.0f : 0.0f;
         targets.pansMoved[(size_t) i] = patch->assignments[(size_t) panTarget].isActive()
                                      || patch->velocityAssignments[(size_t) panTarget].isActive()
                                      || patch->modWheelAssignments[(size_t) panTarget].isActive();
@@ -393,6 +396,9 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         harmonicTunes = targets.harmonicTunes;
         noiseLevels = targets.noiseLevels;
         pans = targets.pans;
+        sendLevels = targets.sends;
+        laneMemories = {};
+        previousLeads.fill (-1);
         std::copy (targets.tunes.begin(), targets.tunes.end(), tunes.begin());
         gain.setCurrentAndTargetValue (targets.gain);
 
@@ -510,10 +516,10 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
     // Each oscillator's pan glides to where it's set within 20 ms, so dragging it doesn't click, or where an LFO,
     // envelope, velocity or the mod wheel moves it as quickly as they move other controls, its gains either side
-    // moving evenly through the chunk. While every oscillator sounding is panned alike, which it is unless they've been panned apart, the
-    // sound is worked out once, filtered once and then panned, as cheaply as in mono.
+    // moving evenly through the chunk. So does each send to a filter, over 20 ms.
     std::array<float, modulation::numOscillators> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
-    const auto setPanShare = std::min (1.0, numSamples / (0.02 * sampleRate));
+    std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendFrom {}, sendSteps {};
+    const auto setShare = std::min (1.0, numSamples / (0.02 * sampleRate));
     auto sounding = std::array<bool, modulation::numOscillators> {};
 
     for (size_t i = 0; i < numPlaying; ++i)
@@ -522,13 +528,10 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     for (size_t i = 0; i < numNoises; ++i)
         sounding[noises[i].oscillator] = true;
 
-    auto panned = false;
-    auto firstSounding = -1;
-
     for (size_t i = 0; i < pans.size(); ++i)
     {
         const auto from = pans[i];
-        pans[i] += (float) ((targets.pans[i] - from) * (targets.pansMoved[i] ? glideShare : setPanShare));
+        pans[i] += (float) ((targets.pans[i] - from) * (targets.pansMoved[i] ? glideShare : setShare));
 
         if (std::abs (targets.pans[i] - pans[i]) < 1.0e-4f)
             pans[i] = targets.pans[i];
@@ -538,16 +541,87 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         leftSteps[i] = (Patch::Oscillator::panToLeftGain (pans[i]) - leftGains[i]) / (float) numSamples;
         rightSteps[i] = (Patch::Oscillator::panToRightGain (pans[i]) - rightGains[i]) / (float) numSamples;
 
+        for (size_t filter = 0; filter < sendLevels[i].size(); ++filter)
+        {
+            auto& send = sendLevels[i][filter];
+            sendFrom[i][filter] = send;
+            send += (float) ((targets.sends[i][filter] - send) * setShare);
+
+            if (std::abs (targets.sends[i][filter] - send) < 1.0e-4f)
+                send = targets.sends[i][filter];
+
+            sendSteps[i][filter] = (send - sendFrom[i][filter]) / (float) numSamples;
+        }
+    }
+
+    const auto alike = [] (const auto& a, const auto& b)
+    {
+        for (size_t k = 0; k < a.size(); ++k)
+            if (! juce::exactlyEqual (a[k], b[k]))
+                return false;
+
+        return true;
+    };
+
+    // While every oscillator sounding is panned alike, which it is unless they've been panned apart, each lane's
+    // sound is worked out once, filtered once and then panned, as cheaply as in mono. Oscillators sent through the
+    // same filters, as they all are to begin with, share a lane.
+    auto panned = false;
+    auto firstSounding = -1;
+    std::array<size_t, modulation::numOscillators> leads {}, laneOf {};
+    size_t numLanes = 0;
+
+    for (size_t i = 0; i < pans.size(); ++i)
+    {
         if (! sounding[i])
             continue;
 
-        const auto first = (size_t) firstSounding;
-
         if (firstSounding < 0)
+        {
             firstSounding = (int) i;
-        else if (! juce::exactlyEqual (leftGains[i], leftGains[first]) || ! juce::exactlyEqual (rightGains[i], rightGains[first])
-                 || ! juce::exactlyEqual (leftSteps[i], leftSteps[first]) || ! juce::exactlyEqual (rightSteps[i], rightSteps[first]))
-            panned = true;
+        }
+        else
+        {
+            const auto first = (size_t) firstSounding;
+
+            if (! juce::exactlyEqual (leftGains[i], leftGains[first]) || ! juce::exactlyEqual (rightGains[i], rightGains[first])
+                || ! juce::exactlyEqual (leftSteps[i], leftSteps[first]) || ! juce::exactlyEqual (rightSteps[i], rightSteps[first]))
+                panned = true;
+        }
+
+        auto lane = numLanes;
+
+        for (size_t l = 0; l < numLanes; ++l)
+            if (alike (sendFrom[leads[l]], sendFrom[i]) && alike (sendSteps[leads[l]], sendSteps[i]))
+                lane = l;
+
+        if (lane == numLanes)
+            leads[numLanes++] = i;
+
+        laneOf[i] = lane;
+    }
+
+    // A lane now led by an oscillator that was in another lane carries on from that lane's memories, and one led by
+    // an oscillator that wasn't sounding starts afresh.
+    {
+        const auto before = laneMemories;
+
+        for (size_t l = 0; l < numLanes; ++l)
+        {
+            const auto lead = leads[l];
+            const auto previous = previousLeads[lead];
+
+            if (previous < 0)
+                laneMemories[lead] = {};
+            else if ((size_t) previous != lead)
+                laneMemories[lead] = before[(size_t) previous];
+        }
+
+        previousLeads.fill (-1);
+
+        for (size_t i = 0; i < pans.size(); ++i)
+            if (sounding[i])
+                previousLeads[i] = (int) leads[laneOf[i]];
     }
 
     const auto stereo = panned && output.getNumChannels() > 1;
@@ -555,16 +629,29 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     auto sharedLeft = leftGains[shared], sharedRight = rightGains[shared];
     std::array<float, modulation::numOscillators> values {};
 
-    // A filter that's out starts afresh when it's switched back in.
+    // A filter that's out, or that a lane isn't sent through, starts afresh when it's switched back in.
     std::array<bool, modulation::numFilters> filterActive {};
+    std::array<std::array<bool, modulation::numFilters>, modulation::numOscillators> laneFiltered {};
+    std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> laneSends {};
 
-    for (size_t i = 0; i < filters.size(); ++i)
+    for (size_t f = 0; f < filters.size(); ++f)
     {
-        filterActive[i] = filters[i].isActive();
+        filterActive[f] = filters[f].isActive();
 
-        if (! filterActive[i])
-            filters[i].reset();
+        for (size_t l = 0; l < numLanes; ++l)
+        {
+            const auto lead = leads[l];
+            laneSends[l][f] = sendFrom[lead][f];
+            laneFiltered[l][f] = filterActive[f] && (sendFrom[lead][f] > 0.0f || sendSteps[lead][f] > 0.0f);
+
+            if (! laneFiltered[l][f])
+                laneMemories[lead][f] = {};
+        }
     }
+
+    // Each oscillator's sound is kept apart only when it has to be.
+    const auto apart = stereo || numLanes > 1;
+    std::array<FilterStage::Step, modulation::numFilters> steps {};
 
     for (int s = 0; s < numSamples; ++s)
     {
@@ -575,7 +662,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             auto& harmonic = playing[i];
             const auto contribution = harmonic.bandLimit * (harmonic.cosine * (float) harmonic.x + harmonic.sine * (float) harmonic.y);
 
-            if (stereo)
+            if (apart)
                 values[harmonic.oscillator] += contribution;
             else
                 value += contribution;
@@ -597,7 +684,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             noiseState ^= noiseState << 5;
             const auto white = (float) (std::int32_t) noiseState * (1.0f / 2147483648.0f);
 
-            if (stereo)
+            if (apart)
                 values[noise.oscillator] += noise.level * white;
             else
                 value += noise.level * white;
@@ -609,33 +696,94 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         if (numNoises > 0)
             recentNoisePosition = (recentNoisePosition + 1) % recentNoise[0].size();
 
+        for (size_t f = 0; f < filters.size(); ++f)
+            if (filterActive[f])
+                steps[f] = filters[f].advance();
+
         auto left = 0.0f, right = 0.0f;
 
-        if (stereo)
+        if (! apart)
         {
-            for (size_t i = 0; i < values.size(); ++i)
+            // One lane, in the middle or panned alike: filtered once, then panned.
+            for (size_t f = 0; f < filters.size(); ++f)
             {
-                left += values[i] * leftGains[i];
-                right += values[i] * rightGains[i];
-                values[i] = 0.0f;
-                leftGains[i] += leftSteps[i];
-                rightGains[i] += rightSteps[i];
-            }
+                if (laneFiltered[0][f])
+                {
+                    auto& memory = laneMemories[leads[0]][f];
+                    value = filters[f].filter (value, memory.left, steps[f], laneSends[0][f]);
+                    memory.right = memory.left;
+                }
 
-            for (size_t i = 0; i < filters.size(); ++i)
-                if (filterActive[i])
-                    filters[i].process (left, right);
-        }
-        else
-        {
-            for (size_t i = 0; i < filters.size(); ++i)
-                if (filterActive[i])
-                    value = filters[i].process (value);
+                laneSends[0][f] += sendSteps[leads[0]][f];
+            }
 
             left = value * sharedLeft;
             right = value * sharedRight;
             sharedLeft += leftSteps[shared];
             sharedRight += rightSteps[shared];
+        }
+        else
+        {
+            for (size_t l = 0; l < numLanes; ++l)
+            {
+                const auto lead = leads[l];
+                auto laneLeft = 0.0f, laneRight = 0.0f;
+
+                for (size_t i = 0; i < values.size(); ++i)
+                {
+                    if (! sounding[i] || laneOf[i] != l)
+                        continue;
+
+                    if (stereo)
+                    {
+                        laneLeft += values[i] * leftGains[i];
+                        laneRight += values[i] * rightGains[i];
+                    }
+                    else
+                    {
+                        laneLeft += values[i];
+                    }
+                }
+
+                for (size_t f = 0; f < filters.size(); ++f)
+                {
+                    if (laneFiltered[l][f])
+                    {
+                        auto& memory = laneMemories[lead][f];
+                        laneLeft = filters[f].filter (laneLeft, memory.left, steps[f], laneSends[l][f]);
+
+                        if (stereo)
+                            laneRight = filters[f].filter (laneRight, memory.right, steps[f], laneSends[l][f]);
+                        else
+                            memory.right = memory.left;
+                    }
+
+                    laneSends[l][f] += sendSteps[lead][f];
+                }
+
+                left += laneLeft;
+                right += laneRight;
+            }
+
+            if (stereo)
+            {
+                for (size_t i = 0; i < values.size(); ++i)
+                {
+                    leftGains[i] += leftSteps[i];
+                    rightGains[i] += rightSteps[i];
+                }
+            }
+            else
+            {
+                // Panned alike, the lanes together are panned as one.
+                const auto together = left;
+                left = together * sharedLeft;
+                right = together * sharedRight;
+                sharedLeft += leftSteps[shared];
+                sharedRight += rightSteps[shared];
+            }
+
+            values.fill (0.0f);
         }
 
         const auto level = noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();

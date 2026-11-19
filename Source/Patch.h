@@ -39,6 +39,9 @@ struct Patch
         /** Where it's panned, from 0, all the way left, to 1, all the way right. */
         float pan = 0.5f;
 
+        /** Whether it's sent through each filter, or skips it, going straight on to the next. */
+        std::array<bool, modulation::numFilters> filterSends { true, true, true, true };
+
         /** How loud it plays panned this far, on the left and on the right: each side at its full level as far as
             the middle, and fading out beyond it, so a sound in the middle plays as it does in mono.
         */

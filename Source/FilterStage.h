@@ -72,7 +72,9 @@ public:
     /** Gets ready to play at a sample rate, starting with these settings rather than gliding to them. */
     void prepare (double sampleRate, const Settings&);
 
-    /** Goes straight to these settings, forgetting the sound so far, as when a voice starts a new note. */
+    /** Goes straight to these settings, as when a voice starts a new note. The memories of the sound it filters,
+        which are kept apart from it, start afresh too.
+    */
     void jumpTo (const Settings&);
 
     /** Sets the settings to glide to. Cutoffs too near the Nyquist frequency are lowered, as the filter can't
@@ -83,16 +85,27 @@ public:
     /** Whether the filter is on, or still fading out, so the sound needs to go through it. */
     bool isActive() const noexcept;
 
-    /** Filters a sample, moving the settings one sample along their glides. */
-    float process (float input);
-
-    /** Filters a sample on each side, moving the settings one sample along their glides. The right side has its own
-        memory of the sound, which follows the left's while it's filtered in mono, so it can go on from there.
+    /** A memory of the sound filtered so far: its two integrators. The filter can filter several sounds at once,
+        such as each side, or oscillators sent through different filters, each with its own memory.
     */
-    void process (float& left, float& right);
+    struct Memory
+    {
+        float s1 = 0.0f, s2 = 0.0f;
+    };
 
-    /** Clears the filter's memory of the sound, as when it's switched out. */
-    void reset();
+    /** The settings, and the fades between them, for one sample. */
+    struct Step
+    {
+        float cut = 0.0f, typeShare = 1.0f, wet = 0.0f;
+    };
+
+    /** Moves the settings one sample along their glides, for filtering that sample. */
+    Step advance();
+
+    /** Filters a sample through a memory, as the settings are for it, with the share given sent through it, from 0,
+        none, which leaves it as it is, to 1, all of it.
+    */
+    float filter (float input, Memory&, const Step&, float sent = 1.0f) const;
 
 private:
     float limitCutoff (float) const;
@@ -104,10 +117,6 @@ private:
     FilterType type = FilterType::lowPass, previousType = FilterType::lowPass;
     double sampleRate = 44100.0;
 
-    // The state variable filter: its two integrators, and its coefficients.
-    float s1 = 0.0f, s2 = 0.0f, rightS1 = 0.0f, rightS2 = 0.0f;
-
-    /** Filters a sample through one side's memory, with the settings and fades as they are. */
-    float filter (float input, float& integrator1, float& integrator2, float cut, float typeShare, float wet) const;
+    // The state variable filter's coefficients.
     float g = 0.0f, r2 = 1.0f, h = 1.0f;
 };

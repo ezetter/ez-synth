@@ -9,6 +9,7 @@
 #include "LfoPanel.h"
 #include "ModulationOverview.h"
 #include "PitchSetScreen.h"
+#include "RoutingScreen.h"
 #include "MidiPanel.h"
 #include "ModulatableControls.h"
 #include "PresetBar.h"
@@ -64,6 +65,11 @@ public:
     void showPitchSetScreen (bool);
     bool isPitchSetScreenShown() const   { return pitchSetScreen.isVisible(); }
     PitchSetScreen& getPitchSetScreen() noexcept   { return pitchSetScreen; }
+
+    /** Shows the screen setting where an oscillator's sound goes, over the synth but for the keyboard, or hides it. */
+    void showRoutingScreen (bool visible, int oscillator = 0);
+    bool isRoutingScreenShown() const   { return routingScreen.isVisible(); }
+    RoutingScreen& getRoutingScreen() noexcept   { return routingScreen; }
     juce::String getPitchSetButtonText() const   { return pitchSetButton.getButtonText(); }
 
     /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
@@ -147,6 +153,9 @@ private:
         that shows it, named after the active pitch set once there are others than the default.
     */
     PitchSetScreen pitchSetScreen { synthProcessor };
+
+    /** Over everything but the keyboard, while it's shown, from the Filters button under an oscillator's glide. */
+    RoutingScreen routingScreen { synthProcessor };
     juce::TextButton pitchSetButton { "Pitch Sets" };
     int shownPitchSetVersion = -1;
     void showPitchSets();

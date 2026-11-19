@@ -179,6 +179,12 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     };
     addChildComponent (pitchSetScreen);
 
+    // Choosing another oscillator on the routing screen edits it in the window too.
+    routingScreen.onClose = [this] { showRoutingScreen (false); };
+    routingScreen.onOscillatorChosen = [this] (int oscillator) { editSource (oscillator); };
+    addChildComponent (routingScreen);
+    tuneSlider.onShowFilterRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource); };
+
     pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
     pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
     pitchSetButton.setWantsKeyboardFocus (false);
@@ -315,6 +321,7 @@ void SynthEditor::resized()
 
     keyboard.setBounds (keys);
     pitchSetScreen.setBounds (getLocalBounds().withBottom (keys.getY() - 6));
+    routingScreen.setBounds (pitchSetScreen.getBounds());
     area.removeFromBottom (12);
 
     // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
@@ -629,6 +636,9 @@ void SynthEditor::refresh()
 
     presetBar.refresh();
 
+    if (routingScreen.isVisible())
+        routingScreen.refresh();
+
     if (midiPanel != nullptr)
         midiPanel->refresh (synthProcessor.getMidiReceived());
 
@@ -711,10 +721,35 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
                                             getLocalArea (&anchor, anchor.getLocalBounds()), this);
 }
 
+void SynthEditor::showRoutingScreen (bool visible, int oscillator)
+{
+    if (visible)
+    {
+        showModulationOverview (false);
+        showPitchSetScreen (false);
+        routingScreen.showOscillator (oscillator);
+    }
+
+    routingScreen.setVisible (visible);
+
+    if (visible)
+    {
+        routingScreen.toFront (true);
+        routingScreen.grabKeyboardFocus();
+    }
+    else if (isShowing())
+    {
+        grabKeyboardFocus();
+    }
+}
+
 void SynthEditor::showPitchSetScreen (bool visible)
 {
     if (visible)
+    {
         showModulationOverview (false);
+        routingScreen.setVisible (false);
+    }
 
     pitchSetScreen.setVisible (visible);
     pitchSetButton.setToggleState (visible, juce::dontSendNotification);
@@ -755,7 +790,10 @@ void SynthEditor::showPitchSets()
 void SynthEditor::showModulationOverview (bool visible)
 {
     if (visible)
+    {
         showPitchSetScreen (false);
+        routingScreen.setVisible (false);
+    }
 
     modulationOverview.setVisible (visible);
     modulationButton.setToggleState (visible, juce::dontSendNotification);

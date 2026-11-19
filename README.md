@@ -49,6 +49,18 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the oscillator from side to side, and the figure beside the slider follows where it's moved to. An envelope's
   release brings it back to where it's set, rather than all the way left. In mono,
   as in a mono track in a host, the two sides are played together.
+- **Route an oscillator through the filters** you choose: click **Filters**, on the **Routing** row at the
+  foot of the oscillator's panel, below the glide. A screen opens over the synth, with buttons along the top
+  to choose the oscillator, and a switch for each filter, beside its type and cutoff. The filters run in a
+  chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
+  filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
+  as they were. The chain the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Out*, is
+  spelled out above the switches, and the Routing row says which filters it's sent through. Each pitch set
+  can route its oscillators differently. **Done**, or Escape, goes back to the synth. The screen has room
+  for more kinds of routing later.
+
+![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter](docs/images/routing.png)
+
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
   to zoom right out. The figure beside it says how far either side of the middle the scale reaches. Zoomed
@@ -762,6 +774,11 @@ save pictures of the window showing several waves.
   Otherwise, as in every sound panned in the middle, the oscillators are added up and filtered once, then
   panned, as cheaply as in mono. A pan glides to where it's set within 20 ms, so dragging it doesn't click;
   one an LFO, envelope, velocity or the mod wheel moves follows within 1.5 ms, as other moved controls do.
+- **Routing.** Oscillators sent through the same filters share a lane, which is filtered once; all of them
+  do to begin with, so routing costs nothing until an oscillator's routed differently. Each lane has its own
+  memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
+  A send that's switched fades over 20 ms, so switching it mid-note doesn't click; an oscillator that moves
+  to a lane of its own carries on from the memories of the lane it left.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
@@ -812,7 +829,8 @@ save pictures of the window showing several waves.
 | `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
-| `Source/TuneSlider.*` | The tune slider, with its intervals marked, the zoom slider above it, and the pan slider above that |
+| `Source/TuneSlider.*` | The tune slider, with its intervals marked, the zoom slider above it, the pan slider above that, and the glide and routing rows below |
+| `Source/RoutingScreen.*` | The routing screen, setting which filters each oscillator's sent through |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |
