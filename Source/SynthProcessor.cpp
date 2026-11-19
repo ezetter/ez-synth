@@ -58,11 +58,13 @@ namespace
         return juce::String (hertz / 1000.0f, hertz < 10000.0f ? 2 : 1) + " kHz";
     }
 
-    /** An LFO's rate, from its period, such as "0.25 Hz" or "4.0 Hz". */
+    /** An LFO's rate, from its period, such as "0.25 Hz", "1.00 Hz" or "4.0 Hz": to two places up to 1 Hz, even
+        where rounding leaves 1 Hz a hair over.
+    */
     juce::String formatRate (float seconds)
     {
         const auto hertz = 1.0f / seconds;
-        return juce::String (hertz, hertz < 1.0f ? 2 : 1) + " Hz";
+        return juce::String (hertz, hertz < 1.005f ? 2 : 1) + " Hz";
     }
 
     juce::String formatTime (float seconds)
@@ -229,7 +231,7 @@ namespace
         layout.add (createFilterParameters (3, FilterType::notch, 1500.0f));
 
         // The LFOs start off, ready to switch on, which giving one something to move does. Each keeps its period, in seconds,
-        // but it's shown as a rate, in hertz, which rises as its dial turns up, from 0.1 to 10 Hz.
+        // but it's shown as a rate, in hertz, which rises as its dial turns up, from 0.05 to 100 Hz.
         const juce::NormalisableRange<float> periodRange (modulation::shortestPeriod, modulation::longestPeriod,
                                                           [] (float, float, float position) { return modulation::positionToPeriod (1.0f - position); },
                                                           [] (float, float, float seconds) { return 1.0f - modulation::periodToPosition (seconds); });

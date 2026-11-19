@@ -276,7 +276,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   sight. LFOs 4 to 8 start off, each with a wave and rate of its own, ready to switch on, and projects and
   presets saved when there were three load with them that way, sounding as they did.
 - **An LFO is an oscillator mostly too slow to hear**, whose wave moves controls instead. Its card has a switch,
-  a **Rate** dial for how many cycles it runs a second, from 0.1 Hz, a cycle every 10 seconds, to 100 Hz,
+  a **Rate** dial for how many cycles it runs a second, from 0.05 Hz, a cycle every 20 seconds, to 100 Hz,
   fast enough to roughen a sound or growl, and **Loop** and **Once**, which is a menu. Even at 100 Hz an LFO swings the volume,
   a level or a harmonic as fully as a slow one does, within 1 dB, and a filter's cutoff nearly so, as the
   filter itself takes a moment to respond. Click

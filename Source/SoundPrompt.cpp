@@ -245,7 +245,7 @@ drawn as the curve you want, or put the envelope on the volume, whose square law
 Eight, LFO 1 to LFO 8. Each has a wave, from -1 to 1, and plays it over its period:
 
 - `lfoNOn` switches it on; giving it something to move switches it on too.
-- `lfoNPeriod` is its period in seconds, from 0.01 (100 Hz) to 10 (0.1 Hz), shown as a rate in hertz.
+- `lfoNPeriod` is its period in seconds, from 0.01 (100 Hz) to 20 (0.05 Hz), shown as a rate in hertz.
 - `lfoNMode`: "Loop" runs it all the time, the same for every note. "Once" starts it with each note, separately for
   each, runs through its wave once over its period, then holds its last value: an envelope of any shape you draw.
   "Twice" up to "5 times" run through it that many times from each note, and "∞" runs it forever from each note.
@@ -273,7 +273,7 @@ shares, from 0 to 1, of the control's travel along its dial or slider, which is 
 values say in the list of parameters below. A harmonic's amplitude travels from 0 to 1.5 with weak amplitudes given
 more of its length: at a share p of its travel the amplitude is 1.5 × p^2.1, so 0.5 of the way is 0.35. A harmonic's
 tune travels from -1 to 1, and its phase round a whole turn. The number of harmonics travels from 1 to 16 in equal
-steps. An LFO's rate travels from 0.1 Hz to 100 Hz, each tenth of its travel about twice as fast.
+steps. An LFO's rate travels from 0.05 Hz to 100 Hz, each tenth of its travel about twice as fast.
 
 Controls marked triggered below, a switch or randomizing, aren't moved: each time what's given them crosses its
 threshold, from 0 to 1, they're switched or randomized. They're rarely useful for matching a sample.

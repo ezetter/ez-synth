@@ -292,11 +292,11 @@ namespace modulation
     float harmonicsToPosition (int numHarmonics);
     int positionToHarmonics (float position);
 
-    /** An LFO's period, from 0.01 seconds, 100 Hz, to 10 seconds, spread evenly in proportion, as tempo is felt. */
+    /** An LFO's period, from 0.01 seconds, 100 Hz, to 20 seconds, spread evenly in proportion, as tempo is felt. */
     float periodToPosition (float seconds);
     float positionToPeriod (float position);
     inline constexpr float shortestPeriod = 0.01f;
-    inline constexpr float longestPeriod = 10.0f;
+    inline constexpr float longestPeriod = 20.0f;
 
     /** The longest an envelope's attack, decay or release can take, in seconds. */
     inline constexpr float longestStage = 20.0f;

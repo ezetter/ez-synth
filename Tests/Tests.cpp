@@ -6014,7 +6014,7 @@ namespace
 
         SynthProcessor synth;
         auto& rate = *synth.parameters.getParameter (SynthProcessor::lfoPeriodId (0));
-        check (rate.getText (1.0f, 20) == "100.0 Hz" && rate.getText (0.0f, 20) == "0.10 Hz", "an LFO's rate goes from 0.1 Hz up to 100 Hz");
+        check (rate.getText (1.0f, 20) == "100.0 Hz" && rate.getText (0.0f, 20) == "0.05 Hz", "an LFO's rate goes from 0.05 Hz, a cycle every 20 seconds, up to 100 Hz");
     }
 
     void testFactoryPresets()

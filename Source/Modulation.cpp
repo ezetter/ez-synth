@@ -266,12 +266,13 @@ namespace modulation
 
     float periodToPosition (float seconds)
     {
-        return std::log (seconds / shortestPeriod) / std::log (longestPeriod / shortestPeriod);
+        // Worked out in double precision, so a period goes to its position and back as nearly unchanged as it can.
+        return (float) (std::log ((double) seconds / (double) shortestPeriod) / std::log ((double) longestPeriod / (double) shortestPeriod));
     }
 
     float positionToPeriod (float position)
     {
-        return shortestPeriod * std::pow (longestPeriod / shortestPeriod, position);
+        return (float) ((double) shortestPeriod * std::pow ((double) longestPeriod / (double) shortestPeriod, (double) position));
     }
 
     float getRestPosition (int target)
