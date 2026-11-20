@@ -1,6 +1,7 @@
-// Makes twenty strange pads that go on changing for as long as a key is held, every LFO but two of Ring Fog's in time
-// with the host's tempo, the slowest over cycles of 16 beats, and saves them among your own presets, in ~/Documents/EZ Synth/Presets unless another folder is named, in the Pads
-// category with the label Evolving. They aren't factory presets: they're yours to change, save over or delete.
+// Makes twenty strange pads that go on changing for as long as a key is held, every LFO in time with the host's tempo,
+// the slowest over cycles of 16 beats, but for a few in Ring Fog, Moth Swarm, Warped Tape and Whale Canyon that are
+// better free of it. It saves them among your own presets, in ~/Documents/EZ Synth/Presets unless another folder is
+// named, in the Pads category with the label Evolving. They aren't factory presets: they're yours to change, save over or delete.
 //
 //     ./build/EZSynthMakeEvolvingPads
 //
@@ -58,6 +59,19 @@ namespace
     {
         timed (synth, lfo, beats, loops, sine);
         setRandom (synth, lfo, false);
+    }
+
+    /** LFOs that wander and jump free of the tempo, a cycle lasting some seconds, for the few that suit it. */
+    void freeDrift (SynthProcessor& synth, int lfo, float seconds)
+    {
+        setLfo (synth, lfo, seconds, loops, sine);
+        setRandom (synth, lfo, false);
+    }
+
+    void freeJumps (SynthProcessor& synth, int lfo, float seconds, int numSteps)
+    {
+        setLfo (synth, lfo, seconds, loops, sine);
+        setRandom (synth, lfo, true, numSteps);
     }
 
     /** An LFO that jumps: new random steps every cycle. */
@@ -184,17 +198,18 @@ namespace
         } },
 
         // Six sines at pitches no scale has, the 7th, 11th and 13th harmonics among them. Each one's level, pan and
-        // tune jump on random steps, a different LFO for each, eight steps to a cycle of 1, 2, 3, 4, 6 or 8 beats, so
-        // they flutter in time but never together, while a 16 beat LFO opens and sharpens the filters round them.
+        // tune jump on random steps, a different LFO for each, free of the tempo, and a seventh LFO, over 16 beats,
+        // takes all six from a slow flutter to a frantic one and back.
         { "Moth Swarm", [] (SynthProcessor& synth)
         {
             constexpr std::array tunes { 0.0f, 2.04f, 5.51f, 8.41f, 9.69f, 14.04f };
-            constexpr std::array periods { 2.0, 3.0, 1.0, 4.0, 6.0, 8.0 };
+            constexpr std::array periods { 0.9f, 1.3f, 0.7f, 1.7f, 1.1f, 2.3f };
 
             for (int i = 0; i < 6; ++i)
             {
                 setPartials (synth, i, 0.45f, tunes[(size_t) i], { 1.0f, 0.0f, 0.2f });
-                jumps (synth, i, periods[(size_t) i], 8);
+                freeJumps (synth, i, periods[(size_t) i], 8);
+                assign (synth, lfoRateTarget (i), lfo7, 0.5f);
                 assign (synth, oscillatorLevelTarget (i), i, 0.9f);
                 assign (synth, oscillatorPanTarget (i), (i + 1) % 6, 0.9f);
                 setTuneReach (synth, i, 1.0);
@@ -207,8 +222,6 @@ namespace
             setFilter (synth, 0, FilterType::lowPass, 5000.0f, 0.15f);
             drift (synth, lfo8, 8.0);
             assign (synth, filterCutoffTarget (0), lfo8, 0.3f);
-            assign (synth, filterResonanceTarget (0), lfo7, 0.5f);
-            assign (synth, filterCutoffTarget (1), lfo7, 0.3f);
 
             swell (synth, 1.0f, 2.5f, 0.66f);
         } },
@@ -698,9 +711,9 @@ namespace
             swell (synth, 1.0f, 3.0f, 0.85f);
         } },
 
-        // A tape left in the sun: the pitch wows and flutters on wandering LFOs, the low pass comes and goes, the
-        // level drops out in random steps, and hiss, sent only through the high pass, plays over it. Each note starts
-        // flat and comes up to speed.
+        // A tape left in the sun: the pitch wows and flutters on wandering LFOs and the low pass comes and goes, all
+        // three free of the tempo, as a tape is, while the level drops out in random steps, and hiss, sent only
+        // through the high pass, plays over it.
         { "Warped Tape", [] (SynthProcessor& synth)
         {
             setPartials (synth, osc1, 0.8f, 0.0f, { 1.0f, 0.4f, 0.15f, 0.08f, 0.04f });
@@ -709,16 +722,16 @@ namespace
             setSends (synth, osc1, { 0 });
             setSends (synth, osc2, { 0 });
 
-            drift (synth, lfo1, 4.0);
+            freeDrift (synth, lfo1, 2.5f);
             setTuneReach (synth, osc1, 1.0);
             assign (synth, oscillatorTuneTarget (osc1), lfo1, 0.35f);
             assign (synth, oscillatorPanTarget (osc1), lfo1, 0.3f);
-            drift (synth, lfo2, 0.125);
+            freeDrift (synth, lfo2, 0.12f);
             setTuneReach (synth, osc2, 1.0);
             assign (synth, oscillatorTuneTarget (osc2), lfo2, 0.12f);
 
             setFilter (synth, 0, FilterType::lowPass, 2200.0f, 0.15f);
-            drift (synth, lfo3, 6.0);
+            freeDrift (synth, lfo3, 4.0f);
             assign (synth, filterCutoffTarget (0), lfo3, 0.25f);
 
             jumps (synth, lfo4, 16.0, 16);
@@ -774,10 +787,10 @@ namespace
             swell (synth, 0.6f, 4.0f, 1.0f);
         } },
 
-        // Something calling in deep water: every 16 beats from the key a voice swoops up a fifth and moans back down
-        // past where it started, its formant opening as it rises, and every 8 another, an octave below, groans
-        // downwards, louder or fainter as a wandering LFO has it, over a sub and a wash of noise. Legato notes slide
-        // for over a second.
+        // Something calling in deep water: every 17 seconds or so from the key a voice swoops up a fifth and moans
+        // back down past where it started, its formant opening as it rises, and every 20 another, an octave below,
+        // groans downwards. Those two LFOs run free of the tempo, and a wandering one hurries and holds them back, so
+        // the calls don't keep time, over a sub and a wash of noise. Legato notes slide for over a second.
         { "Whale Canyon", [] (SynthProcessor& synth)
         {
             setPartials (synth, osc1, 0.7f, 0.0f, { 1.0f, 0.5f, 0.1f, 0.2f, 0.05f });
@@ -785,20 +798,21 @@ namespace
             setUnison (synth, osc1, 2, 12.0f, 0.6f);
             setGlide (synth, { osc1, osc2 }, Glide::legato, 1.2f);
 
-            timed (synth, lfo1, 16.0, fromKey, draw ([] (double t)
+            setLfo (synth, lfo1, 17.0f, fromKey, draw ([] (double t)
             {
                 return t < 0.5 ? 0.0 : t < 0.6 ? ease ((t - 0.5) / 0.1) : t < 0.9 ? 1.0 - 1.3 * ease ((t - 0.6) / 0.3) : -0.3 * (1.0 - ease ((t - 0.9) / 0.1));
             }));
             assign (synth, oscillatorTuneTarget (osc1), lfo1, 0.3f);
 
-            timed (synth, lfo2, 8.0, fromKey, draw ([] (double t)
+            setLfo (synth, lfo2, 20.0f, fromKey, draw ([] (double t)
             {
                 return t < 0.2 ? 0.0 : t < 0.5 ? -ease ((t - 0.2) / 0.3) : t < 0.6 ? -1.0 + 1.4 * ease ((t - 0.5) / 0.1) : 0.4 * (1.0 - ease ((t - 0.6) / 0.4));
             }));
             assign (synth, oscillatorTuneTarget (osc2), lfo2, 0.2f);
 
             drift (synth, lfo3, 6.0);
-            assign (synth, oscillatorLevelTarget (osc2), lfo3, 0.5f);
+            assign (synth, lfoRateTarget (lfo1), lfo3, 0.1f);
+            assign (synth, lfoRateTarget (lfo2), lfo3, 0.1f, true);
 
             setFilter (synth, 0, FilterType::lowPass, 700.0f, 0.5f);
             assign (synth, filterCutoffTarget (0), lfo1, 0.25f);
@@ -848,8 +862,14 @@ namespace
 
 namespace
 {
-    /** The LFOs that aren't synced to the tempo: Ring Fog's two that shake the levels tens of times a second. */
-    const std::map<juce::String, std::set<int>> freeLfos { { "Ring Fog", { lfo1, lfo3 } } };
+    /** The LFOs that aren't synced to the tempo: Ring Fog's two that shake the levels tens of times a second, the
+        six whose flutter Moth Swarm speeds up and slows down, a tape's wow, flutter and wandering low pass, and the
+        two calls in Whale Canyon, which mustn't keep time.
+    */
+    const std::map<juce::String, std::set<int>> freeLfos { { "Ring Fog", { lfo1, lfo3 } },
+                                                           { "Moth Swarm", { lfo1, lfo2, lfo3, lfo4, lfo5, lfo6 } },
+                                                           { "Warped Tape", { lfo1, lfo2, lfo3 } },
+                                                           { "Whale Canyon", { lfo1, lfo2 } } };
 }
 
 int main (int argc, char* argv[])
