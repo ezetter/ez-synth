@@ -572,6 +572,22 @@ from the repository's folder, and build again:
 Every recipe needs a category in the tool's list, or the tool says so and fails. A recipe can load a sound description instead, as the Grand Piano's and the Snare Drum's do from `Tools/Sounds/`,
 which Claude matched to samples.
 
+#### Evolving pads
+
+`Tools/MakeEvolvingPads.cpp` makes twenty more sounds the same way, but as presets of your own rather than factory
+ones: strange pads that go on changing for as long as a key is held, some over cycles 20 seconds long. It saves
+them in `~/Documents/EZ Synth/Presets`, in the Pads category with the label Evolving, leaving alone any preset of
+yours that has one of their names without that label:
+
+```bash
+./build/EZSynthMakeEvolvingPads
+```
+
+Some change the same way every time, such as Spectral Tide, a wave travelling up an oscillator's harmonics, and
+Infinite Staircase, a pitch that climbs for ever. Some are moved by random LFOs, such as Moth Swarm and Liquid
+Metal. And some switch or randomize parts of themselves as they play, such as Overtone Clockwork and Ghost
+Machine, which leaves them changed. Hold a key, or a chord, for half a minute to hear one through.
+
 The tool takes away any other presets in the folder, so `Presets/` holds just the ones with recipes. To add a preset, add its recipe, and its file to the list in `CMakeLists.txt`. As the tool is built with the
 presets in it, make an empty file for the new one first, so the tool can be built to fill it in:
 
@@ -866,6 +882,8 @@ save pictures of the window showing several waves.
 | `Presets/` | The factory presets, which the build turns into code with `juce_add_binary_data` |
 | `docs/images/` | The pictures in this README, from the window pictures `./build/EZSynthTests --snapshots <folder>` saves, scaled down |
 | `Tools/MakeFactoryPresets.cpp` | The factory presets' recipes, and the tool that saves them |
+| `Tools/MakeEvolvingPads.cpp` | Twenty evolving pads' recipes, and the tool that saves them among your own presets |
+| `Tools/RecipeTools.h` | What the two tools' recipes are written with |
 | `Tools/Sounds/` | Sound descriptions that factory presets are made from, such as the Grand Piano matched to samples |
 | `Tools/RenderPreset.cpp` | The tool that plays a preset through a phrase into a WAV file |
 | `Tools/SoundTool.cpp` | The tool Claude uses to measure samples and its own attempts |

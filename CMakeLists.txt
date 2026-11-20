@@ -168,6 +168,11 @@ add_executable(EZSynthMakeFactoryPresets Tools/MakeFactoryPresets.cpp)
 target_include_directories(EZSynthMakeFactoryPresets PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
 target_link_libraries(EZSynthMakeFactoryPresets PRIVATE EZSynth)
 
+# Makes twenty evolving pads among your own presets, in the Pads category with the label Evolving.
+add_executable(EZSynthMakeEvolvingPads Tools/MakeEvolvingPads.cpp)
+target_include_directories(EZSynthMakeEvolvingPads PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
+target_link_libraries(EZSynthMakeEvolvingPads PRIVATE EZSynth)
+
 # Plays a preset through a short phrase and saves it as a WAV file, to hear it outside the app.
 add_executable(EZSynthRenderPreset Tools/RenderPreset.cpp)
 target_include_directories(EZSynthRenderPreset PRIVATE $<TARGET_PROPERTY:EZSynth,INCLUDE_DIRECTORIES>)
