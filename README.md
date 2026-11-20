@@ -575,7 +575,8 @@ which Claude matched to samples.
 #### Evolving pads
 
 `Tools/MakeEvolvingPads.cpp` makes twenty more sounds the same way, but as presets of your own rather than factory
-ones: strange pads that go on changing for as long as a key is held, some over cycles 20 seconds long. It saves
+ones: strange pads that go on changing for as long as a key is held. Every LFO in them is synced to the host's
+tempo, the slowest a cycle every 16 beats, which is 8 seconds at 120 BPM, the tempo with no host. It saves
 them in `~/Documents/EZ Synth/Presets`, in the Pads category with the label Evolving, leaving alone any preset of
 yours that has one of their names without that label:
 
