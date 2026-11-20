@@ -1,5 +1,5 @@
-// Makes twenty strange pads that go on changing for as long as a key is held, every LFO in time with the host's tempo,
-// the slowest over cycles of 16 beats, and saves them among your own presets, in ~/Documents/EZ Synth/Presets unless another folder is named, in the Pads
+// Makes twenty strange pads that go on changing for as long as a key is held, every LFO but two of Ring Fog's in time
+// with the host's tempo, the slowest over cycles of 16 beats, and saves them among your own presets, in ~/Documents/EZ Synth/Presets unless another folder is named, in the Pads
 // category with the label Evolving. They aren't factory presets: they're yours to change, save over or delete.
 //
 //     ./build/EZSynthMakeEvolvingPads
@@ -12,6 +12,8 @@
 #include "RecipeTools.h"
 
 #include <iostream>
+#include <map>
+#include <set>
 
 namespace
 {
@@ -511,9 +513,10 @@ namespace
             swell (synth, 1.5f, 3.0f, 0.66f);
         } },
 
-        // Two tones whose levels LFOs shake eight and six times a beat, a buzz at most tempos and, at fast ones, quick
-        // enough to be heard as new pitches either side of each harmonic. A 16 beat LFO bends one tone's tune and a
-        // wandering one the other's, so the two slide through each other, in tune with nothing.
+        // Two tones whose levels LFOs shake tens of times a second, fast enough to be heard not as a tremolo but as
+        // new pitches either side of each harmonic. Those two LFOs alone run free of the tempo, which has no rate that
+        // fast. A 16 beat LFO moves one's rate and a wandering one the other's, so those pitches slide through each
+        // other, in tune with nothing, and the mod wheel raises the first's.
         { "Ring Fog", [] (SynthProcessor& synth)
         {
             setPartials (synth, osc1, 0.5f, 0.0f, { 1.0f, 0.5f, 0.3f, 0.2f });
@@ -522,24 +525,22 @@ namespace
             setPan (synth, osc1, 0.3f);
             setPan (synth, osc2, 0.7f);
 
-            slow (synth, lfo1, 0.125, sine);
+            setLfo (synth, lfo1, 1.0f / 35.0f, loops, sine);
             assign (synth, oscillatorLevelTarget (osc1), lfo1, 1.0f);
             slow (synth, lfo2, 16.0, sine);
-            setTuneReach (synth, osc1, 1.0);
-            assign (synth, oscillatorTuneTarget (osc1), lfo2, 0.3f);
+            assign (synth, lfoRateTarget (lfo1), lfo2, 0.25f);
+            assignModWheel (synth, lfoRateTarget (lfo1), 0.2f);
 
-            slow (synth, lfo3, 1.0 / 6.0, sine);
+            setLfo (synth, lfo3, 1.0f / 50.0f, loops, sine);
             assign (synth, oscillatorLevelTarget (osc2), lfo3, 1.0f);
             drift (synth, lfo4, 8.0);
-            setTuneReach (synth, osc2, 1.0);
-            assign (synth, oscillatorTuneTarget (osc2), lfo4, 0.3f);
+            assign (synth, lfoRateTarget (lfo3), lfo4, 0.25f);
 
             slow (synth, lfo5, 6.0, triangle);
             assign (synth, oscillatorPanTarget (osc1), lfo5, 0.6f);
             assign (synth, oscillatorPanTarget (osc2), lfo5, 0.6f, true);
 
             setFilter (synth, 0, FilterType::lowPass, 3500.0f);
-            assignModWheel (synth, filterCutoffTarget (0), 0.25f, true);
 
             swell (synth, 1.2f, 3.0f, 0.72f);
         } },
@@ -845,6 +846,12 @@ namespace
     };
 }
 
+namespace
+{
+    /** The LFOs that aren't synced to the tempo: Ring Fog's two that shake the levels tens of times a second. */
+    const std::map<juce::String, std::set<int>> freeLfos { { "Ring Fog", { lfo1, lfo3 } } };
+}
+
 int main (int argc, char* argv[])
 {
     const juce::ScopedJuceInitialiser_GUI initialiser;
@@ -867,13 +874,17 @@ int main (int argc, char* argv[])
         SynthProcessor synth;
         recipe.make (synth);
 
-        // Every LFO follows the tempo, in every pitch set, those nothing uses yet too.
+        // Every LFO follows the tempo, in every pitch set, those nothing uses yet too, but for the few that have to
+        // run faster than the tempo has a rate for.
+        const auto free = freeLfos.find (recipe.name);
+
         for (int set = synth.getNumPitchSets(); --set >= 0;)
         {
             synth.setActivePitchSet (set);
 
             for (int lfo = 0; lfo < numLfos; ++lfo)
-                setParameter (synth, SynthProcessor::lfoSyncId (lfo), 1.0f);
+                if (free == freeLfos.end() || free->second.count (lfo) == 0)
+                    setParameter (synth, SynthProcessor::lfoSyncId (lfo), 1.0f);
         }
 
         const auto saved = synth.savePreset (file, category, label);
