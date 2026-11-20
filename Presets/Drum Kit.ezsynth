@@ -64,35 +64,35 @@
   <PARAM id="lfo1BeatRate" value="6.0"/>
   <PARAM id="lfo1Mode" value="0.0"/>
   <PARAM id="lfo1On" value="0.0"/>
-  <PARAM id="lfo1Period" value="1.00000011920929"/>
+  <PARAM id="lfo1Period" value="0.9999999403953552"/>
   <PARAM id="lfo1Random" value="0.0"/>
   <PARAM id="lfo1StartOnPlay" value="1.0"/>
   <PARAM id="lfo1Sync" value="0.0"/>
   <PARAM id="lfo2BeatRate" value="6.0"/>
   <PARAM id="lfo2Mode" value="0.0"/>
   <PARAM id="lfo2On" value="0.0"/>
-  <PARAM id="lfo2Period" value="1.999999642372131"/>
+  <PARAM id="lfo2Period" value="1.999999523162842"/>
   <PARAM id="lfo2Random" value="0.0"/>
   <PARAM id="lfo2StartOnPlay" value="1.0"/>
   <PARAM id="lfo2Sync" value="0.0"/>
   <PARAM id="lfo3BeatRate" value="6.0"/>
   <PARAM id="lfo3Mode" value="0.0"/>
   <PARAM id="lfo3On" value="0.0"/>
-  <PARAM id="lfo3Period" value="3.999999523162842"/>
+  <PARAM id="lfo3Period" value="4.0"/>
   <PARAM id="lfo3Random" value="0.0"/>
   <PARAM id="lfo3StartOnPlay" value="1.0"/>
   <PARAM id="lfo3Sync" value="0.0"/>
   <PARAM id="lfo4BeatRate" value="6.0"/>
   <PARAM id="lfo4Mode" value="0.0"/>
   <PARAM id="lfo4On" value="0.0"/>
-  <PARAM id="lfo4Period" value="0.5"/>
+  <PARAM id="lfo4Period" value="0.5000000596046448"/>
   <PARAM id="lfo4Random" value="0.0"/>
   <PARAM id="lfo4StartOnPlay" value="1.0"/>
   <PARAM id="lfo4Sync" value="0.0"/>
   <PARAM id="lfo5BeatRate" value="6.0"/>
   <PARAM id="lfo5Mode" value="0.0"/>
   <PARAM id="lfo5On" value="0.0"/>
-  <PARAM id="lfo5Period" value="8.0"/>
+  <PARAM id="lfo5Period" value="7.999998569488525"/>
   <PARAM id="lfo5Random" value="0.0"/>
   <PARAM id="lfo5StartOnPlay" value="1.0"/>
   <PARAM id="lfo5Sync" value="0.0"/>
@@ -113,7 +113,7 @@
   <PARAM id="lfo8BeatRate" value="6.0"/>
   <PARAM id="lfo8Mode" value="0.0"/>
   <PARAM id="lfo8On" value="0.0"/>
-  <PARAM id="lfo8Period" value="6.000000476837158"/>
+  <PARAM id="lfo8Period" value="5.999999046325684"/>
   <PARAM id="lfo8Random" value="0.0"/>
   <PARAM id="lfo8StartOnPlay" value="1.0"/>
   <PARAM id="lfo8Sync" value="0.0"/>
@@ -123,48 +123,96 @@
   <PARAM id="osc1Level" value="0.699999988079071"/>
   <PARAM id="osc1Noise" value="0.0"/>
   <PARAM id="osc1On" value="1.0"/>
+  <PARAM id="osc1Pan" value="0.5"/>
+  <PARAM id="osc1ToFilter1" value="1.0"/>
+  <PARAM id="osc1ToFilter2" value="1.0"/>
+  <PARAM id="osc1ToFilter3" value="1.0"/>
+  <PARAM id="osc1ToFilter4" value="1.0"/>
   <PARAM id="osc1Tune" value="15.99999904632568"/>
   <PARAM id="osc1TuneZoom" value="0.0"/>
+  <PARAM id="osc1Unison" value="1.0"/>
+  <PARAM id="osc1UnisonDetune" value="20.0"/>
+  <PARAM id="osc1UnisonSpread" value="0.5"/>
   <PARAM id="osc2Glide" value="0.0"/>
   <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc2Harmonics" value="3.0"/>
   <PARAM id="osc2Level" value="0.0"/>
   <PARAM id="osc2Noise" value="1.0"/>
   <PARAM id="osc2On" value="1.0"/>
+  <PARAM id="osc2Pan" value="0.5"/>
+  <PARAM id="osc2ToFilter1" value="1.0"/>
+  <PARAM id="osc2ToFilter2" value="1.0"/>
+  <PARAM id="osc2ToFilter3" value="1.0"/>
+  <PARAM id="osc2ToFilter4" value="1.0"/>
   <PARAM id="osc2Tune" value="0.0"/>
   <PARAM id="osc2TuneZoom" value="0.0"/>
+  <PARAM id="osc2Unison" value="1.0"/>
+  <PARAM id="osc2UnisonDetune" value="20.0"/>
+  <PARAM id="osc2UnisonSpread" value="0.5"/>
   <PARAM id="osc3Glide" value="0.0"/>
   <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc3Harmonics" value="3.0"/>
   <PARAM id="osc3Level" value="1.0"/>
   <PARAM id="osc3Noise" value="0.0"/>
   <PARAM id="osc3On" value="0.0"/>
+  <PARAM id="osc3Pan" value="0.5"/>
+  <PARAM id="osc3ToFilter1" value="1.0"/>
+  <PARAM id="osc3ToFilter2" value="1.0"/>
+  <PARAM id="osc3ToFilter3" value="1.0"/>
+  <PARAM id="osc3ToFilter4" value="1.0"/>
   <PARAM id="osc3Tune" value="0.0"/>
   <PARAM id="osc3TuneZoom" value="0.0"/>
+  <PARAM id="osc3Unison" value="1.0"/>
+  <PARAM id="osc3UnisonDetune" value="20.0"/>
+  <PARAM id="osc3UnisonSpread" value="0.5"/>
   <PARAM id="osc4Glide" value="0.0"/>
   <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc4Harmonics" value="3.0"/>
   <PARAM id="osc4Level" value="1.0"/>
   <PARAM id="osc4Noise" value="0.0"/>
   <PARAM id="osc4On" value="0.0"/>
+  <PARAM id="osc4Pan" value="0.5"/>
+  <PARAM id="osc4ToFilter1" value="1.0"/>
+  <PARAM id="osc4ToFilter2" value="1.0"/>
+  <PARAM id="osc4ToFilter3" value="1.0"/>
+  <PARAM id="osc4ToFilter4" value="1.0"/>
   <PARAM id="osc4Tune" value="0.0"/>
   <PARAM id="osc4TuneZoom" value="0.0"/>
+  <PARAM id="osc4Unison" value="1.0"/>
+  <PARAM id="osc4UnisonDetune" value="20.0"/>
+  <PARAM id="osc4UnisonSpread" value="0.5"/>
   <PARAM id="osc5Glide" value="0.0"/>
   <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc5Harmonics" value="3.0"/>
   <PARAM id="osc5Level" value="1.0"/>
   <PARAM id="osc5Noise" value="0.0"/>
   <PARAM id="osc5On" value="0.0"/>
+  <PARAM id="osc5Pan" value="0.5"/>
+  <PARAM id="osc5ToFilter1" value="1.0"/>
+  <PARAM id="osc5ToFilter2" value="1.0"/>
+  <PARAM id="osc5ToFilter3" value="1.0"/>
+  <PARAM id="osc5ToFilter4" value="1.0"/>
   <PARAM id="osc5Tune" value="0.0"/>
   <PARAM id="osc5TuneZoom" value="0.0"/>
+  <PARAM id="osc5Unison" value="1.0"/>
+  <PARAM id="osc5UnisonDetune" value="20.0"/>
+  <PARAM id="osc5UnisonSpread" value="0.5"/>
   <PARAM id="osc6Glide" value="0.0"/>
   <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
   <PARAM id="osc6Harmonics" value="3.0"/>
   <PARAM id="osc6Level" value="1.0"/>
   <PARAM id="osc6Noise" value="0.0"/>
   <PARAM id="osc6On" value="0.0"/>
+  <PARAM id="osc6Pan" value="0.5"/>
+  <PARAM id="osc6ToFilter1" value="1.0"/>
+  <PARAM id="osc6ToFilter2" value="1.0"/>
+  <PARAM id="osc6ToFilter3" value="1.0"/>
+  <PARAM id="osc6ToFilter4" value="1.0"/>
   <PARAM id="osc6Tune" value="0.0"/>
   <PARAM id="osc6TuneZoom" value="0.0"/>
+  <PARAM id="osc6Unison" value="1.0"/>
+  <PARAM id="osc6UnisonDetune" value="20.0"/>
+  <PARAM id="osc6UnisonSpread" value="0.5"/>
   <PARAM id="volume" value="0.0"/>
   <WAVE oscillator="0" points="2048......3M5uxi1Y+ROhB8f8ncmu1iHMscOGt1.9.hFY3Cst5hOfVBQ93zdY4CLr5lOhocf9nLRL5yleZoOnzMn937+p5S6ETqOx2tu9HksH6yhcIsOjH919PqPk6i084tOxH489DzO.7ivfRvOBzNB+.2HM7CfCEwOqxTE+PmOY7iXXzwOFnMH+bufj7izRfxO9j3J+fd4t7CgnHyOPCUM+.oW37CjQsyOjlhO+fp4.8SfHNzOX7fQ+PldH8SWJqzOJ7OS+LGFO8CqVD0OPmuT+HfvT8yZuY0O6H.V+zpdY8y+Xq0O50AW+rFRc8yIZ40OJL0W+b2Lf8y06C1OXxZX+.iQh8iFIK1OXWyX+3Nii8S5NO1OZw+X+bcEj8S9aP1Of8.Y+7J7i8yh.O1Og92X+voKi8CLNK1OO7kX+De3g8SiWE1OfBLX+bdGf8iGv80OGfqW+Hl8c8C7qz0OykEW+35ea8iXep0OOkaV+fiyX8y1de0O3utU+nj8U8ii9S0O6U.U+r7BS8yKRH0OZkQT+jeHP8ysr7zO7niS+vxRM8SIfwzOAm2R+fIlJ8CO8lzO5fNR+fgFH8CVSczO5QoQ+He2E8iLvTzOmtHQ+HK7C8iseMzOIjsP+vOWB8C2qGzOpWXP+b1JA8igbCzO3kIP+PlX.8yZ2.zOnhAP+rhA.8C...zOqX.P+fJF.8yZ2.zOjIFP+fWl.8igbCzOmsRP+ndgA8C2qGzO7ykP+jP1B8iseMzOxB+P+b5hD8iLvTzOx2cQ+nGkF8CVSczOXnAR+nC5H8CO8lzOXhoR+DbdK8SIfwzOrrTS+viNN8ysr7zO4GBT+nUFQ8yKRH0OKuvT+rWAT8ii9S0OJYeU+f+5V8y1de0O33LV+7TtY8iXep0Ot92V+LWVb8C7qz0OhYeW+b.td8iGv80Om2AX+.Jvf8SiWE1OwGdX+7vWh8CLNK1Ob5xX+D5ei8yh.O1OuB+X+.1Cj8S9aP1OWWAY+nE+i8S5NO1Oty3X+fcMi8iFIK1OvXjX+fIqg8y06C1O2MCX+nvTe8yIZ40OqgTW+nWGb8y+Xq0OspWV+ri.X8yZuY0OBHLU+.c9R8CqVD0OygwS+nv+L8SWJqzOjoGR+fwCF8SfHNzOnZNP+PZJ97CjQsyOP5EN+.MT07CgnHyOnWtK+3Shq7izRfxO2KHI+Xf1f7iXXzwOz4SF+rJSU7CfCEwOvMRC+HP6H7ivfRvOA8C.+Hij26i084tOzJT49Ph3a6yhcIsORYKx9He695S6ETqON+up9fR2f5yleZoOJiDi9Hl1A5CLr5lONsWV9.ZID4Cst5hOfnQF9b3ZC3iHMscOZ24q8HJzC1i1Y+ROdi9q7bgE2Uh2n+JuZm8K8JJzC1q1c9Zuhzz18d3ZC3KHZjguz5pK9BZID4qS6kkuvvpa9Jl1A5qxHwnua9ok9hR2f5qy+qpusWPs9Je695qT1hruK1kz9Rh3a6KsBUtuV2m69Jij26aP+.vuBCJA+JP6H7Kbizvu.NTD+tJSU7Kc9jwuhgQG+Zf1f768BRxuRKAJ+5Shq7K5k6xuDhhL+BMT07KjdgyuPF0N+RZJ97KplCzuAh3P+hwCF8KY5gzucorR+pv+L86bX7zurZQT+Bc9R8q.BS0uq8lU+ti.X8aq5k0u+isV+pWGb86ZH00umnkW+pvTe86cy.1uWuOX+hIqg8KLFI1uZjrX+hcMi8q6LN1uo67X+pE+i860UP1u4uAY+B1Cj86qvO1uKB7X+F5ei8KmtL1uv3rX+9vWh8a7gG1uMdUX+BJvf864c.1ud.2W+d.td8qX120uvuRW+NWVb8qq+s0uh8oV+9TtY8KNNi0ua68U+h+5V8qR1W0uN5OU+tWAT86xKL0uuHgT+pUFQ8a9g.0u2xxS+xiNN8KKK0zuk.FS+FbdK8KlXpzu7zaR+pC5H8KFZfzuXM0Q+pGkF8q7cWzux.SQ+d5hD8qrvOzu190P+lP1B8K+bIzubudP+pdgA86YqDzuFxMP+hWl.8KYhAzuqcCP+hJF.86JF.zu...P+thA.8KpX.zuqcCP+RlX.8KdYBzuFxMP+d1JA8q5EFzubudP+xOWB8aBYKzu190P+JK7C86oKRzux.SQ+Je2E8qdTZzuXM0Q+hgFH8qNnizu7zaR+hIlJ8av4szuk.FS+xxRM8KO53zu2xxS+leHP8qVYD0uuHgT+t7BS86dEP0uN5OU+pj8U8K9qa0ua68U+hiyX86S4l0uh8oV+55ea86bYw0uvuRW+Jl8c86A350ud.2W+ddGf8Kn.C1uMdUX+Fe3g86CeI1uv3rX+xoKi8an+M1uKB7X+9J7i8KXOP1u4uAY+dcEj8qV7O1uo67X+5Nii8K10L1uZjrX+BiQh8KlrF1uWuOX+d2Lf8qBS80umnkW+tFRc8qdcv0u+isV+1pdY86NBf0uq8lU+JfvT8Kz4K0urZQT+NGFO8qB+yzucorR+RldH8KFOXzuAh3P+hp4.8Koo3yuPF0N+BoW37KzPUyuDhhL+hd4t7qOItxuRKAJ+dufj7qAZCxuhgQG+RmOY76pLUwu.NTD+B2HM7q.sivuBCJA+FzO.7qLRduuV2m69RqPk6KIhusuK1kz9JksH6q7s6qusWPs957+p5KJcCpua9ok9pLRL5qXZGnuvvpa95zdY4KnkPjuz5pK9BhFY36gqMfuhzz18pcmu1qnPOXuZm8K85M5uxK"
         preset="" stepped="0" steps="8"/>
@@ -270,35 +318,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -319,7 +367,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -329,48 +377,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="0.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="-4.999999523162842"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="0.0"/>
         <PARAM id="osc2Noise" value="1.0"/>
         <PARAM id="osc2On" value="1.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="" stepped="0" steps="8"/>
@@ -475,35 +571,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="3.0"/>
         <PARAM id="lfo1On" value="1.0"/>
-        <PARAM id="lfo1Period" value="0.0120000010356307"/>
+        <PARAM id="lfo1Period" value="0.01199999824166298"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -524,7 +620,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -534,48 +630,96 @@
         <PARAM id="osc1Level" value="0.0"/>
         <PARAM id="osc1Noise" value="1.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="0.0"/>
         <PARAM id="osc2Noise" value="1.0"/>
         <PARAM id="osc2On" value="1.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="1.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="Sine" stepped="0" steps="8"/>
@@ -679,35 +823,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -728,7 +872,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -738,48 +882,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="0.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="0.0"/>
         <PARAM id="osc2Noise" value="1.0"/>
         <PARAM id="osc2On" value="1.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048......jzqBxiAqJPOgW+P8nelB1ievLZOfw6v832Nj2y2UIfO.VnD9f4ph3CFGKiO3asP93h1R4iqOKlO0Yqb93qQA5y2ojnOcPPj9fO0X5C7aBpOFhEp97iBv5imvdqOlrzu9.V1F6izZ4rOD7b09HXMc6i0MRtOMd859XiDy6iW8nuOMwJ.+3aLD7yxtdvO.MxB+ntiN7CkwGwOMrTE+LxlX7SoguwOj4wG+HSTh7S34UxOCgIJ+7Bqq7yc05xO0OaL+32oz7y5OdyOWzlN+rsO87CEE.zOc9qP+XkaE8CGQfzORepR+XkLM8iiv9zOZIhT+H5gT8iRfa0O5vRV+n0Za8Ckc10OQK7W+7u1g8iBlO1OfOdY+.G0m8Cq2l1OF13Z+.eUs8i2P71OF4Kb+zgWx8SWvO2O9SWc+n+518CSUg2OwCad+bt+58yJ+v2O9FWe+Dpk98i0s92OvtEf+LZ1.9SwPE3OZDbf+TpJB9CaMJ3Oyktf+.rOC9CVMN3OAU8f+PnED9CJQQ3OyTHg+.qrD9ioYS3OenOg+TBEE9yvmT3OBTSg+39NE9Ck7T3O9aSg+nyJE9yTYT3OYEPg+X03D9yV+R3O1UIg+PaYD9SIvP3OXS+f+38rC9SQsM3OeDxf+v2yB9Ca3I3OBvgf+3jtA9SXSE3OOcNf+jhc.9C...3OQmve+fdB98Ca.z2OC19d+HUz58i.rl2O31Gd+voQ28i0FX2OL5Kc+bday8yCUH2OqPKb+T1Ru8y3Z21OPKFa+L03p8yjbk1O757Y+LeNl8iXdR1OwvuX+f3Tg8Sjj90Ov8dW+.EMb8SVyo0OwxJV+.H3V8C6NT0OcfyT+nCWQ8CZ68zONWYS+H4pK8C17lzOEm7Q+7mzE8iJWOzOpecP+DN0+7CMN2yOEP7N+Xms47SpkdyO+FYM+jsdy7iEgEyOXRzK+vWIs7S3CrxOm+MJ+nZtl7iQQRxOZalH+.nNf7CUL3wOvw8F+3tpY7C52cwO2MTE+LaCS7irVCwOL5oC+fUYL7CKqnvOZ.+A+nCsE7Cm2MvOVoS.+DO986CK7kuO.5O89n.fv6C7.vtOJE349XS.i6iz.5sO2.f1932eU6iu9CsON3Gy9HX+G6iL8MrOrzuu9XXe55CS9WqON9Wr9vU.s5SvChpOJa.o97mhe5C6NroOYPok9vfFR5Cyf1nOdgRh9bLrD5CB5.nOLg3c9.jmt4C70VlOY8LW9fm5S4SSGrjONWhP9PeQ43StmAiOOr3I9v9qd3CQVWgOH3OC9jxID3yJiZeO7oO48vAUS2y4uFbO11.r8vUad1yqNyXOELlc8T0JS0y50+ROrILC83NHSySU+xHON5KC7XzpEShi9x.uU8Ki75NHSyKaByPuqW+K8V0JS0aAiYWuu5Li8xUad1qsM.aum+Zv8xAUS2Ke5SduqLp88lxID3KB9yfuDYcE9x9qd36CKdhu4dFL9ReQ43qykHjuMcvR9hm5S4aVOykuvWaY9Bjmt4KSHdmuHnCf9dLrD5qWnjnuLCZi9xfFR5aFTZour6vl99mhe5qxFPpuAOHp9xU.s5qi+EquL4es9ZXe55KK86quxz2v9JX+G6qC9wru95Oz952eU66M.nsuRCn29ZS.i6qRAdtuvC.69p.fv6Kf9SuurvW99FO986qU5Dvubd2.+pCsE7qFvevurrhB+hUYL7Kid5vuxZMD+NaCS76cCUwune2E+5tpY7KbbuwuTwfG+BnNf7q1lIxuFEII+pZtl764eixugOvJ+xWIs7KlD8xuVDVL+lsdy76uQVyuoV5M+Zms47aADuyuz3bO+FN0+7q5WGzupb8P+9mzE8awIezuXyaR+J4pK8qyU1zuns2S+pCWQ8aG3L0ur6PU+BH3V8arrh0uYMmV+BEMb8Kbu20uQR5W+h3Tg8aL7K1uh4IY+NeNl8KuNe1uSxUZ+N03p8Kzhw1uiqca+V1Ru86JzB2uOTgb+dday8Ki9R2uVafc+xoQ28Kt8g2uBvZd+JUz586fsu2urAPe+hdB98azI72u...f+lhc.96SmC3ugMUf+5jtA9q.bH3urgmf+x2yB96GgL3uE01f+58rC9K1zO3uk.Cg+RaYD9qcUR3ua8Kg+Z03D9aVAT3uSkQg+pyJE9q+1T3uTxSg+59NE9q.0T3uCeRg+VBEE96G5S3ullMg+BqrD96LER3unDEg+RnED9aPUO3uX03f+BrOC96boK3ur0nf+VpJB9qFAG3uECUf+NZ1.9KraA3uV25e+Fpk98quw02uq7Ce+dt+58a7vl2uLUEd+p+518q+zU2ucA+b+1gWx8qQ9B2udCwa+BeUs8qgMt1urdaZ+BG0m8K3iW1uJX9X+9u1g8azB+0uT1YW+p0Za8qNrj0uJAtU+J5gT8qVhH0uNB6S+ZkLM8qzmpzubDAR+ZkaE8am+JzuTT.P+tsO876Esoyuq+3M+52oz7a8yFyu2UqK+9Bqq76PXhxugmWI+JSTh7KYd7wukF9F+NxlX7aCKUwuTFeD+ptiN7KPirvuK65A+5aLD7aSrBvud0i99ZiDy6aiWutuV2H49JXMc6KAOWsuRqky9BV1F6qIK8qudB6s99iBv5qgXgpuvuIn9hO0X5aGDDouemRh95qQA5ac1Jmut9rX95h1R4K9VKjuXbrL9h4ph3KfEJgueWk.952Nj2KX7Nbu9Ayn8pelB1a30OTuFrp.8lzqBxK"
               preset="" stepped="0" steps="8"/>
@@ -883,35 +1075,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -932,7 +1124,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -942,48 +1134,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="1.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="1.0"/>
         <PARAM id="osc2Noise" value="0.0"/>
         <PARAM id="osc2On" value="0.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="Sine" stepped="0" steps="8"/>
@@ -1085,35 +1325,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -1134,7 +1374,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -1144,48 +1384,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="1.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="1.0"/>
         <PARAM id="osc2Noise" value="0.0"/>
         <PARAM id="osc2On" value="0.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="Sine" stepped="0" steps="8"/>
@@ -1287,35 +1575,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -1336,7 +1624,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -1346,48 +1634,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="1.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="1.0"/>
         <PARAM id="osc2Noise" value="0.0"/>
         <PARAM id="osc2On" value="0.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="Sine" stepped="0" steps="8"/>
@@ -1489,35 +1825,35 @@
         <PARAM id="lfo1BeatRate" value="6.0"/>
         <PARAM id="lfo1Mode" value="0.0"/>
         <PARAM id="lfo1On" value="0.0"/>
-        <PARAM id="lfo1Period" value="1.00000011920929"/>
+        <PARAM id="lfo1Period" value="0.9999999403953552"/>
         <PARAM id="lfo1Random" value="0.0"/>
         <PARAM id="lfo1StartOnPlay" value="1.0"/>
         <PARAM id="lfo1Sync" value="0.0"/>
         <PARAM id="lfo2BeatRate" value="6.0"/>
         <PARAM id="lfo2Mode" value="0.0"/>
         <PARAM id="lfo2On" value="0.0"/>
-        <PARAM id="lfo2Period" value="1.999999642372131"/>
+        <PARAM id="lfo2Period" value="1.999999523162842"/>
         <PARAM id="lfo2Random" value="0.0"/>
         <PARAM id="lfo2StartOnPlay" value="1.0"/>
         <PARAM id="lfo2Sync" value="0.0"/>
         <PARAM id="lfo3BeatRate" value="6.0"/>
         <PARAM id="lfo3Mode" value="0.0"/>
         <PARAM id="lfo3On" value="0.0"/>
-        <PARAM id="lfo3Period" value="3.999999523162842"/>
+        <PARAM id="lfo3Period" value="4.0"/>
         <PARAM id="lfo3Random" value="0.0"/>
         <PARAM id="lfo3StartOnPlay" value="1.0"/>
         <PARAM id="lfo3Sync" value="0.0"/>
         <PARAM id="lfo4BeatRate" value="6.0"/>
         <PARAM id="lfo4Mode" value="0.0"/>
         <PARAM id="lfo4On" value="0.0"/>
-        <PARAM id="lfo4Period" value="0.5"/>
+        <PARAM id="lfo4Period" value="0.5000000596046448"/>
         <PARAM id="lfo4Random" value="0.0"/>
         <PARAM id="lfo4StartOnPlay" value="1.0"/>
         <PARAM id="lfo4Sync" value="0.0"/>
         <PARAM id="lfo5BeatRate" value="6.0"/>
         <PARAM id="lfo5Mode" value="0.0"/>
         <PARAM id="lfo5On" value="0.0"/>
-        <PARAM id="lfo5Period" value="8.0"/>
+        <PARAM id="lfo5Period" value="7.999998569488525"/>
         <PARAM id="lfo5Random" value="0.0"/>
         <PARAM id="lfo5StartOnPlay" value="1.0"/>
         <PARAM id="lfo5Sync" value="0.0"/>
@@ -1538,7 +1874,7 @@
         <PARAM id="lfo8BeatRate" value="6.0"/>
         <PARAM id="lfo8Mode" value="0.0"/>
         <PARAM id="lfo8On" value="0.0"/>
-        <PARAM id="lfo8Period" value="6.000000476837158"/>
+        <PARAM id="lfo8Period" value="5.999999046325684"/>
         <PARAM id="lfo8Random" value="0.0"/>
         <PARAM id="lfo8StartOnPlay" value="1.0"/>
         <PARAM id="lfo8Sync" value="0.0"/>
@@ -1548,48 +1884,96 @@
         <PARAM id="osc1Level" value="1.0"/>
         <PARAM id="osc1Noise" value="1.0"/>
         <PARAM id="osc1On" value="1.0"/>
+        <PARAM id="osc1Pan" value="0.5"/>
+        <PARAM id="osc1ToFilter1" value="1.0"/>
+        <PARAM id="osc1ToFilter2" value="1.0"/>
+        <PARAM id="osc1ToFilter3" value="1.0"/>
+        <PARAM id="osc1ToFilter4" value="1.0"/>
         <PARAM id="osc1Tune" value="0.0"/>
         <PARAM id="osc1TuneZoom" value="0.0"/>
+        <PARAM id="osc1Unison" value="1.0"/>
+        <PARAM id="osc1UnisonDetune" value="20.0"/>
+        <PARAM id="osc1UnisonSpread" value="0.5"/>
         <PARAM id="osc2Glide" value="0.0"/>
         <PARAM id="osc2GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc2Harmonics" value="3.0"/>
         <PARAM id="osc2Level" value="1.0"/>
         <PARAM id="osc2Noise" value="1.0"/>
         <PARAM id="osc2On" value="1.0"/>
+        <PARAM id="osc2Pan" value="0.5"/>
+        <PARAM id="osc2ToFilter1" value="1.0"/>
+        <PARAM id="osc2ToFilter2" value="1.0"/>
+        <PARAM id="osc2ToFilter3" value="1.0"/>
+        <PARAM id="osc2ToFilter4" value="1.0"/>
         <PARAM id="osc2Tune" value="0.0"/>
         <PARAM id="osc2TuneZoom" value="0.0"/>
+        <PARAM id="osc2Unison" value="1.0"/>
+        <PARAM id="osc2UnisonDetune" value="20.0"/>
+        <PARAM id="osc2UnisonSpread" value="0.5"/>
         <PARAM id="osc3Glide" value="0.0"/>
         <PARAM id="osc3GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc3Harmonics" value="3.0"/>
         <PARAM id="osc3Level" value="1.0"/>
         <PARAM id="osc3Noise" value="0.0"/>
         <PARAM id="osc3On" value="0.0"/>
+        <PARAM id="osc3Pan" value="0.5"/>
+        <PARAM id="osc3ToFilter1" value="1.0"/>
+        <PARAM id="osc3ToFilter2" value="1.0"/>
+        <PARAM id="osc3ToFilter3" value="1.0"/>
+        <PARAM id="osc3ToFilter4" value="1.0"/>
         <PARAM id="osc3Tune" value="0.0"/>
         <PARAM id="osc3TuneZoom" value="0.0"/>
+        <PARAM id="osc3Unison" value="1.0"/>
+        <PARAM id="osc3UnisonDetune" value="20.0"/>
+        <PARAM id="osc3UnisonSpread" value="0.5"/>
         <PARAM id="osc4Glide" value="0.0"/>
         <PARAM id="osc4GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc4Harmonics" value="3.0"/>
         <PARAM id="osc4Level" value="1.0"/>
         <PARAM id="osc4Noise" value="0.0"/>
         <PARAM id="osc4On" value="0.0"/>
+        <PARAM id="osc4Pan" value="0.5"/>
+        <PARAM id="osc4ToFilter1" value="1.0"/>
+        <PARAM id="osc4ToFilter2" value="1.0"/>
+        <PARAM id="osc4ToFilter3" value="1.0"/>
+        <PARAM id="osc4ToFilter4" value="1.0"/>
         <PARAM id="osc4Tune" value="0.0"/>
         <PARAM id="osc4TuneZoom" value="0.0"/>
+        <PARAM id="osc4Unison" value="1.0"/>
+        <PARAM id="osc4UnisonDetune" value="20.0"/>
+        <PARAM id="osc4UnisonSpread" value="0.5"/>
         <PARAM id="osc5Glide" value="0.0"/>
         <PARAM id="osc5GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc5Harmonics" value="3.0"/>
         <PARAM id="osc5Level" value="1.0"/>
         <PARAM id="osc5Noise" value="0.0"/>
         <PARAM id="osc5On" value="0.0"/>
+        <PARAM id="osc5Pan" value="0.5"/>
+        <PARAM id="osc5ToFilter1" value="1.0"/>
+        <PARAM id="osc5ToFilter2" value="1.0"/>
+        <PARAM id="osc5ToFilter3" value="1.0"/>
+        <PARAM id="osc5ToFilter4" value="1.0"/>
         <PARAM id="osc5Tune" value="0.0"/>
         <PARAM id="osc5TuneZoom" value="0.0"/>
+        <PARAM id="osc5Unison" value="1.0"/>
+        <PARAM id="osc5UnisonDetune" value="20.0"/>
+        <PARAM id="osc5UnisonSpread" value="0.5"/>
         <PARAM id="osc6Glide" value="0.0"/>
         <PARAM id="osc6GlideTime" value="0.2000000178813934"/>
         <PARAM id="osc6Harmonics" value="3.0"/>
         <PARAM id="osc6Level" value="1.0"/>
         <PARAM id="osc6Noise" value="0.0"/>
         <PARAM id="osc6On" value="0.0"/>
+        <PARAM id="osc6Pan" value="0.5"/>
+        <PARAM id="osc6ToFilter1" value="1.0"/>
+        <PARAM id="osc6ToFilter2" value="1.0"/>
+        <PARAM id="osc6ToFilter3" value="1.0"/>
+        <PARAM id="osc6ToFilter4" value="1.0"/>
         <PARAM id="osc6Tune" value="0.0"/>
         <PARAM id="osc6TuneZoom" value="0.0"/>
+        <PARAM id="osc6Unison" value="1.0"/>
+        <PARAM id="osc6UnisonDetune" value="20.0"/>
+        <PARAM id="osc6UnisonSpread" value="0.5"/>
         <PARAM id="volume" value="0.0"/>
         <WAVE oscillator="0" points="2048.......oCIwCrJjLOrLrE8.y9H0CcqrWOEjpk8.nsu1iM8hbOtva38Lmr52igOmfOCBjE9X6ph3inP7hOO61N9HbwG4S.UPkOSvEX97mlr4CyOimO.2mf9LoiH5iHZ5nOw.Jk9XHnZ5S4ZBpOR7no9PMer5y6iIqOpPDt9nTG95SEuOrOSkax9n7dO6SP1TsO.ht197jjf6ScyXtO6t759ntVw6yxfauOmzE+9P94.7SObNvOBtjA+rY8H7yZZtvOZmiC+z7zP7iJnMwOYaeE+.7eX7iwBrwOQ+WG+rr8e7SlmIxOkHMI+XkMm7SETlxOJs9J+38Nt7ytEByOIirL+LOA07yH5byOBgVN+ryi67S9t1yOmc7O+.G1A8C.hOzOCPdQ+Tl2G8iDQmzO3u6R+HvmM8yG58zO8zTT+jDFS8SLaS0OkWoU+LERX8iZxm0OZP4V+LUKc8SA950OgXDX+fYwg8iV7L1OYoJY+f3Cl8C1qc1O77KZ+bZBp8CCKs1OdMHa+Lors8imX61OyU+a+fPBw8iTSH2OGQwb+z8Bz8yB5S2OF6cc+bft18SwKd2O3OEd+foD48SmGm2OBLmd+3KE68Syrt2OnrCe+j7u78Cq5z2OLuZe+PxD98Crv42OsQre+fkC+8SaN82OqR3e+7Pr+8ykS+2OCw9e+Dw9+8C...3OQr+e+LD6+8ykS+2OOD6e+rJg+8SaN82OX4ve+zFw98Crv42OjLge+v7p88Cq5z2OI+Ke+fxN78Syrt2O9Rwd+Hvb58SmGm2OXJQd+f+T38SwKd2OGnqc+Xr208yB5S2Ocu.c+bDEy8iTSH2OHjPb+LW8u8imX61OSJaa+30fr8CCKs1OmlfZ+vyun8C1qc1OH9fY+jkpj8iV7L1OXVbX+DhQf8SA950OS0RW+nAka8iZxm0OSgDV+TdkV8SLaS0OIgwT+zSSQ8yG58zOB7YS+f+tK8iDQmzOk48Q+L.4E8C.hOzOvgcP+b1w+7S9t1yO673N+HDZ47yH5byOySPM+jLxx7ytEByOduiK+nz5q7SETlxOVYyI+Thzj7SlmIxOKa+G+D8ec7iwBrwO.+GF+js8U7iJnMwOMOMD+ncNN7yZZtvOaVOB+H3RF7SObNvOjeN.+bRW76yxfauOpqU79r6xq6ScyXtOOII39.H5Z6SP1TsOJu2y9LUtI6SEuOrOJ0gu9nBQ35y6iIqOTyGq9Hwil5S4ZBpOFBpl9DCnT5iHZ5nOS5Hh9.beB5CyOimO+oIa9LAWf4S.UPkOBW7Q97ra63inP7hO1tpH9LHPV3igOmfOyIq983Bug2iM8hbO.Z6q8TPpV1CcqrWOvrOR8vxvVzCrJjLOP5PR7HSLMTBjNjDuvpPx7xxvVzKL6iTuzsxd8VPpV1Kf19Zu1zKx85Bug26bxpeuF9bB9NHPV3qsqJhuhBwK99ra63qvEejuATAU9NAWf46eZxluL+Ld9BbeB56jNhnuhnoi9FCnT5qgfpoukqIn9Jwil5K07wpuuOlr9pBQ35qRc3quU79v9NUtI6qx68ruAYS09BH5Z66SRBtu0Mi49t6xq6q5ZEuuKCt89dRW76K4mCvu8v4.+J3RF76l0ivuqo4B+pcNN7aySCwupf1D+ls8U7Kv+gwuFKvF+F8ec76x1+wuYdlH+Vhzj7qU1bxuUPYJ+pz5q7q263xu6VHL+lLxx767DTyuinyM+JDZ476NOtyu46ZO+d1w+7KbXGzu.H9P+N.4E8aYdezuRDcR+h+tK8q.e1zuen2S+1SSQ8aRXL0uwrMU+VdkV86THg0upIeV+pAka86Tsz0uE3qW+FhQf8KlEG1uZwyX+lkpj8KhOX1uXu1Y+xyun86oIn1uLrzZ+50fr86jx11udhsa+NW8u8KBID2uRMgb+dDEy8a2KP2uKnOc+Zr2086A5Z2uEu3c+h+T38KlRj2ucdbd+Jvb58quTr2uMy5d+hxN78ax+x2urpSe+x7p88KIS32uvBme+1Fw98KVN72us4ze+tJg+86Cw92uWN8e+ND6+8aD6+2u...f+Fw9+86Pr+2uWN8e+9Pr+86pD92us4ze+hkC+8aaD62uvBme+RxD98Kyq12urpSe+l7u78KJ6v2uMy5d+5KE68q.yo2ucdbd+hoD48K9Sg2uEu3c+dft18qwdW2uKnOc+18Bz86QTL2uRMgb+hPBw86b0+1udhsa+Nors8qWCx1uLrzZ+dZBp8KO+h1uXu1Y+h3Cl8aVpR1uZwyX+hYwg8aHFA1uE3qW+NUKc8qFTt0upIeV+NERX8a4UZ0uwrMU+lDFS8aOME0uen2S+JvmM8K96tzuRDcR+Vl2G86.jWzu.H9P+BG1A86YG+yu46ZO+tyi67qPnkyuinyM+NOA07axHKyu6VHL+58Nt7qRquxuUPYJ+ZkMm7aIRSxuYdlH+tr8e7az+0wuFKvF+B7eX7a11Wwupf1D+17zP7q143vuqo4B+tY8H7qfKYvu8v4.+R94.76IcwuuKCt89ptVw66tKutu0Mi499jjf6KfnqsuAYS09p7dO66T4lruU79v9pTG95qJDgquuOlr9RMer5qDOZpukqIn9ZHnZ5aLfRouhnoi9NoiH5Kv8InuL+Ld99mlr46DbAluATAU9JbwG46ytsiuhBwK9Z6ph36f.YguF9bB9Nmr52qK7Fdu1zKx8Bnsu1aAoZYuzsxd8By9H0KKCaQuvpPx7BoCIwK"
               preset="Sine" stepped="0" steps="8"/>
