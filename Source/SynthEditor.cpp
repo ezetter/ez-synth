@@ -184,6 +184,8 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     routingScreen.onOscillatorChosen = [this] (int oscillator) { editSource (oscillator); };
     addChildComponent (routingScreen);
     oscillatorPanel.onShowFilterRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource); };
+    oscillatorPanel.onShowEffectRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource, RoutingScreen::Page::effects); };
+    oscillatorPanel.setEffectsShown (synthProcessor.hostsEffects());
 
     pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
     pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
@@ -736,13 +738,14 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
                                             getLocalArea (&anchor, anchor.getLocalBounds()), this);
 }
 
-void SynthEditor::showRoutingScreen (bool visible, int oscillator)
+void SynthEditor::showRoutingScreen (bool visible, int oscillator, RoutingScreen::Page page)
 {
     if (visible)
     {
         showModulationOverview (false);
         showPitchSetScreen (false);
         routingScreen.showOscillator (oscillator);
+        routingScreen.showPage (page);
     }
 
     routingScreen.setVisible (visible);

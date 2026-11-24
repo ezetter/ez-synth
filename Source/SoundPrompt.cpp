@@ -184,6 +184,8 @@ oscillator's tune.
   middle it plays at its full level on both sides; panned away from it, the far side fades out. The sound tool
   measures both sides together, as it does a stereo sample, so leave pans in the middle to match a sample. Like
   any control, it can be moved, as `osc1Pan` in the modulation: an LFO on it swings the oscillator side to side.
+- `oscNToBusM`, true or false, false to begin with, sends oscillator N through effect bus M (1 to 4), the
+  standalone app's effect plugins. Leave these false: the sound tool plays no effects.
 - `oscNUnison`, from 1 (off) to 8, stacks that many voices of the oscillator, detuned `oscNUnisonDetune` cents
   either way at the outermost (0 to 100, 20 to begin with) and spread `oscNUnisonSpread` either side of its pan
   (0 to 1, 0.5 to begin with), together about as loud as one voice. Use it for supersaws, string ensembles,

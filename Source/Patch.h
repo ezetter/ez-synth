@@ -15,6 +15,11 @@ struct Patch
     /** The most voices an oscillator's unison can stack. */
     static constexpr int maxUnisonVoices = 8;
 
+    /** How many effect buses there are, each a chain of effect plugins, in the standalone app, that oscillators can be
+        sent through.
+    */
+    static constexpr int numEffectBuses = 4;
+
     /** The furthest an oscillator's unison can detune its outermost voices, either way, in cents. */
     static constexpr float mostUnisonDetune = 100.0f;
 
@@ -52,6 +57,11 @@ struct Patch
         int unisonVoices = 1;
         float unisonDetune = 20.0f;
         float unisonSpread = 0.5f;
+
+        /** Whether it's sent through each effect bus. One sent through none plays straight out, as does every
+            oscillator where effects aren't hosted, in the plugins.
+        */
+        std::array<bool, numEffectBuses> busSends {};
 
         /** Whether it's sent through each filter, or skips it, going straight on to the next. */
         std::array<bool, modulation::numFilters> filterSends { true, true, true, true };

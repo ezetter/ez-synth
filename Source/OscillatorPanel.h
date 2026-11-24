@@ -2,6 +2,7 @@
 
 #include "ChoiceButtons.h"
 #include "Modulation.h"
+#include "Patch.h"
 #include "ModulatableControls.h"
 #include "Tuning.h"
 
@@ -48,8 +49,13 @@ public:
     /** Shows only the pan and the routing, for an oscillator playing noise, which has no unison, tune or glide. */
     void setPanOnly (bool);
 
-    /** Called when the Filters button's clicked, to show the screen setting which filters the oscillator's sent through. */
-    std::function<void()> onShowFilterRouting;
+    /** Called when the Filters button's clicked, to show the screen setting which filters the oscillator's sent through,
+        and when the Effects button is, to show which effect buses it's sent through.
+    */
+    std::function<void()> onShowFilterRouting, onShowEffectRouting;
+
+    /** Shows the Effects button, and the buses the oscillator's sent through, in the standalone app, which hosts effects. */
+    void setEffectsShown (bool);
     bool isPanOnly() const noexcept   { return panOnly; }
 
     /** Which glide button is chosen: 0 for Off, 1 for Glide, 2 for Legato. */
@@ -62,7 +68,7 @@ public:
     void resized() override;
 
     /** The least height it fits in. Given more, it spreads its sections apart. */
-    static constexpr int preferredHeight = 347;
+    static constexpr int preferredHeight = 353;
 
 private:
     void showTune (float semitones);
@@ -75,7 +81,10 @@ private:
     juce::Slider zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
     ChoiceButtons glideMode { { "Off", "Glide", "Legato" } };
-    juce::TextButton filtersButton { "Filters" };
+    juce::TextButton filtersButton { "Filters" }, effectsButton { "Effects" };
+    std::array<std::unique_ptr<juce::ParameterAttachment>, Patch::numEffectBuses> busAttachments;
+    std::array<bool, Patch::numEffectBuses> buses {};
+    bool effectsShown = false;
     std::array<std::unique_ptr<juce::ParameterAttachment>, modulation::numFilters> sendAttachments;
     std::array<bool, modulation::numFilters> sends { true, true, true, true };
     juce::Slider glideTimeSlider;

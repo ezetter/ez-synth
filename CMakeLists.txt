@@ -47,6 +47,7 @@ target_sources(EZSynth
         Source/CardStrip.cpp
         Source/ChoiceButtons.cpp
         Source/Dropdown.cpp
+        Source/EffectRack.cpp
         Source/Envelope.cpp
         Source/EnvelopePanel.cpp
         Source/FilterPanel.cpp
@@ -127,7 +128,10 @@ target_compile_definitions(EZSynth
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
-        JUCE_VST3_CAN_REPLACE_VST2=0)
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        # The standalone app hosts VST3 and Audio Unit effects on its effect buses.
+        JUCE_PLUGINHOST_VST3=1
+        JUCE_PLUGINHOST_AU=1)
 
 target_link_libraries(EZSynth
     PRIVATE
