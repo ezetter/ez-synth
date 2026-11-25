@@ -148,12 +148,27 @@ void Reverb::process (float* left, float* right, int numSamples, const Settings&
         return std::all_of (samples, samples + numSamples, [] (float sample) { return sample == 0.0f; });
     };
 
-    if (! isRinging() && glide && silent (left) && silent (right))
+    // With none of it mixed in, and none still fading out, it's off: what went in comes out as it is. It starts
+    // again from silence when it's turned up.
+    const auto off = glide && current.mix <= 0.0f && settings.mix <= 0.0f;
+
+    if ((! isRinging() && glide && silent (left) && silent (right)) || off)
     {
         current = settings;
         scale = sizeToScale (settings.size);
+
+        if (off && ! resting)
+        {
+            reset();
+            glide = true;
+            resting = true;
+            current = settings;
+        }
+
         return;
     }
+
+    resting = false;
 
     const auto share = glideShare (sampleRate);
     const auto toward = [share] (float& value, float target)

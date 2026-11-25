@@ -3645,8 +3645,41 @@ namespace
             auto synth = std::make_unique<SynthProcessor>();
             setPreset (*synth, 0, waveform::Preset::sine);
             setParameter (*synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), sent ? 1.0f : 0.0f);
+            setParameter (*synth, SynthProcessor::reverbMixId, 0.3f);
             return synth;
         };
+
+        // To begin with, every oscillator's sent through the reverb, in every pitch set, but none of it's mixed in,
+        // so it's off: a note plays exactly as it would straight out, and stops when it does.
+        {
+            SynthProcessor fresh;
+            auto allSent = true;
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                allSent = allSent && fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (i, Patch::reverbEffect))->load() >= 0.5f;
+
+            fresh.setActivePitchSet (fresh.addPitchSet ({ 60, 71 }));
+
+            for (int i = 0; i < SynthProcessor::numOscillators; ++i)
+                allSent = allSent && fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (i, Patch::reverbEffect))->load() >= 0.5f;
+
+            check (allSent && fresh.parameters.getRawParameterValue (SynthProcessor::reverbMixId)->load() == 0.0f,
+                   "to begin with, every oscillator in every pitch set is sent through the reverb, with none of it mixed in");
+
+            auto off = std::make_unique<SynthProcessor>();
+            setPreset (*off, 0, waveform::Preset::sine);
+            auto straight = std::make_unique<SynthProcessor>();
+            setPreset (*straight, 0, waveform::Preset::sine);
+            setParameter (*straight, SynthProcessor::effectSendId (0, Patch::reverbEffect), 0.0f);
+            const auto [left, right] = playSides (*off, 69, 0.2, 1.0);
+            const auto [straightLeft, straightRight] = playSides (*straight, 69, 0.2, 1.0);
+            auto furthest = 0.0f;
+
+            for (size_t i = 0; i < left.size(); ++i)
+                furthest = std::max ({ furthest, std::abs (left[i] - straightLeft[i]), std::abs (right[i] - straightRight[i]) });
+
+            check (peakOf (left) > 0.1f && furthest < 1.0e-6f, "...so it's off, and a note plays as it does straight out");
+        }
 
         const auto decibels = [] (double level) { return 20.0 * std::log10 (std::max (level, 1.0e-12)); };
 
@@ -3775,9 +3808,9 @@ namespace
                      && isNear (value (SynthProcessor::reverbMixId), 0.8, 0.01)
                      && value (SynthProcessor::effectSendId (0, Patch::reverbEffect)) > 0.5f,
                    "a preset keeps the reverb's settings, and which oscillators are sent through it");
-            check (loaded.loadFactoryPreset ("Acid Bass") && value (SynthProcessor::effectSendId (0, Patch::reverbEffect)) < 0.5f
-                     && isNear (value (SynthProcessor::reverbMixId), 0.3, 0.01),
-                   "...and a factory preset, saved before there was a reverb, sends nothing through it, set as it starts");
+            check (loaded.loadFactoryPreset ("Acid Bass") && value (SynthProcessor::effectSendId (0, Patch::reverbEffect)) >= 0.5f
+                     && value (SynthProcessor::reverbMixId) == 0.0f,
+                   "...and a factory preset, saved before there was a reverb, sends everything through it, with none mixed in");
             file.deleteFile();
         }
     }
@@ -4056,13 +4089,13 @@ namespace
 
             // Its reverb switch sends the oscillator through the reverb, after its filters.
             screen.showOscillator (2);
-            check (screen.describePath() == juce::String (juce::CharPointer_UTF8 ("Osc 3  \xe2\x86\x92  Filter 1  \xe2\x86\x92  Filter 3  \xe2\x86\x92  Filter 4  \xe2\x86\x92  Out"))
-                     && ! screen.getEffectSwitch (Patch::reverbEffect).getToggleState(),
-                   "...which spells out the path the oscillator takes, through no effect to begin with");
-            screen.getEffectSwitch (Patch::reverbEffect).setToggleState (true, juce::sendNotificationSync);
-            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::reverbEffect))->load() >= 0.5f
-                     && screen.describePath().endsWith (juce::String (juce::CharPointer_UTF8 ("Filter 4  \xe2\x86\x92  Reverb  \xe2\x86\x92  Out"))),
-                   "...and whose reverb switch sends it through the reverb, after its filters");
+            check (screen.describePath() == juce::String (juce::CharPointer_UTF8 ("Osc 3  \xe2\x86\x92  Filter 1  \xe2\x86\x92  Filter 3  \xe2\x86\x92  Filter 4  \xe2\x86\x92  Reverb  \xe2\x86\x92  Out"))
+                     && screen.getEffectSwitch (Patch::reverbEffect).getToggleState(),
+                   "...which spells out the path the oscillator takes, through the reverb, after its filters, to begin with");
+            screen.getEffectSwitch (Patch::reverbEffect).setToggleState (false, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::reverbEffect))->load() < 0.5f
+                     && screen.describePath().endsWith (juce::String (juce::CharPointer_UTF8 ("Filter 4  \xe2\x86\x92  Out"))),
+                   "...and whose reverb switch takes it out of the reverb");
 
             screen.doneButton.onClick();
             check (! synthEditor.isRoutingScreenShown(), "Done closes it");
@@ -4070,11 +4103,11 @@ namespace
             // The Effects screen sets the reverb, and which oscillators are sent through it.
             synthEditor.showEffectsScreen (true);
             auto& effects = synthEditor.getEffectsScreen();
-            check (synthEditor.isEffectsScreenShown() && effects.getSendSwitch (2).getToggleState() && ! effects.getSendSwitch (0).getToggleState(),
+            check (synthEditor.isEffectsScreenShown() && ! effects.getSendSwitch (2).getToggleState() && effects.getSendSwitch (0).getToggleState(),
                    "the Effects screen shows which oscillators are sent through the reverb");
-            effects.getSendSwitch (0).setToggleState (true, juce::sendNotificationSync);
+            effects.getSendSwitch (0).setToggleState (false, juce::sendNotificationSync);
             effects.getReverbDial (2).setValue (6.0, juce::sendNotificationSync);
-            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (0, Patch::reverbEffect))->load() >= 0.5f
+            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (0, Patch::reverbEffect))->load() < 0.5f
                      && isNear (shown.parameters.getRawParameterValue (SynthProcessor::reverbDecayId)->load(), 6.0, 0.01),
                    "...and sets them, and the reverb's dials");
             synthEditor.showRoutingScreen (true, 0);
@@ -6587,17 +6620,18 @@ namespace
         setParameter (synth, SynthProcessor::filterSendId (1, 1), 1.0f);
         setParameter (synth, SynthProcessor::filterSendId (1, 3), 1.0f);
 
-        // The effects screen, oscillators 1 and 2 sent through the reverb, a larger room ringing for 3.5 seconds.
-        setParameter (synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), 1.0f);
-        setParameter (synth, SynthProcessor::effectSendId (1, Patch::reverbEffect), 1.0f);
+        // The effects screen, every oscillator but the third sent through the reverb, a larger room ringing for
+        // 3.5 seconds, 30% of it mixed in.
+        setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 0.0f);
+        setParameter (synth, SynthProcessor::reverbMixId, 0.3f);
         setParameter (synth, SynthProcessor::reverbSizeId, 72.0f);
         setParameter (synth, SynthProcessor::reverbDecayId, 3.5f);
         synthEditor.showEffectsScreen (true);
         synthEditor.refresh();
         save ("10g-effects");
         synthEditor.showEffectsScreen (false);
-        setParameter (synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), 0.0f);
-        setParameter (synth, SynthProcessor::effectSendId (1, Patch::reverbEffect), 0.0f);
+        setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 1.0f);
+        setParameter (synth, SynthProcessor::reverbMixId, 0.0f);
 
         // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
         // added, waiting for its highest key.

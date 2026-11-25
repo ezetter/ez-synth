@@ -25,7 +25,7 @@ public:
         float decay = 2.0f;
 
         /** How much of what comes out is the reverb, from 0 to 1, the rest being what went in. */
-        float mix = 0.3f;
+        float mix = 0.0f;
     };
 
     static constexpr float longestDelay = 200.0f;
@@ -79,4 +79,5 @@ private:
     int untilUpdate = 0;
 
     int quietSamples = 0, ringingSamples = 0;
+    bool resting = false;
 };

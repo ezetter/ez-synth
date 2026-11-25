@@ -67,8 +67,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   the reverb, beside its settings. The filters run in a
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
-  as they were. After the filters, an oscillator sent through the reverb plays out through it; none is to
-  begin with. The path the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Reverb → Out*, is
+  as they were. After the filters, an oscillator sent through the reverb plays out through it; every one is
+  to begin with, but the reverb starts with none of it mixed in, so it's off until its **Mix** is turned up. The path the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Reverb → Out*, is
   spelled out above the switches, and the Routing row says which filters it's sent through, and the reverb,
   if it is. Each pitch set can route its oscillators differently. The reverb's **Settings** button opens the
   effects' screen. **Done**, or Escape, goes back to the synth.
@@ -80,16 +80,19 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   box, to 100, a large hall, which spaces the reflections and the echoes its tail is made of; **Decay**, how
   long the tail takes to fall 60 dB, from 0.1 to 20 seconds, its highs fading twice as fast, as in a real
   room; and **Mix**, how much of what comes out is the reverb, the rest being the dry sound. Under them is a
-  switch for each oscillator, sending it through the reverb, the same switches as on the routing screen. An
-  oscillator sent through it rings on after its note ends; one that isn't plays straight out, dry. Held, a
+  switch for each oscillator, sending it through the reverb, the same switches as on the routing screen. Every
+  oscillator, in every pitch set, is sent through it to begin with, and the mix starts at 0%, all dry, so the
+  reverb is off until you turn the mix up; with none of it mixed in it doesn't run at all. An oscillator sent
+  through it rings on after its note ends; one that isn't plays straight out, dry. Held, a
   sound at full mix is about as loud as it is dry, in any room. Moving the dials while it rings glides them,
   so nothing clicks; changing the size bends the tail's pitch a little as it glides. The reverb is one for the
   whole synth, set the same for every pitch set, though each pitch set chooses which of its oscillators go
-  through it. It's saved with presets, and a preset from before there was a reverb sends nothing through it.
+  through it. It's saved with presets, and a preset from before there was a reverb sends every oscillator
+  through it with none mixed in, so it plays dry.
   Double-click a dial to set it back to where it starts. Its dials can't be moved by LFOs or envelopes, as
   they belong to every note at once.
 
-![The effects screen: the reverb's delay, size, decay and mix dials, with oscillators 1 and 2 switched to be sent through it](docs/images/effects.png)
+![The effects screen: the reverb's delay, size, decay and mix dials, turned up to 30%, with every oscillator but the third switched to be sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -845,7 +848,7 @@ save pictures of the window showing several waves.
   if the decay were half as long. As much goes in as the tail keeps from fading, √(1 − g²), so a steady
   sound comes out about as loud however long it rings. Each side hears the lines in its own blend of signs,
   so the two sides differ. The settings glide over about 50 ms; the lines' lengths are read between samples,
-  so the size can glide. Once it's rung out and nothing's sent to it, it rests.
+  so the size can glide. Once it's rung out and nothing's sent to it, or while none of it is mixed in, it rests.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the

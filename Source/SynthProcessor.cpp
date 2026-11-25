@@ -222,10 +222,11 @@ namespace
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); })),
                 std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::effectSendId (i, Patch::reverbEffect), 1 }, name + " to Reverb", false)));
+                    juce::ParameterID { SynthProcessor::effectSendId (i, Patch::reverbEffect), 1 }, name + " to Reverb", true)));
         }
 
-        // The reverb, which oscillators are sent through on their own: a medium room, ringing for two seconds.
+        // The reverb, which every oscillator's sent through to begin with: a medium room, ringing for two seconds,
+        // but none of it mixed in, so it's off until the mix is turned up.
         {
             juce::NormalisableRange<float> decayRange (Reverb::shortestDecay, Reverb::longestDecay);
             decayRange.setSkewForCentre (2.0f);
@@ -255,7 +256,7 @@ namespace
                         })),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::reverbMixId, 1 }, "Reverb Mix",
-                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.3f, asPercentage())));
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, asPercentage())));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the

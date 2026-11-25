@@ -71,8 +71,9 @@ public:
     */
     static juce::String filterSendId (int oscillator, int filter);
 
-    /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which none is
-        to begin with. One sent through none plays straight out. For now the only effect is the reverb.
+    /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which every
+        one is to begin with. One sent through none plays straight out. For now the only effect is the reverb, which
+        starts with none of it mixed in.
     */
     static juce::String effectSendId (int oscillator, int effect);
 

@@ -58,7 +58,7 @@ struct Patch
         float unisonSpread = 0.5f;
 
         /** Whether it's sent through each effect, once it's filtered. One sent through none plays straight out. */
-        std::array<bool, numEffects> effectSends {};
+        std::array<bool, numEffects> effectSends { true };
 
         /** Whether it's sent through each filter, or skips it, going straight on to the next. */
         std::array<bool, modulation::numFilters> filterSends { true, true, true, true };
