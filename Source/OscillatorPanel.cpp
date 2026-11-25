@@ -120,16 +120,6 @@ OscillatorPanel::OscillatorPanel()
     };
     addAndMakeVisible (filtersButton);
 
-    effectsButton.setTooltip ("Choose which effect buses this oscillator is sent through, and load effects into them");
-    effectsButton.setMouseClickGrabsKeyboardFocus (false);
-    effectsButton.setWantsKeyboardFocus (false);
-    effectsButton.onClick = [this]
-    {
-        if (onShowEffectRouting != nullptr)
-            onShowEffectRouting();
-    };
-    addChildComponent (effectsButton);
-
     moveWindow();
 }
 
@@ -161,9 +151,6 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
 
     for (auto& sendAttachment : sendAttachments)
         sendAttachment.reset();
-
-    for (auto& busAttachment : busAttachments)
-        busAttachment.reset();
 
     attachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneId (oscillator)),
                                                               [this] (float semitones) { showTune (semitones); });
@@ -213,28 +200,7 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
         sendAttachments[filter]->sendInitialUpdate();
     }
 
-    effectsButton.setTitle (name + " effects");
-
-    for (size_t bus = 0; bus < busAttachments.size(); ++bus)
-    {
-        busAttachments[bus] = std::make_unique<juce::ParameterAttachment> (
-            *parameters.getParameter (SynthProcessor::busSendId (oscillator, (int) bus)),
-            [this, bus] (float value)
-            {
-                buses[bus] = value >= 0.5f;
-                repaint (routingValueArea);
-            });
-        busAttachments[bus]->sendInitialUpdate();
-    }
-
     moveWindow();
-}
-
-void OscillatorPanel::setEffectsShown (bool shown)
-{
-    effectsShown = shown;
-    effectsButton.setVisible (shown);
-    repaint();
 }
 
 void OscillatorPanel::setPanOnly (bool shouldBePanOnly)
@@ -326,9 +292,9 @@ void OscillatorPanel::resized()
     constexpr auto unisonHeight = captionHeight + 3 * (panHeight + rowGap);
     constexpr auto tuneHeight = captionHeight + 2 + panHeight + 2 + 20 + 16;
     constexpr auto glideHeight = 22 + rowGap + sliderHeight;
-    constexpr auto routingHeight = captionHeight + rowGap + 22;
+    constexpr auto routingHeight = 22;
     const auto content = panOnly ? panHeight + routingHeight : panHeight + unisonHeight + tuneHeight + glideHeight + routingHeight;
-    const auto gap = juce::jlimit (9, 36, (area.getHeight() - content) / (numSections - 1));
+    const auto gap = juce::jlimit (12, 36, (area.getHeight() - content) / (numSections - 1));
 
     const auto divide = [&area, gap, this]
     {
@@ -343,14 +309,11 @@ void OscillatorPanel::resized()
     // The routing comes straight under the pan when that's all there is, as for an oscillator playing noise.
     const auto layOutRouting = [this, &area]
     {
-        // Its caption, with where it goes, over the buttons for the screens setting it.
-        routingCaptionArea = area.removeFromTop (captionHeight);
-        routingValueArea = routingCaptionArea;
-        area.removeFromTop (rowGap);
-        auto buttons = area.removeFromTop (22);
-        filtersButton.setBounds (buttons.removeFromLeft (76));
-        buttons.removeFromLeft (8);
-        effectsButton.setBounds (buttons.removeFromLeft (76));
+        auto routingRow = area.removeFromTop (22);
+        routingCaptionArea = routingRow.removeFromLeft (70);
+        filtersButton.setBounds (routingRow.removeFromLeft (76));
+        routingRow.removeFromLeft (8);
+        routingValueArea = routingRow;
     };
 
     if (panOnly)
@@ -429,22 +392,11 @@ void OscillatorPanel::paint (juce::Graphics& g)
         if (sends[filter])
             sentTo.add (juce::String ((int) filter + 1));
 
-    auto summary = sentTo.size() == (int) sends.size() ? juce::String ("All filters")
-                 : sentTo.isEmpty()                  ? juce::String ("No filters")
-                 : (sentTo.size() == 1 ? "Filter " : "Filters ") + sentTo.joinIntoString (", ");
-
-    // And the effect buses it's sent through, where they're hosted.
-    juce::StringArray busesTo;
-
-    for (size_t bus = 0; bus < buses.size(); ++bus)
-        if (buses[bus])
-            busesTo.add (juce::String ((int) bus + 1));
-
-    if (effectsShown && ! busesTo.isEmpty())
-        summary += dot.paddedLeft (' ', 3).paddedRight (' ', 5) + (busesTo.size() == 1 ? "Bus " : "Buses ") + busesTo.joinIntoString (", ");
-
     g.setFont (fonts::body (12.0f));
-    g.drawText (summary, routingValueArea, juce::Justification::centredRight);
+    g.drawText (sentTo.size() == (int) sends.size() ? juce::String ("All filters")
+                : sentTo.isEmpty()                  ? juce::String ("No filters")
+                : (sentTo.size() == 1 ? "Filter " : "Filters ") + sentTo.joinIntoString (", "),
+                routingValueArea, juce::Justification::centredRight);
 
     if (panOnly)
         return;

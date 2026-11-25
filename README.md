@@ -72,28 +72,6 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter](docs/images/routing.png)
 
-- **Send oscillators through effect plugins** (standalone app only): click **Effects**, beside **Filters**
-  on the Routing row, or **Effects** at the top of the routing screen. There are four effect buses, each a
-  chain of four slots that play from left to right. Click a slot's **+** to load a VST3 or Audio Unit effect
-  found on your Mac, by manufacturer, and its window opens; click a loaded slot to show its window again,
-  bypass it, replace it or remove it. The first time, click **Find Plugins...**, then **Options...** in the window that opens,
-  and scan for new or updated VST3 or AudioUnit plug-ins; EZ Synth remembers what it finds, and a plugin that crashes while it
-  looks is skipped next time. Each bus has a switch per oscillator, like the filters' switches, all off to
-  begin with: an oscillator sent through no bus plays straight out, as before; one sent through a bus plays
-  through its effects, after its filters, and not straight out; one sent through two buses plays through both,
-  side by side. The path above the switches spells it out, such as *Osc 2 → Filter 1 → Bus 1 (AUDelay) → Out*,
-  and the Routing row adds the buses, such as *All filters · Bus 1*. Switching a bus mid-note fades over 20 ms.
-  The effects, with their settings, are saved with the app's state, but presets keep only the dry sound:
-  a preset is saved without the effects and with no oscillator sent through a bus, and loading one leaves
-  the effects, and which oscillators are sent through them, as they are, so you can try presets through
-  them. A plugin saved with the app's state but not on this Mac stays in its slot as **Missing**, with its
-  settings, so saving keeps it. Each pitch set can set the bus switches differently (a preset loaded takes
-  the current pitch set's switches for all of its own); the effects themselves are shared. The VST3 and Audio Unit versions of
-  EZ Synth don't host effects (use your DAW's): there, every oscillator plays straight out, and a project's
-  effects are kept as they are.
-
-![The routing screen's effects page for oscillator 2, sent through bus 1, which has Apple's AUDelay in its first slot, with four slots for each of the four buses](docs/images/effects.png)
-
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
   to zoom right out. The figure beside it says how far either side of the middle the scale reaches. Zoomed
@@ -837,15 +815,6 @@ save pictures of the window showing several waves.
   memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
   A send that's switched fades over 20 ms, so switching it mid-note doesn't click; an oscillator that moves
   to a lane of its own carries on from the memories of the lane it left.
-- **Effect buses.** In the standalone app, each voice plays into ten channels rather than two: a pair played
-  straight out and a pair for each bus. Each oscillator's lane, once filtered and panned, goes to the pairs it's
-  routed to, at levels that glide over 20 ms, so lanes are kept apart by where they go as well as by their
-  filters. After the voices, each bus's pair plays through its slots in turn (`Source/EffectRack.cpp`), in
-  stereo where the plugin allows, then every pair's added up. Plugins load and are removed on the message
-  thread, prepared before they're swapped in under a lock the audio thread only tries, so a block passes the
-  buses by rather than waiting. A plugin's latency isn't made up for, so a bus with a lookahead effect plays
-  slightly behind the rest. The effects are kept out of the undo history, which takes the sound's state many
-  times a second, and saved alongside it instead.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
@@ -896,9 +865,8 @@ save pictures of the window showing several waves.
 | `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
-| `Source/EffectRack.*` | The standalone app's effect buses: loading VST3 and Audio Unit effects into their slots, playing each bus through its chain, and saving them |
 | `Source/OscillatorPanel.*` | The oscillator's panel left of the grid: its pan, its unison's voices, detune and spread, its tune slider, with its intervals marked, and the zoom slider above it, then its glide and routing rows |
-| `Source/RoutingScreen.*` | The routing screen, setting which filters and effect buses each oscillator's sent through, with each bus's effect slots and their windows |
+| `Source/RoutingScreen.*` | The routing screen, setting which filters each oscillator's sent through |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |

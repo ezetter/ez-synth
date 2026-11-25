@@ -263,8 +263,6 @@ HarmonicVoice::Targets HarmonicVoice::getTargets (int startSample) const
 
         for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
             targets.sends[(size_t) i][filter] = oscillator.filterSends[filter] ? 1.0f : 0.0f;
-
-        targets.busSends[(size_t) i] = oscillator.busSends;
         targets.pansMoved[(size_t) i] = patch->assignments[(size_t) panTarget].isActive()
                                      || patch->velocityAssignments[(size_t) panTarget].isActive()
                                      || patch->modWheelAssignments[(size_t) panTarget].isActive();
@@ -428,28 +426,8 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    // Where each oscillator's sound goes: straight out, unless it's sent through an effect bus and the output has
-    // channels for the buses.
-    const auto routed = output.getNumChannels() >= routedChannels;
-    std::array<std::array<float, numRoutes>, modulation::numOscillators> routeTargets {};
-
-    for (size_t i = 0; i < routeTargets.size(); ++i)
-    {
-        auto anyBus = false;
-
-        for (size_t bus = 0; bus < (size_t) Patch::numEffectBuses; ++bus)
-        {
-            const auto sent = routed && targets.busSends[i][bus];
-            routeTargets[i][bus + 1] = sent ? 1.0f : 0.0f;
-            anyBus = anyBus || sent;
-        }
-
-        routeTargets[i][0] = anyBus ? 0.0f : 1.0f;
-    }
-
     if (startingNote)
     {
-        routeLevels = routeTargets;
         cosines = targets.cosines;
         sines = targets.sines;
         harmonicTunes = targets.harmonicTunes;
@@ -612,7 +590,6 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     // over 20 ms.
     std::array<float, numUnits> leftGains {}, rightGains {}, leftSteps {}, rightSteps {};
     std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendFrom {}, sendSteps {};
-    std::array<std::array<float, numRoutes>, modulation::numOscillators> routeFrom {}, routeSteps {};
     std::array<bool, numUnits> unitSounding {};
     std::array<bool, modulation::numOscillators> sounding {};
 
@@ -660,18 +637,6 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
             sendSteps[i][filter] = (send - sendFrom[i][filter]) / (float) numSamples;
         }
-
-        for (size_t route = 0; route < numRoutes; ++route)
-        {
-            auto& level = routeLevels[i][route];
-            routeFrom[i][route] = level;
-            level += (float) ((routeTargets[i][route] - level) * setShare);
-
-            if (std::abs (routeTargets[i][route] - level) < 1.0e-4f)
-                level = routeTargets[i][route];
-
-            routeSteps[i][route] = (level - routeFrom[i][route]) / (float) numSamples;
-        }
     }
 
     const auto alike = [] (const auto& a, const auto& b)
@@ -709,8 +674,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         auto lane = numLanes;
 
         for (size_t l = 0; l < numLanes; ++l)
-            if (alike (sendFrom[leads[l]], sendFrom[i]) && alike (sendSteps[leads[l]], sendSteps[i])
-                && alike (routeFrom[leads[l]], routeFrom[i]) && alike (routeSteps[leads[l]], routeSteps[i]))
+            if (alike (sendFrom[leads[l]], sendFrom[i]) && alike (sendSteps[leads[l]], sendSteps[i]))
                 lane = l;
 
         if (lane == numLanes)
@@ -751,18 +715,6 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
     std::array<std::array<bool, modulation::numFilters>, modulation::numOscillators> laneFiltered {};
     std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> laneSends {};
 
-    // Where each lane goes, from its lead's routes, and which routes any lane goes to this chunk.
-    std::array<std::array<float, numRoutes>, modulation::numOscillators> laneRoutes {};
-    std::array<bool, numRoutes> routeUsed {};
-
-    for (size_t l = 0; l < numLanes; ++l)
-    {
-        laneRoutes[l] = routeFrom[leads[l]];
-
-        for (size_t route = 0; route < numRoutes; ++route)
-            routeUsed[route] = routeUsed[route] || routeFrom[leads[l]][route] > 0.0f || routeSteps[leads[l]][route] > 0.0f;
-    }
-
     for (size_t f = 0; f < filters.size(); ++f)
     {
         filterActive[f] = filters[f].isActive();
@@ -778,8 +730,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    // Each copy's sound is kept apart only when it has to be. Lanes going different ways are kept apart anyway,
-    // as they're filtered apart.
+    // Each copy's sound is kept apart only when it has to be.
     const auto apart = stereo || numLanes > 1;
     std::array<FilterStage::Step, modulation::numFilters> steps {};
 
@@ -830,21 +781,7 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             if (filterActive[f])
                 steps[f] = filters[f].advance();
 
-        // Each lane's sound, filtered and panned, goes each way it's routed: straight out, or through effect buses.
-        std::array<float, numRoutes> routeLeft {}, routeRight {};
-
-        const auto route = [&] (size_t lane, float laneLeft, float laneRight)
-        {
-            for (size_t r = 0; r < numRoutes; ++r)
-            {
-                if (! routeUsed[r])
-                    continue;
-
-                routeLeft[r] += laneLeft * laneRoutes[lane][r];
-                routeRight[r] += laneRight * laneRoutes[lane][r];
-                laneRoutes[lane][r] += routeSteps[leads[lane]][r];
-            }
-        };
+        auto left = 0.0f, right = 0.0f;
 
         if (! apart)
         {
@@ -861,9 +798,8 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                 laneSends[0][f] += sendSteps[leads[0]][f];
             }
 
-            if (numLanes > 0)
-                route (0, value * sharedLeft, value * sharedRight);
-
+            left = value * sharedLeft;
+            right = value * sharedRight;
             sharedLeft += leftSteps[shared];
             sharedRight += rightSteps[shared];
         }
@@ -908,11 +844,8 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
                     laneSends[l][f] += sendSteps[lead][f];
                 }
 
-                // Panned alike, each lane is panned as they all are.
-                if (stereo)
-                    route (l, laneLeft, laneRight);
-                else
-                    route (l, laneLeft * sharedLeft, laneLeft * sharedRight);
+                left += laneLeft;
+                right += laneRight;
             }
 
             if (stereo)
@@ -926,6 +859,10 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
             }
             else
             {
+                // Panned alike, the lanes together are panned as one.
+                const auto together = left;
+                left = together * sharedLeft;
+                right = together * sharedRight;
                 sharedLeft += leftSteps[shared];
                 sharedRight += rightSteps[shared];
             }
@@ -936,21 +873,15 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
 
         const auto level = noteLevel * gain.getNextValue() * ownEnvelope.getNextSample();
 
-        // In mono, both sides together. Without channels for the buses, everything goes straight out.
+        // In mono, both sides together.
         if (output.getNumChannels() == 1)
         {
-            output.addSample (0, startSample + s, 0.5f * (routeLeft[0] + routeRight[0]) * level);
+            output.addSample (0, startSample + s, 0.5f * (left + right) * level);
         }
         else
         {
-            for (size_t r = 0; r < (routed ? numRoutes : 1); ++r)
-            {
-                if (! routeUsed[r])
-                    continue;
-
-                output.addSample (2 * (int) r, startSample + s, routeLeft[r] * level);
-                output.addSample (2 * (int) r + 1, startSample + s, routeRight[r] * level);
-            }
+            output.addSample (0, startSample + s, left * level);
+            output.addSample (1, startSample + s, right * level);
         }
 
         if (! ownEnvelope.isActive())

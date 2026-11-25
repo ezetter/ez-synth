@@ -73,11 +73,6 @@ public:
     /** How many of the samples of white noise an oscillator played last it keeps, for the window to show. */
     static constexpr int recentNoiseLength = 512;
 
-    /** How many channels an output needs for the voices to play each effect bus on its own pair, after the pair
-        played straight out. With fewer, every oscillator plays straight out.
-    */
-    static constexpr int routedChannels = 2 * (1 + Patch::numEffectBuses);
-
     /** Copies the last samples of white noise an oscillator played, from -1 to 1 before its level, oldest first. */
     void copyRecentNoise (int oscillator, float* destination, int count) const noexcept;
 
@@ -112,9 +107,6 @@ private:
 
         /** How much of each oscillator is sent through each filter: 1 if it is, 0 if it skips it. */
         std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sends {};
-
-        /** Whether each oscillator's sent through each effect bus. */
-        std::array<std::array<bool, (size_t) Patch::numEffectBuses>, modulation::numOscillators> busSends {};
         std::array<Patch::Filter, modulation::numFilters> filters {};
         float gain = 0.0f;
 
@@ -156,12 +148,6 @@ private:
     // lead's memories of the sound, left and right, in each filter. Each oscillator's lead last chunk, or -1 if it
     // wasn't sounding, lets a lane that's led by another oscillator now carry on from the memories it had.
     std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendLevels {};
-
-    // Where each oscillator's sound goes once it's filtered, gliding over 20 ms when it's switched: straight out, the
-    // first, or through each effect bus. Each goes to its own pair of the output's channels, when the output has
-    // enough for every bus; otherwise everything goes straight out.
-    static constexpr size_t numRoutes = 1 + (size_t) Patch::numEffectBuses;
-    std::array<std::array<float, numRoutes>, modulation::numOscillators> routeLevels {};
 
     struct LaneMemory
     {

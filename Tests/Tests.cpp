@@ -3771,209 +3771,6 @@ namespace
         }
     }
 
-    /** Apple's delay effect, which every Mac has, as an effect plugin to host. */
-    std::optional<juce::PluginDescription> findAppleDelay (EffectRack& rack)
-    {
-        juce::OwnedArray<juce::PluginDescription> found;
-
-        for (auto* format : rack.getFormats().getFormats())
-            if (format->getName() == "AudioUnit")
-                rack.getKnownPlugins().scanAndAddFile ("AudioUnit:Effects/aufx,dely,appl", true, found, *format);
-
-        if (found.isEmpty())
-            return std::nullopt;
-
-        return *found[0];
-    }
-
-    void testEffects()
-    {
-        std::cout << "Effect buses" << std::endl;
-
-        const auto sine = []
-        {
-            auto synth = std::make_unique<SynthProcessor>();
-            synth->hostEffectsAnyway();
-            setPreset (*synth, 0, waveform::Preset::sine);
-            return synth;
-        };
-
-        // Sent through a bus with no effects, an oscillator plays as it does straight out.
-        {
-            auto straight = sine();
-            const auto [straightLeft, straightRight] = playSides (*straight, 69, 0.3, 0.5);
-            auto bussed = sine();
-            setParameter (*bussed, SynthProcessor::busSendId (0, 1), 1.0f);
-            const auto [left, right] = playSides (*bussed, 69, 0.3, 0.5);
-            auto furthest = 0.0f;
-
-            for (size_t i = 0; i < left.size(); ++i)
-                furthest = std::max ({ furthest, std::abs (left[i] - straightLeft[i]), std::abs (right[i] - straightRight[i]) });
-
-            check (peakOf (left) > 0.1f && furthest < 1.0e-5f, "an oscillator sent through an empty bus plays as it does straight out");
-        }
-
-        SynthProcessor probe;
-        probe.hostEffectsAnyway();
-        const auto delay = findAppleDelay (probe.getEffectRack());
-        check (delay.has_value(), "Apple's delay effect is found, to host");
-
-        if (! delay.has_value())
-            return;
-
-        // Apple's delay echoes a second later. An oscillator sent through it echoes; one that isn't doesn't.
-        const auto echoAfter = [&] (bool sent)
-        {
-            auto synth = sine();
-            synth->prepareToPlay (sampleRate, blockSize);
-            check (synth->getEffectRack().load (1, 0, *delay).isEmpty(), sent ? "an effect loads into a bus's slot" : "...again");
-            setParameter (*synth, SynthProcessor::busSendId (0, 1), sent ? 1.0f : 0.0f);
-            const auto [left, right] = playSides (*synth, 69, 0.15, 1.6);
-            return loudness (left, 0.6, 0.9) < 1.0e-4 ? loudness (left, 1.0, 1.4) : -1.0;
-        };
-
-        check (echoAfter (true) > 0.01, "an oscillator sent through a bus with a delay on it echoes");
-        check (juce::exactlyEqual (echoAfter (false), 0.0) || echoAfter (false) < 1.0e-5, "...and one that isn't doesn't");
-
-        // Two oscillators, an octave apart, only the higher sent through the delay: only it echoes.
-        {
-            auto synth = sine();
-            synth->prepareToPlay (sampleRate, blockSize);
-            synth->getEffectRack().load (0, 2, *delay);
-            setPreset (*synth, 1, waveform::Preset::sine);
-            setParameter (*synth, SynthProcessor::onId (1), 1.0f);
-            setParameter (*synth, SynthProcessor::tuneId (1), 12.0f);
-            setParameter (*synth, SynthProcessor::busSendId (1, 0), 1.0f);
-            const auto [left, right] = playSides (*synth, 69, 0.3, 1.6);
-            const auto during = slice (left, 0.1, 0.25), echo = slice (left, 1.1, 1.25);
-            check (amplitudeAt (during, 440.0) > 0.05 && amplitudeAt (during, 880.0) > 0.05
-                     && amplitudeAt (echo, 880.0) > 0.005 && amplitudeAt (echo, 440.0) < 0.1 * amplitudeAt (echo, 880.0),
-                   "with only one oscillator sent through the delay, only it echoes, and the other plays straight out");
-
-            // A bypassed effect is passed by.
-            synth->getEffectRack().setBypassed (0, 2, true);
-            const auto [bypassedLeft, bypassedRight] = playSides (*synth, 69, 0.3, 1.6);
-            check (loudness (bypassedLeft, 1.1, 1.25) < 1.0e-5, "...and bypassed, it doesn't echo");
-            check (synth->getEffectRack().getSlot (0, 2).bypassed && synth->getEffectRack().getSlot (0, 2).loaded
-                     && synth->getEffectRack().getSlot (0, 2).name == delay->name,
-                   "a slot says what's in it, and whether it's bypassed");
-        }
-
-        // The effects are saved with the project, with their settings, and loaded back.
-        {
-            auto synth = sine();
-            synth->getEffectRack().load (2, 1, *delay);
-            auto* plugin = synth->getEffectRack().getPlugin (2, 1);
-            auto* parameter = plugin != nullptr && ! plugin->getParameters().isEmpty() ? plugin->getParameters()[0] : nullptr;
-
-            if (parameter != nullptr)
-                parameter->setValueNotifyingHost (0.25f);
-
-            juce::MemoryBlock saved;
-            synth->getStateInformation (saved);
-
-            auto loaded = sine();
-            loaded->setStateInformation (saved.getData(), (int) saved.getSize());
-            auto* restored = loaded->getEffectRack().getPlugin (2, 1);
-            check (restored != nullptr && restored->getName() == plugin->getName()
-                     && (parameter == nullptr || isNear (restored->getParameters()[0]->getValue(), 0.25, 0.01)),
-                   "the effects are saved with the project, with their settings");
-
-            // A preset is only the dry sound: it keeps neither the effects nor the bus switches, and loading one
-            // leaves both as they are.
-            const auto sendOf = [] (SynthProcessor& s, int i, int bus)
-            {
-                return s.parameters.getRawParameterValue (SynthProcessor::busSendId (i, bus))->load() >= 0.5f;
-            };
-            const auto setSend = [] (SynthProcessor& s, int i, int bus, bool on)
-            {
-                s.parameters.getParameter (SynthProcessor::busSendId (i, bus))->setValueNotifyingHost (on ? 1.0f : 0.0f);
-            };
-
-            setSend (*synth, 0, 2, true);
-            const auto file = juce::File::createTempFile (".ezsynth");
-            synth->savePreset (file);
-            const auto savedXml = juce::XmlDocument::parse (file);
-            check (savedXml != nullptr && savedXml->getChildByName (EffectRack::stateType) == nullptr,
-                   "a preset is saved without the effects");
-
-            auto fromPreset = sine();
-            check (fromPreset->loadPreset (file) && fromPreset->getEffectRack().getPlugin (2, 1) == nullptr
-                     && ! sendOf (*fromPreset, 0, 2),
-                   "...or which oscillators are sent through them");
-
-            setSend (*synth, 1, 3, true);
-            check (synth->loadPreset (file) && synth->getEffectRack().getPlugin (2, 1) != nullptr
-                     && sendOf (*synth, 0, 2) && sendOf (*synth, 1, 3) && ! sendOf (*synth, 0, 0),
-                   "...and loading one leaves the effects, and the oscillators sent through them, as they are");
-            check (synth->loadFactoryPreset ("Acid Bass") && synth->getEffectRack().getPlugin (2, 1) != nullptr
-                     && sendOf (*synth, 0, 2),
-                   "...as does loading a factory preset");
-            file.deleteFile();
-
-            // A plugin that isn't on this Mac stays in its slot, missing, and is saved again.
-            auto xml = juce::AudioProcessor::getXmlFromBinary (saved.getData(), (int) saved.getSize());
-            auto* description = xml->getChildByName (EffectRack::stateType)->getChildByName ("SLOT")->getChildElement (0);
-            description->setAttribute ("name", "Nowhere Reverb");
-            description->setAttribute ("file", "AudioUnit:Effects/aufx,nowh,nope");
-            description->setAttribute ("uniqueId", "1");
-            description->setAttribute ("uid", "1");
-            juce::MemoryBlock missing;
-            juce::AudioProcessor::copyXmlToBinary (*xml, missing);
-            auto withMissing = sine();
-            withMissing->setStateInformation (missing.getData(), (int) missing.getSize());
-            const auto slot = withMissing->getEffectRack().getSlot (2, 1);
-            juce::MemoryBlock again;
-            withMissing->getStateInformation (again);
-            check (slot.missing && slot.name == "Nowhere Reverb"
-                     && juce::AudioProcessor::getXmlFromBinary (again.getData(), (int) again.getSize())->toString().contains ("Nowhere Reverb"),
-                   "an effect that isn't on this Mac stays in its slot, missing, and is saved again");
-        }
-
-        // The plugins don't host effects: an oscillator sent through a bus plays straight out, and a project's
-        // effects are kept as they are.
-        {
-            auto host = sine();
-            host->getEffectRack().load (0, 0, *delay);
-            setParameter (*host, SynthProcessor::busSendId (0, 0), 1.0f);
-            juce::MemoryBlock saved;
-            host->getStateInformation (saved);
-
-            SynthProcessor plugin;
-            plugin.setStateInformation (saved.getData(), (int) saved.getSize());
-            const auto [left, right] = playSides (plugin, 69, 0.15, 1.6);
-            juce::MemoryBlock again;
-            plugin.getStateInformation (again);
-            check (! plugin.hostsEffects() && peakOf (left) > 0.1f && loudness (left, 1.0, 1.4) < 1.0e-5
-                     && juce::AudioProcessor::getXmlFromBinary (again.getData(), (int) again.getSize())->getChildByName (EffectRack::stateType) != nullptr,
-                   "the plugins play every oscillator straight out, and keep a project's effects to save again");
-        }
-
-        // The routing screen's effects page: a switch for each bus, and its slots.
-        {
-            auto synth = sine();
-            synth->getEffectRack().load (0, 0, *delay);
-            std::unique_ptr<juce::AudioProcessorEditor> editor (synth->createEditorAndMakeActive());
-            auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
-            auto* panel = findChild<OscillatorPanel> (synthEditor);
-            check (panel != nullptr && panel->onShowEffectRouting != nullptr, "an Effects button beside Filters opens the effect routing");
-            panel->onShowEffectRouting();
-            auto& screen = synthEditor.getRoutingScreen();
-            check (synthEditor.isRoutingScreenShown() && screen.getPage() == RoutingScreen::Page::effects
-                     && screen.getSlotButton (0, 0).getButtonText() == delay->name && screen.getSlotButton (0, 1).getButtonText() == "+",
-                   "...showing each bus's slots, with the effects in them");
-            screen.getBusSwitch (2).setToggleState (true, juce::sendNotificationSync);
-            check (synth->parameters.getRawParameterValue (SynthProcessor::busSendId (0, 2))->load() >= 0.5f
-                     && screen.describePath().contains ("Bus 3"),
-                   "...and a switch for each bus sends the oscillator through it");
-            screen.showPluginWindow (0, 0);
-            check (screen.isPluginWindowShown (0, 0), "an effect's window opens from its slot");
-            synth->getEffectRack().remove (0, 0);
-            check (! screen.isPluginWindowShown (0, 0) && synth->getEffectRack().getPlugin (0, 0) == nullptr,
-                   "...and closes when the effect's removed");
-        }
-    }
-
     void testFilterRouting()
     {
         std::cout << "Filter routing" << std::endl;
@@ -6449,9 +6246,7 @@ namespace
         std::cout << "Saving pictures of the window to " << folder.getFullPathName().toStdString() << std::endl;
         folder.createDirectory();
 
-        // As the standalone app shows it, with the effect buses.
         SynthProcessor synth;
-        synth.hostEffectsAnyway();
         std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
         auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
 
@@ -6618,18 +6413,6 @@ namespace
         synthEditor.showRoutingScreen (true, 1);
         synthEditor.refresh();
         save ("10f-routing");
-
-        // Its effects page, with Apple's delay on the first bus, which oscillator 2 is sent through.
-        if (const auto delay = findAppleDelay (synth.getEffectRack()))
-        {
-            synth.getEffectRack().load (0, 0, *delay);
-            setParameter (synth, SynthProcessor::busSendId (1, 0), 1.0f);
-            synthEditor.showRoutingScreen (true, 1, RoutingScreen::Page::effects);
-            save ("10g-effects");
-            setParameter (synth, SynthProcessor::busSendId (1, 0), 0.0f);
-            synth.getEffectRack().clear();
-        }
-
         synthEditor.showRoutingScreen (false);
         setParameter (synth, SynthProcessor::filterSendId (1, 1), 1.0f);
         setParameter (synth, SynthProcessor::filterSendId (1, 3), 1.0f);
@@ -6907,7 +6690,6 @@ int main (int argc, char* argv[])
     testPan();
     testFilterRouting();
     testUnison();
-    testEffects();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

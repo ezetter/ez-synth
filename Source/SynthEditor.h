@@ -67,7 +67,7 @@ public:
     PitchSetScreen& getPitchSetScreen() noexcept   { return pitchSetScreen; }
 
     /** Shows the screen setting where an oscillator's sound goes, over the synth but for the keyboard, or hides it. */
-    void showRoutingScreen (bool visible, int oscillator = 0, RoutingScreen::Page = RoutingScreen::Page::filters);
+    void showRoutingScreen (bool visible, int oscillator = 0);
     bool isRoutingScreenShown() const   { return routingScreen.isVisible(); }
     RoutingScreen& getRoutingScreen() noexcept   { return routingScreen; }
     juce::String getPitchSetButtonText() const   { return pitchSetButton.getButtonText(); }

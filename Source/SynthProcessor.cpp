@@ -220,15 +220,7 @@ namespace
                     juce::ParameterID { SynthProcessor::unisonSpreadId (i), 1 }, name + " Unison Spread",
                     juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f,
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); })),
-                std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::busSendId (i, 0), 1 }, name + " to Bus 1", false),
-                std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::busSendId (i, 1), 1 }, name + " to Bus 2", false),
-                std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::busSendId (i, 2), 1 }, name + " to Bus 3", false),
-                std::make_unique<juce::AudioParameterBool> (
-                    juce::ParameterID { SynthProcessor::busSendId (i, 3), 1 }, name + " to Bus 4", false)));
+                        .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); }))));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -381,12 +373,6 @@ juce::String SynthProcessor::filterSendId (int oscillator, int filter)
     return "osc" + juce::String (oscillator + 1) + "ToFilter" + juce::String (filter + 1);
 }
 
-juce::String SynthProcessor::busSendId (int oscillator, int bus)
-{
-    static_assert (Patch::numEffectBuses == 4, "Each bus needs its parameter");
-    return "osc" + juce::String (oscillator + 1) + "ToBus" + juce::String (bus + 1);
-}
-
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
 juce::String SynthProcessor::unisonVoicesId (int oscillator)   { return modulation::getKey (modulation::unisonVoicesTarget (oscillator)); }
@@ -520,12 +506,6 @@ SynthProcessor::SynthProcessor()
 
     synth.addSound (new HarmonicSound());
 
-    // The standalone app remembers the effect plugins it's found, beside its settings.
-    if (hostsEffects())
-        effectRack.keepKnownPluginsIn (juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                                           .getChildFile ("Application Support").getChildFile ("EZ Synth")
-                                           .getChildFile ("Effect Plugins.xml"));
-
     velocityAssignments[(size_t) modulation::volumeTarget] = modulation::startingVelocityOnVolume;
 
     for (int i = 0; i < numOscillators; ++i)
@@ -565,8 +545,7 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
                                         find (noiseId (i)), find (panId (i)),
                                         { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
                                           find (filterSendId (i, 3)) },
-                                        find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)),
-                                        { find (busSendId (i, 0)), find (busSendId (i, 1)), find (busSendId (i, 2)), find (busSendId (i, 3)) } };
+                                        find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)) };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -613,24 +592,13 @@ bool SynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
 }
 
-void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void SynthProcessor::prepareToPlay (double sampleRate, int)
 {
     playingSampleRate = sampleRate;
     synth.setCurrentPlaybackSampleRate (sampleRate);
 
-    if (hostsEffects())
-    {
-        routedBuffer.setSize (HarmonicVoice::routedChannels, std::max (1, samplesPerBlock));
-        effectRack.prepare (sampleRate, std::max (1, samplesPerBlock));
-    }
-
     // The looping LFOs carry on where they were: a host may prepare again whenever its transport starts or loops,
     // and they're never sent back to the start of their cycles.
-}
-
-void SynthProcessor::releaseResources()
-{
-    effectRack.release();
 }
 
 void SynthProcessor::restartLfos()
@@ -760,34 +728,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             periodsSinceLastNote[i] += numSamples / patch.getLfoPeriodSamples (i);
     }
 
-    // Hosting effects, the voices play each bus's sound on its own pair of channels, which plays through the bus's
-    // effects before everything's added up.
-    if (hostsEffects() && buffer.getNumChannels() > 0)
-    {
-        routedBuffer.setSize (HarmonicVoice::routedChannels, numSamples, false, false, true);
-        routedBuffer.clear();
-        synth.renderNextBlock (routedBuffer, midi, 0, numSamples);
-        effectRack.process (routedBuffer, numSamples);
-
-        for (int pair = 0; pair < HarmonicVoice::routedChannels / 2; ++pair)
-        {
-            if (buffer.getNumChannels() == 1)
-            {
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples, 0.5f);
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair + 1, 0, numSamples, 0.5f);
-            }
-            else
-            {
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples);
-                buffer.addFrom (1, 0, routedBuffer, 2 * pair + 1, 0, numSamples);
-            }
-        }
-    }
-    else
-    {
-        synth.renderNextBlock (buffer, midi, 0, numSamples);
-    }
-
+    synth.renderNextBlock (buffer, midi, 0, numSamples);
     modWheelShown = patch.modWheel;
     shareNewestNote();
 
@@ -1288,9 +1229,6 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.unisonVoices = juce::jlimit (1, Patch::maxUnisonVoices, juce::roundToInt (source.unisonVoices->load()));
         oscillator.unisonDetune = source.unisonDetune->load();
         oscillator.unisonSpread = source.unisonSpread->load();
-
-        for (size_t bus = 0; bus < oscillator.busSends.size(); ++bus)
-            oscillator.busSends[bus] = source.busSends[bus]->load() >= 0.5f;
 
         for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
             oscillator.filterSends[filter] = source.filterSends[filter]->load() >= 0.5f;
@@ -2126,11 +2064,6 @@ void SynthProcessor::getStateInformation (juce::MemoryBlock& destData)
 
     state.appendChild (links, nullptr);
 
-    // The effects go with the project, and the window's state, as they are, or as they were saved where they aren't
-    // hosted.
-    if (const auto effects = hostsEffects() ? effectRack.save() : keptEffects; effects.isValid() && effects.getNumChildren() > 0)
-        state.appendChild (effects.createCopy(), nullptr);
-
     if (const auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
@@ -2162,15 +2095,6 @@ void SynthProcessor::setStateInformation (const void* data, int sizeInBytes)
 
         state.removeChild (links, nullptr);
     }
-
-    // A project's effects, or none if it has none.
-    const auto effects = state.getChildWithName (EffectRack::stateType);
-    state.removeChild (effects, nullptr);
-
-    if (hostsEffects())
-        effectRack.restore (effects);
-    else
-        keptEffects = effects.createCopy();
 
     loadState (state);
 }
@@ -2802,9 +2726,6 @@ bool SynthProcessor::savePreset (const juce::File& file, const juce::String& cat
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
 
-    // A preset is only the dry sound: no effects, and no oscillator sent through a bus.
-    setBusSends (state, [] (int, int) { return false; });
-
     auto xml = state.createXml();
 
     if (xml != nullptr && label.trim().isNotEmpty())
@@ -2931,58 +2852,12 @@ bool SynthProcessor::loadFactoryPreset (const juce::String& name)
     return false;
 }
 
-void SynthProcessor::setBusSends (juce::ValueTree& state, const std::function<bool (int oscillator, int bus)>& send)
-{
-    // In the state's own sound, and in each of its other pitch sets'.
-    const auto setIn = [&send] (juce::ValueTree sound)
-    {
-        if (! sound.isValid())
-            return;
-
-        for (int i = 0; i < numOscillators; ++i)
-        {
-            for (int bus = 0; bus < Patch::numEffectBuses; ++bus)
-            {
-                const auto id = busSendId (i, bus);
-                auto parameter = sound.getChildWithProperty ("id", id);
-
-                if (! parameter.isValid())
-                {
-                    parameter = juce::ValueTree ("PARAM");
-                    parameter.setProperty ("id", id, nullptr);
-                    sound.appendChild (parameter, nullptr);
-                }
-
-                parameter.setProperty ("value", send (i, bus) ? 1.0 : 0.0, nullptr);
-            }
-        }
-    };
-
-    setIn (state);
-
-    for (const auto& entry : state.getChildWithName ("PITCHSETS"))
-        setIn (entry.getChild (0));
-}
-
 bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::String& name, bool isFactory)
 {
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
         return false;
 
     auto state = juce::ValueTree::fromXml (*xml);
-
-    // A preset is only the dry sound, so the effects, and which oscillators are sent through them, stay as they
-    // are, and presets can be tried through them. A preset saved when presets kept effects has its left out.
-    state.removeChild (state.getChildWithName (EffectRack::stateType), nullptr);
-    std::array<std::array<bool, Patch::numEffectBuses>, numOscillators> sends {};
-
-    for (int i = 0; i < numOscillators; ++i)
-        for (int bus = 0; bus < Patch::numEffectBuses; ++bus)
-            if (const auto* send = parameters.getRawParameterValue (busSendId (i, bus)))
-                sends[(size_t) i][(size_t) bus] = send->load() >= 0.5f;
-
-    setBusSends (state, [&sends] (int i, int bus) { return sends[(size_t) i][(size_t) bus]; });
-
     state.setProperty ("presetName", name, nullptr);
     state.setProperty ("presetEdited", false, nullptr);
     state.setProperty ("presetFactory", isFactory, nullptr);

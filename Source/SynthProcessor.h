@@ -1,6 +1,5 @@
 #pragma once
 
-#include "EffectRack.h"
 #include "HarmonicVoice.h"
 #include "Modulation.h"
 #include "Patch.h"
@@ -71,11 +70,6 @@ public:
     */
     static juce::String filterSendId (int oscillator, int filter);
 
-    /** The ID of whether an oscillator's sent through an effect bus, both numbered from 0, which none is to begin
-        with. One sent through none plays straight out. Only the standalone app hosts effects.
-    */
-    static juce::String busSendId (int oscillator, int bus);
-
     /** Where a pan sends the sound, as its shares either way, such as "L 50% · R 50%", "L 25% · R 75%" or "L 100%". */
     static juce::String panToText (float pan);
 
@@ -128,16 +122,7 @@ public:
         smoothly through its loops and restarts; it's for starting from a known point, as the tests do.
     */
     void restartLfos();
-    void releaseResources() override;
-
-    /** The effect buses, whose plugins oscillators can be sent through. Only the standalone app hosts them; the
-        plugins play every oscillator straight out, and keep any effects saved with a project as they are.
-    */
-    EffectRack& getEffectRack() noexcept   { return effectRack; }
-    bool hostsEffects() const noexcept     { return wrapperType == wrapperType_Standalone || effectsHostedAnyway; }
-
-    /** Hosts effects outside the standalone app, as the tests do. */
-    void hostEffectsAnyway()   { effectsHostedAnyway = true; }
+    void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout&) const override;
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     using AudioProcessor::processBlock;
@@ -674,7 +659,6 @@ private:
 
     /** Loads a preset's XML under a name. Returns false, and leaves the sound alone, if it isn't a preset. */
     bool loadPresetXml (const juce::XmlElement*, const juce::String& name, bool isFactory);
-    static void setBusSends (juce::ValueTree& state, const std::function<bool (int oscillator, int bus)>& send);
 
     struct Oscillator
     {
@@ -725,7 +709,6 @@ private:
         std::atomic<float>* unisonVoices = nullptr;
         std::atomic<float>* unisonDetune = nullptr;
         std::atomic<float>* unisonSpread = nullptr;
-        std::array<std::atomic<float>*, Patch::numEffectBuses> busSends {};
     };
 
     struct FilterParameters
@@ -1018,14 +1001,6 @@ private:
     };
 
     ModWheelSynthesiser synth { patches };
-
-    // The effect buses, and the voices' sound split by where it goes, straight out and through each bus, before the
-    // buses play through their effects and everything's added up. Effects saved with a project where they aren't
-    // hosted are kept to be saved again.
-    EffectRack effectRack;
-    juce::AudioBuffer<float> routedBuffer;
-    juce::ValueTree keptEffects;
-    bool effectsHostedAnyway = false;
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
     std::array<waveform::Drawing, numSources> drawings;
