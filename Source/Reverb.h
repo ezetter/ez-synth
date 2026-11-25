@@ -15,7 +15,7 @@ class Reverb
 public:
     struct Settings
     {
-        /** How long, in milliseconds, before the first reflection, from 0 to 200. */
+        /** How long, in milliseconds, before the first reflection, from 0 to 1000. */
         float delay = 20.0f;
 
         /** How big the room is, from 1 to 100. */
@@ -28,7 +28,7 @@ public:
         float mix = 0.0f;
     };
 
-    static constexpr float longestDelay = 200.0f;
+    static constexpr float longestDelay = 1000.0f;
     static constexpr float smallestSize = 1.0f, largestSize = 100.0f;
     static constexpr float shortestDecay = 0.1f, longestDecay = 20.0f;
 

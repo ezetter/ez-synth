@@ -229,7 +229,7 @@ steady tone, set the harmonics directly instead: it's more exact.
 ### Reverb
 
 One stereo reverb, for the whole synth, that the oscillators sent through it (`oscNToReverb`) play out through:
-`reverbDelay`, the pre-delay before the first reflection, 0 to 200 ms (20 to begin with); `reverbSize`, the room,
+`reverbDelay`, the pre-delay before the first reflection, 0 to 1000 ms (20 to begin with); `reverbSize`, the room,
 from 1 (a small box) to 100 (a large hall), 50 to begin with; `reverbDecay`, the seconds its tail takes to fall
 60 dB, 0.1 to 20 (2 to begin with), its highs fading twice as fast; and `reverbMix`, how much of what comes out of
 it is the reverb, 0 to 1, the rest being the dry sound. It's 0 to begin with, so the reverb is off until it's

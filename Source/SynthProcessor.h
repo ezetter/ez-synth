@@ -77,7 +77,7 @@ public:
     */
     static juce::String effectSendId (int oscillator, int effect);
 
-    /** The IDs of the reverb's settings: its pre-delay, from 0 to 200 ms, the room's size, from 1 to 100, how long
+    /** The IDs of the reverb's settings: its pre-delay, from 0 to 1000 ms, the room's size, from 1 to 100, how long
         its tail takes to fall 60 dB, from 0.1 to 20 seconds, and how much of what comes out of it is the reverb,
         the rest being what was sent through it. The reverb is one for the whole synth, so every pitch set plays
         through it as it's set.

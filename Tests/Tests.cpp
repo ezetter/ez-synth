@@ -3759,6 +3759,15 @@ namespace
             const auto [left, right] = playSides (*synth, 69, 0.3, 0.5);
             check (peakOf (slice (left, 0.0, 0.095)) < 1.0e-6f && loudness (left, 0.13, 0.25) > 0.05,
                    "all reverb, nothing's heard before the pre-delay");
+
+            // Up to a second.
+            auto longest = sine (true);
+            setParameter (*longest, SynthProcessor::reverbDelayId, 1000.0f);
+            setParameter (*longest, SynthProcessor::reverbMixId, 1.0f);
+            const auto [far, farRight] = playSides (*longest, 69, 0.3, 1.4);
+            check (isNear (longest->parameters.getRawParameterValue (SynthProcessor::reverbDelayId)->load(), 1000.0, 0.001)
+                     && peakOf (slice (far, 0.0, 0.99)) < 1.0e-6f && loudness (far, 1.03, 1.25) > 0.05,
+                   "...up to a second");
         }
 
         // The bigger the room, the later the first reflection comes back off its walls.

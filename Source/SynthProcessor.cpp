@@ -231,11 +231,15 @@ namespace
             juce::NormalisableRange<float> decayRange (Reverb::shortestDecay, Reverb::longestDecay);
             decayRange.setSkewForCentre (2.0f);
 
+            // Up to a second, with the first 200 ms taking half the dial, as short pre-delays are the most used.
+            juce::NormalisableRange<float> delayRange (0.0f, Reverb::longestDelay);
+            delayRange.setSkewForCentre (200.0f);
+
             layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
                 "reverb", "Reverb", " ",
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::reverbDelayId, 1 }, "Reverb Delay",
-                    juce::NormalisableRange<float> (0.0f, Reverb::longestDelay), 20.0f,
+                    delayRange, 20.0f,
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float milliseconds, int) { return juce::String (juce::roundToInt (milliseconds)) + " ms"; })
                         .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); })),
