@@ -238,7 +238,7 @@ namespace
             layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
                 "reverb", "Reverb", " ",
                 std::make_unique<juce::AudioParameterFloat> (
-                    juce::ParameterID { SynthProcessor::reverbDelayId, 1 }, "Reverb Delay",
+                    juce::ParameterID { SynthProcessor::reverbDelayId, 1 }, "Reverb Pre-delay",
                     delayRange, 20.0f,
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float milliseconds, int) { return juce::String (juce::roundToInt (milliseconds)) + " ms"; })

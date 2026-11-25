@@ -17,7 +17,7 @@ EffectsScreen::EffectsScreen (SynthProcessor& processor)
 
     const std::array<const char*, 4> ids { SynthProcessor::reverbDelayId, SynthProcessor::reverbSizeId,
                                            SynthProcessor::reverbDecayId, SynthProcessor::reverbMixId };
-    const std::array<const char*, 4> captions { "DELAY", "SIZE", "DECAY", "MIX" };
+    const std::array<const char*, 4> captions { "PRE-DELAY", "SIZE", "DECAY", "MIX" };
     const std::array<const char*, 4> hints { "Before the first reflection", "Of the room, from a box to a hall",
                                              "For the tail to fall 60 dB", "Of the reverb, the rest dry" };
 

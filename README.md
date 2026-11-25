@@ -76,7 +76,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the reverb's switch under them](docs/images/routing.png)
 
 - **Add reverb**: click **Effects** in the header. A screen opens over the synth with the reverb's four dials:
-  **Delay**, the pre-delay before the first reflection, from 0 to 1000 ms, the first 200 ms taking half the dial; **Size**, the room, from 1, a small
+  **Pre-delay**, the time before the first reflection, from 0 to 1000 ms, the first 200 ms taking half the dial; **Size**, the room, from 1, a small
   box, to 100, a large hall, which spaces the reflections and the echoes its tail is made of; **Decay**, how
   long the tail takes to fall 60 dB, from 0.1 to 20 seconds, its highs fading twice as fast, as in a real
   room; and **Mix**, how much of what comes out is the reverb, the rest being the dry sound. Under them is a
@@ -92,7 +92,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   Double-click a dial to set it back to where it starts. Its dials can't be moved by LFOs or envelopes, as
   they belong to every note at once.
 
-![The effects screen: the reverb's delay, size, decay and mix dials, turned up to 30%, with every oscillator but the third switched to be sent through it](docs/images/effects.png)
+![The effects screen: the reverb's pre-delay, size, decay and mix dials, turned up to 30%, with every oscillator but the third switched to be sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
