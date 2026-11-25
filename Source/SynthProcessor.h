@@ -674,6 +674,7 @@ private:
 
     /** Loads a preset's XML under a name. Returns false, and leaves the sound alone, if it isn't a preset. */
     bool loadPresetXml (const juce::XmlElement*, const juce::String& name, bool isFactory);
+    static void setBusSends (juce::ValueTree& state, const std::function<bool (int oscillator, int bus)>& send);
 
     struct Oscillator
     {

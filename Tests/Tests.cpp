@@ -3879,14 +3879,36 @@ namespace
                      && (parameter == nullptr || isNear (restored->getParameters()[0]->getValue(), 0.25, 0.01)),
                    "the effects are saved with the project, with their settings");
 
-            // A preset saved with them brings them back; one without leaves them as they are.
+            // A preset is only the dry sound: it keeps neither the effects nor the bus switches, and loading one
+            // leaves both as they are.
+            const auto sendOf = [] (SynthProcessor& s, int i, int bus)
+            {
+                return s.parameters.getRawParameterValue (SynthProcessor::busSendId (i, bus))->load() >= 0.5f;
+            };
+            const auto setSend = [] (SynthProcessor& s, int i, int bus, bool on)
+            {
+                s.parameters.getParameter (SynthProcessor::busSendId (i, bus))->setValueNotifyingHost (on ? 1.0f : 0.0f);
+            };
+
+            setSend (*synth, 0, 2, true);
             const auto file = juce::File::createTempFile (".ezsynth");
             synth->savePreset (file);
+            const auto savedXml = juce::XmlDocument::parse (file);
+            check (savedXml != nullptr && savedXml->getChildByName (EffectRack::stateType) == nullptr,
+                   "a preset is saved without the effects");
+
             auto fromPreset = sine();
-            check (fromPreset->loadPreset (file) && fromPreset->getEffectRack().getPlugin (2, 1) != nullptr,
-                   "a preset saved with effects brings them with it");
-            check (fromPreset->loadFactoryPreset ("Acid Bass") && fromPreset->getEffectRack().getPlugin (2, 1) != nullptr,
-                   "...and a preset without effects leaves them as they are");
+            check (fromPreset->loadPreset (file) && fromPreset->getEffectRack().getPlugin (2, 1) == nullptr
+                     && ! sendOf (*fromPreset, 0, 2),
+                   "...or which oscillators are sent through them");
+
+            setSend (*synth, 1, 3, true);
+            check (synth->loadPreset (file) && synth->getEffectRack().getPlugin (2, 1) != nullptr
+                     && sendOf (*synth, 0, 2) && sendOf (*synth, 1, 3) && ! sendOf (*synth, 0, 0),
+                   "...and loading one leaves the effects, and the oscillators sent through them, as they are");
+            check (synth->loadFactoryPreset ("Acid Bass") && synth->getEffectRack().getPlugin (2, 1) != nullptr
+                     && sendOf (*synth, 0, 2),
+                   "...as does loading a factory preset");
             file.deleteFile();
 
             // A plugin that isn't on this Mac stays in its slot, missing, and is saved again.

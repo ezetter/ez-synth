@@ -2802,10 +2802,8 @@ bool SynthProcessor::savePreset (const juce::File& file, const juce::String& cat
     state.removeProperty ("presetEdited", nullptr);
     state.removeProperty ("presetFactory", nullptr);
 
-    // The effects go with a preset, if there are any.
-    if (hostsEffects())
-        if (const auto effects = effectRack.save(); effects.getNumChildren() > 0)
-            state.appendChild (effects, nullptr);
+    // A preset is only the dry sound: no effects, and no oscillator sent through a bus.
+    setBusSends (state, [] (int, int) { return false; });
 
     auto xml = state.createXml();
 
@@ -2933,6 +2931,39 @@ bool SynthProcessor::loadFactoryPreset (const juce::String& name)
     return false;
 }
 
+void SynthProcessor::setBusSends (juce::ValueTree& state, const std::function<bool (int oscillator, int bus)>& send)
+{
+    // In the state's own sound, and in each of its other pitch sets'.
+    const auto setIn = [&send] (juce::ValueTree sound)
+    {
+        if (! sound.isValid())
+            return;
+
+        for (int i = 0; i < numOscillators; ++i)
+        {
+            for (int bus = 0; bus < Patch::numEffectBuses; ++bus)
+            {
+                const auto id = busSendId (i, bus);
+                auto parameter = sound.getChildWithProperty ("id", id);
+
+                if (! parameter.isValid())
+                {
+                    parameter = juce::ValueTree ("PARAM");
+                    parameter.setProperty ("id", id, nullptr);
+                    sound.appendChild (parameter, nullptr);
+                }
+
+                parameter.setProperty ("value", send (i, bus) ? 1.0 : 0.0, nullptr);
+            }
+        }
+    };
+
+    setIn (state);
+
+    for (const auto& entry : state.getChildWithName ("PITCHSETS"))
+        setIn (entry.getChild (0));
+}
+
 bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::String& name, bool isFactory)
 {
     if (xml == nullptr || ! xml->hasTagName (parameters.state.getType()))
@@ -2940,15 +2971,17 @@ bool SynthProcessor::loadPresetXml (const juce::XmlElement* xml, const juce::Str
 
     auto state = juce::ValueTree::fromXml (*xml);
 
-    // A preset saved with effects brings them with it, where they're hosted. One without leaves the effects as they
-    // are, so presets can be tried through them.
-    if (const auto effects = state.getChildWithName (EffectRack::stateType); effects.isValid())
-    {
-        state.removeChild (effects, nullptr);
+    // A preset is only the dry sound, so the effects, and which oscillators are sent through them, stay as they
+    // are, and presets can be tried through them. A preset saved when presets kept effects has its left out.
+    state.removeChild (state.getChildWithName (EffectRack::stateType), nullptr);
+    std::array<std::array<bool, Patch::numEffectBuses>, numOscillators> sends {};
 
-        if (hostsEffects())
-            effectRack.restore (effects);
-    }
+    for (int i = 0; i < numOscillators; ++i)
+        for (int bus = 0; bus < Patch::numEffectBuses; ++bus)
+            if (const auto* send = parameters.getRawParameterValue (busSendId (i, bus)))
+                sends[(size_t) i][(size_t) bus] = send->load() >= 0.5f;
+
+    setBusSends (state, [&sends] (int i, int bus) { return sends[(size_t) i][(size_t) bus]; });
 
     state.setProperty ("presetName", name, nullptr);
     state.setProperty ("presetEdited", false, nullptr);

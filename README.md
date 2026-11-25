@@ -83,11 +83,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   through its effects, after its filters, and not straight out; one sent through two buses plays through both,
   side by side. The path above the switches spells it out, such as *Osc 2 → Filter 1 → Bus 1 (AUDelay) → Out*,
   and the Routing row adds the buses, such as *All filters · Bus 1*. Switching a bus mid-note fades over 20 ms.
-  The effects, with their settings, are saved with the app's state and with presets you save; loading a preset
-  saved with effects brings them with it, and one without, such as the factory presets, leaves the effects as
-  they are, so you can try presets through them. A plugin saved with a sound but not on this Mac stays in its
-  slot as **Missing**, with its settings, so saving keeps it. The bus switches belong to the sound, so each
-  pitch set can set them differently; the effects themselves are shared. The VST3 and Audio Unit versions of
+  The effects, with their settings, are saved with the app's state, but presets keep only the dry sound:
+  a preset is saved without the effects and with no oscillator sent through a bus, and loading one leaves
+  the effects, and which oscillators are sent through them, as they are, so you can try presets through
+  them. A plugin saved with the app's state but not on this Mac stays in its slot as **Missing**, with its
+  settings, so saving keeps it. Each pitch set can set the bus switches differently (a preset loaded takes
+  the current pitch set's switches for all of its own); the effects themselves are shared. The VST3 and Audio Unit versions of
   EZ Synth don't host effects (use your DAW's): there, every oscillator plays straight out, and a project's
   effects are kept as they are.
 
