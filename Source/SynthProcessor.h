@@ -3,6 +3,7 @@
 #include "HarmonicVoice.h"
 #include "Modulation.h"
 #include "Patch.h"
+#include "Reverb.h"
 #include "Tuning.h"
 #include "Waveform.h"
 
@@ -69,6 +70,25 @@ public:
         One that isn't skips that filter, going straight on to the next in the chain.
     */
     static juce::String filterSendId (int oscillator, int filter);
+
+    /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which none is
+        to begin with. One sent through none plays straight out. For now the only effect is the reverb.
+    */
+    static juce::String effectSendId (int oscillator, int effect);
+
+    /** The IDs of the reverb's settings: its pre-delay, from 0 to 200 ms, the room's size, from 1 to 100, how long
+        its tail takes to fall 60 dB, from 0.1 to 20 seconds, and how much of what comes out of it is the reverb,
+        the rest being what was sent through it. The reverb is one for the whole synth, so every pitch set plays
+        through it as it's set.
+    */
+    static constexpr auto reverbDelayId = "reverbDelay";
+    static constexpr auto reverbSizeId = "reverbSize";
+    static constexpr auto reverbDecayId = "reverbDecay";
+    static constexpr auto reverbMixId = "reverbMix";
+    static juce::StringArray getReverbIds()   { return { reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId }; }
+
+    /** The names of the effects, for the routing screen and the window. */
+    static juce::String getEffectName (int effect);
 
     /** Where a pan sends the sound, as its shares either way, such as "L 50% · R 50%", "L 25% · R 75%" or "L 100%". */
     static juce::String panToText (float pan);
@@ -709,6 +729,7 @@ private:
         std::atomic<float>* unisonVoices = nullptr;
         std::atomic<float>* unisonDetune = nullptr;
         std::atomic<float>* unisonSpread = nullptr;
+        std::array<std::atomic<float>*, Patch::numEffects> effectSends {};
     };
 
     struct FilterParameters
@@ -1001,6 +1022,18 @@ private:
     };
 
     ModWheelSynthesiser synth { patches };
+
+    // The voices' sound, split by where it goes, straight out and through each effect, and the reverb, played
+    // through as it's set, before everything's added up.
+    juce::AudioBuffer<float> routedBuffer;
+    Reverb reverb;
+    std::atomic<float>* reverbDelay = nullptr;
+    std::atomic<float>* reverbSize = nullptr;
+    std::atomic<float>* reverbDecay = nullptr;
+    std::atomic<float>* reverbMix = nullptr;
+
+    /** Puts the reverb's settings as they are into a pitch set's sound, as the reverb is the same for them all. */
+    void keepReverbIn (juce::ValueTree& sound) const;
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
     std::array<waveform::Drawing, numSources> drawings;

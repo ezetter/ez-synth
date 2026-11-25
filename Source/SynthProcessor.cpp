@@ -220,7 +220,42 @@ namespace
                     juce::ParameterID { SynthProcessor::unisonSpreadId (i), 1 }, name + " Unison Spread",
                     juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f,
                     juce::AudioParameterFloatAttributes()
-                        .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); }))));
+                        .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); })),
+                std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::effectSendId (i, Patch::reverbEffect), 1 }, name + " to Reverb", false)));
+        }
+
+        // The reverb, which oscillators are sent through on their own: a medium room, ringing for two seconds.
+        {
+            juce::NormalisableRange<float> decayRange (Reverb::shortestDecay, Reverb::longestDecay);
+            decayRange.setSkewForCentre (2.0f);
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "reverb", "Reverb", " ",
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::reverbDelayId, 1 }, "Reverb Delay",
+                    juce::NormalisableRange<float> (0.0f, Reverb::longestDelay), 20.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float milliseconds, int) { return juce::String (juce::roundToInt (milliseconds)) + " ms"; })
+                        .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::reverbSizeId, 1 }, "Reverb Size",
+                    juce::NormalisableRange<float> (Reverb::smallestSize, Reverb::largestSize), 50.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float size, int) { return juce::String (juce::roundToInt (size)); })
+                        .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::reverbDecayId, 1 }, "Reverb Decay", decayRange, 2.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float seconds, int) { return formatTime (seconds); })
+                        .withValueFromStringFunction ([] (const juce::String& text)
+                        {
+                            const auto number = text.retainCharacters ("0123456789.").getFloatValue();
+                            return text.containsIgnoreCase ("ms") ? number / 1000.0f : number;
+                        })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::reverbMixId, 1 }, "Reverb Mix",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.3f, asPercentage())));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -373,6 +408,15 @@ juce::String SynthProcessor::filterSendId (int oscillator, int filter)
     return "osc" + juce::String (oscillator + 1) + "ToFilter" + juce::String (filter + 1);
 }
 
+juce::String SynthProcessor::effectSendId (int oscillator, int effect)
+{
+    static_assert (Patch::numEffects == 1, "Each effect needs its name");
+    juce::ignoreUnused (effect);
+    return "osc" + juce::String (oscillator + 1) + "To" + getEffectName (Patch::reverbEffect);
+}
+
+juce::String SynthProcessor::getEffectName (int)   { return "Reverb"; }
+
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
 juce::String SynthProcessor::unisonVoicesId (int oscillator)   { return modulation::getKey (modulation::unisonVoicesTarget (oscillator)); }
@@ -455,6 +499,11 @@ SynthProcessor::SynthProcessor()
         envelopeParameters = live.envelopes;
         volume = live.volume;
     }
+
+    reverbDelay = parameters.getRawParameterValue (reverbDelayId);
+    reverbSize = parameters.getRawParameterValue (reverbSizeId);
+    reverbDecay = parameters.getRawParameterValue (reverbDecayId);
+    reverbMix = parameters.getRawParameterValue (reverbMixId);
 
     // Each pitch set's slot keeps its own copy of every parameter, starting as the host's do.
     for (auto* parameter : getParameters())
@@ -545,7 +594,8 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
                                         find (noiseId (i)), find (panId (i)),
                                         { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
                                           find (filterSendId (i, 3)) },
-                                        find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)) };
+                                        find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)),
+                                        { find (effectSendId (i, Patch::reverbEffect)) } };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -592,10 +642,12 @@ bool SynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
     return output == juce::AudioChannelSet::mono() || output == juce::AudioChannelSet::stereo();
 }
 
-void SynthProcessor::prepareToPlay (double sampleRate, int)
+void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     playingSampleRate = sampleRate;
     synth.setCurrentPlaybackSampleRate (sampleRate);
+    routedBuffer.setSize (HarmonicVoice::routedChannels, std::max (1, samplesPerBlock));
+    reverb.prepare (sampleRate);
 
     // The looping LFOs carry on where they were: a host may prepare again whenever its transport starts or loops,
     // and they're never sent back to the start of their cycles.
@@ -728,7 +780,33 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             periodsSinceLastNote[i] += numSamples / patch.getLfoPeriodSamples (i);
     }
 
-    synth.renderNextBlock (buffer, midi, 0, numSamples);
+    // The voices play what's sent through each effect on its own pair of channels, which plays through the effect
+    // before everything's added up.
+    if (buffer.getNumChannels() > 0)
+    {
+        routedBuffer.setSize (HarmonicVoice::routedChannels, numSamples, false, false, true);
+        routedBuffer.clear();
+        synth.renderNextBlock (routedBuffer, midi, 0, numSamples);
+
+        constexpr auto reverbPair = 2 * (1 + Patch::reverbEffect);
+        reverb.process (routedBuffer.getWritePointer (reverbPair), routedBuffer.getWritePointer (reverbPair + 1), numSamples,
+                        { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), reverbMix->load() });
+
+        for (int pair = 0; pair < HarmonicVoice::routedChannels / 2; ++pair)
+        {
+            if (buffer.getNumChannels() == 1)
+            {
+                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples, 0.5f);
+                buffer.addFrom (0, 0, routedBuffer, 2 * pair + 1, 0, numSamples, 0.5f);
+            }
+            else
+            {
+                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples);
+                buffer.addFrom (1, 0, routedBuffer, 2 * pair + 1, 0, numSamples);
+            }
+        }
+    }
+
     modWheelShown = patch.modWheel;
     shareNewestNote();
 
@@ -1232,6 +1310,9 @@ void SynthProcessor::updatePatch (int slotNumber)
 
         for (size_t filter = 0; filter < oscillator.filterSends.size(); ++filter)
             oscillator.filterSends[filter] = source.filterSends[filter]->load() >= 0.5f;
+
+        for (size_t effect = 0; effect < oscillator.effectSends.size(); ++effect)
+            oscillator.effectSends[effect] = source.effectSends[effect]->load() >= 0.5f;
     }
 
     for (size_t i = 0; i < (size_t) modulation::numFilters; ++i)
@@ -2551,10 +2632,29 @@ void SynthProcessor::activate (int index)
     slotOscillators[(size_t) activeSlot.load()] = oscillators;
     activePitchSet = index;
     activeSlot = pitchSets[(size_t) index].slot;
-    loadSoundState (pitchSets[(size_t) index].sound.createCopy());
+    auto sound = pitchSets[(size_t) index].sound.createCopy();
+    keepReverbIn (sound);
+    loadSoundState (sound);
     pitchSets[(size_t) index].sound = {};
     presetEdited = edited;
     ++pitchSetVersion;
+}
+
+void SynthProcessor::keepReverbIn (juce::ValueTree& sound) const
+{
+    for (const auto& id : getReverbIds())
+    {
+        auto parameter = sound.getChildWithProperty ("id", id);
+
+        if (! parameter.isValid())
+        {
+            parameter = juce::ValueTree ("PARAM");
+            parameter.setProperty ("id", id, nullptr);
+            sound.appendChild (parameter, nullptr);
+        }
+
+        parameter.setProperty ("value", parameters.getRawParameterValue (id)->load(), nullptr);
+    }
 }
 
 void SynthProcessor::setActivePitchSet (int index)

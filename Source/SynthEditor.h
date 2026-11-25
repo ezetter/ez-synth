@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CardStrip.h"
+#include "EffectsScreen.h"
 #include "EnvelopePanel.h"
 #include "FilterPanel.h"
 #include "HarmonicSelector.h"
@@ -70,6 +71,11 @@ public:
     void showRoutingScreen (bool visible, int oscillator = 0);
     bool isRoutingScreenShown() const   { return routingScreen.isVisible(); }
     RoutingScreen& getRoutingScreen() noexcept   { return routingScreen; }
+
+    /** Shows the screen setting the effects, the reverb, over the synth but for the keyboard, or hides it. */
+    void showEffectsScreen (bool);
+    bool isEffectsScreenShown() const   { return effectsScreen.isVisible(); }
+    EffectsScreen& getEffectsScreen() noexcept   { return effectsScreen; }
     juce::String getPitchSetButtonText() const   { return pitchSetButton.getButtonText(); }
 
     /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
@@ -156,6 +162,10 @@ private:
 
     /** Over everything but the keyboard, while it's shown, from the Filters button under an oscillator's glide. */
     RoutingScreen routingScreen { synthProcessor };
+
+    /** Over everything but the keyboard, while it's shown, from the header's Effects button. */
+    EffectsScreen effectsScreen { synthProcessor };
+    juce::TextButton effectsButton { "Effects" };
     juce::TextButton pitchSetButton { "Pitch Sets" };
     int shownPitchSetVersion = -1;
     void showPitchSets();

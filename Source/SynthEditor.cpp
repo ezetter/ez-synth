@@ -184,6 +184,16 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     routingScreen.onOscillatorChosen = [this] (int oscillator) { editSource (oscillator); };
     addChildComponent (routingScreen);
     oscillatorPanel.onShowFilterRouting = [this] { showRoutingScreen (true, synthProcessor.editedSource); };
+    routingScreen.onShowEffects = [this] { showEffectsScreen (true); };
+
+    effectsScreen.onClose = [this] { showEffectsScreen (false); };
+    addChildComponent (effectsScreen);
+
+    effectsButton.setTooltip ("Set the reverb, and which oscillators are sent through it");
+    effectsButton.setMouseClickGrabsKeyboardFocus (false);
+    effectsButton.setWantsKeyboardFocus (false);
+    effectsButton.onClick = [this] { showEffectsScreen (! isEffectsScreenShown()); };
+    addAndMakeVisible (effectsButton);
 
     pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
     pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
@@ -312,6 +322,8 @@ void SynthEditor::resized()
     modulationButton.setBounds (row.removeFromRight (116));
     row.removeFromRight (10);
     pitchSetButton.setBounds (row.removeFromRight (132));
+    row.removeFromRight (10);
+    effectsButton.setBounds (row.removeFromRight (96));
     row.removeFromRight (32);
     row.removeFromLeft (8);
     presetBar.setBounds (row.withWidth (juce::jmin (row.getWidth(), 560)));
@@ -331,6 +343,7 @@ void SynthEditor::resized()
     keyboard.setBounds (keys);
     pitchSetScreen.setBounds (getLocalBounds().withBottom (keys.getY() - 6));
     routingScreen.setBounds (pitchSetScreen.getBounds());
+    effectsScreen.setBounds (pitchSetScreen.getBounds());
     area.removeFromBottom (12);
 
     // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
@@ -654,6 +667,9 @@ void SynthEditor::refresh()
     if (routingScreen.isVisible())
         routingScreen.refresh();
 
+    if (effectsScreen.isVisible())
+        effectsScreen.refresh();
+
     if (midiPanel != nullptr)
         midiPanel->refresh (synthProcessor.getMidiReceived());
 
@@ -742,6 +758,7 @@ void SynthEditor::showRoutingScreen (bool visible, int oscillator)
     {
         showModulationOverview (false);
         showPitchSetScreen (false);
+        showEffectsScreen (false);
         routingScreen.showOscillator (oscillator);
     }
 
@@ -758,12 +775,38 @@ void SynthEditor::showRoutingScreen (bool visible, int oscillator)
     }
 }
 
+void SynthEditor::showEffectsScreen (bool visible)
+{
+    if (visible)
+    {
+        showModulationOverview (false);
+        showPitchSetScreen (false);
+        routingScreen.setVisible (false);
+        effectsScreen.refresh();
+    }
+
+    effectsScreen.setVisible (visible);
+    effectsButton.setToggleState (visible, juce::dontSendNotification);
+
+    if (visible)
+    {
+        effectsScreen.toFront (true);
+        effectsScreen.grabKeyboardFocus();
+    }
+    else if (isShowing())
+    {
+        grabKeyboardFocus();
+    }
+}
+
 void SynthEditor::showPitchSetScreen (bool visible)
 {
     if (visible)
     {
         showModulationOverview (false);
         routingScreen.setVisible (false);
+        effectsScreen.setVisible (false);
+        effectsButton.setToggleState (false, juce::dontSendNotification);
     }
 
     pitchSetScreen.setVisible (visible);
@@ -808,6 +851,8 @@ void SynthEditor::showModulationOverview (bool visible)
     {
         showPitchSetScreen (false);
         routingScreen.setVisible (false);
+        effectsScreen.setVisible (false);
+        effectsButton.setToggleState (false, juce::dontSendNotification);
     }
 
     modulationOverview.setVisible (visible);

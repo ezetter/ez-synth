@@ -110,7 +110,7 @@ OscillatorPanel::OscillatorPanel()
     glideTimeSlider.onValueChange = [this] { repaint (glideValueArea); };
     addAndMakeVisible (glideTimeSlider);
 
-    filtersButton.setTooltip ("Choose which filters this oscillator is sent through");
+    filtersButton.setTooltip ("Choose which filters and effects this oscillator is sent through");
     filtersButton.setMouseClickGrabsKeyboardFocus (false);
     filtersButton.setWantsKeyboardFocus (false);
     filtersButton.onClick = [this]
@@ -185,8 +185,8 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
                                                                              glideTimeSlider);
     glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
 
-    // Which filters it's sent through, shown beside the Filters button.
-    filtersButton.setTitle (name + " filters");
+    // Which filters and effects it's sent through, shown beside the Edit button.
+    filtersButton.setTitle (name + " routing");
 
     for (size_t filter = 0; filter < sendAttachments.size(); ++filter)
     {
@@ -198,6 +198,18 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
                 repaint (routingValueArea);
             });
         sendAttachments[filter]->sendInitialUpdate();
+    }
+
+    for (size_t effect = 0; effect < effectSendAttachments.size(); ++effect)
+    {
+        effectSendAttachments[effect] = std::make_unique<juce::ParameterAttachment> (
+            *parameters.getParameter (SynthProcessor::effectSendId (oscillator, (int) effect)),
+            [this, effect] (float value)
+            {
+                effectSends[effect] = value >= 0.5f;
+                repaint (routingValueArea);
+            });
+        effectSendAttachments[effect]->sendInitialUpdate();
     }
 
     moveWindow();
@@ -381,7 +393,7 @@ void OscillatorPanel::paint (juce::Graphics& g)
     const auto movedPan = modulatable::getLivePosition (panSlider);
     drawCaption ("PAN", SynthProcessor::panToText (movedPan.value_or ((float) panSlider.getValue())), panCaptionArea, movedPan.has_value());
 
-    // The routing: which filters the oscillator's sent through.
+    // The routing: which filters and effects the oscillator's sent through.
     g.setColour (colours::dimText);
     g.setFont (fonts::caption());
     g.drawText ("ROUTING", routingCaptionArea, juce::Justification::centredLeft);
@@ -392,11 +404,20 @@ void OscillatorPanel::paint (juce::Graphics& g)
         if (sends[filter])
             sentTo.add (juce::String ((int) filter + 1));
 
+    const auto filters = sentTo.size() == (int) sends.size() ? juce::String ("All filters")
+                       : sentTo.isEmpty()                  ? juce::String ("No filters")
+                       : (sentTo.size() == 1 ? "Filter " : "Filters ") + sentTo.joinIntoString (", ");
+    const auto shortFilters = sentTo.size() == (int) sends.size() ? juce::String ("All")
+                            : sentTo.isEmpty()                  ? juce::String ("None")
+                            : "F" + sentTo.joinIntoString (",");
+    juce::String effects;
+
+    for (size_t effect = 0; effect < effectSends.size(); ++effect)
+        if (effectSends[effect])
+            effects += juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + SynthProcessor::getEffectName ((int) effect);
+
     g.setFont (fonts::body (12.0f));
-    g.drawText (sentTo.size() == (int) sends.size() ? juce::String ("All filters")
-                : sentTo.isEmpty()                  ? juce::String ("No filters")
-                : (sentTo.size() == 1 ? "Filter " : "Filters ") + sentTo.joinIntoString (", "),
-                routingValueArea, juce::Justification::centredRight);
+    fonts::drawFirstThatFits (g, { filters + effects, shortFilters + effects }, routingValueArea, juce::Justification::centredRight);
 
     if (panOnly)
         return;

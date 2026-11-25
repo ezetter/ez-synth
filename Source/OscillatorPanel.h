@@ -3,6 +3,7 @@
 #include "ChoiceButtons.h"
 #include "Modulation.h"
 #include "ModulatableControls.h"
+#include "Patch.h"
 #include "Tuning.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -27,8 +28,8 @@
     Its glide: Off, Glide, to slide into every note from the pitch of the one before, or Legato, to slide only into
     notes played while another key's still held, and how long the slide takes.
 
-    At the foot, its routing: buttons for screens setting where its sound goes, for now the Filters one, which sets
-    which filters it's sent through, with which those are beside it.
+    At the foot, its routing: an Edit button for the screen setting where its sound goes, which filters and effects
+    it's sent through, with which those are beside it.
 
     Like the other controls, the pan, the unison's sliders and the tune can be right-clicked to have an LFO, envelope,
     velocity or the mod wheel move them, and the figures beside them then follow where they're moved to.
@@ -48,7 +49,9 @@ public:
     /** Shows only the pan and the routing, for an oscillator playing noise, which has no unison, tune or glide. */
     void setPanOnly (bool);
 
-    /** Called when the Filters button's clicked, to show the screen setting which filters the oscillator's sent through. */
+    /** Called when the routing's Edit button's clicked, to show the screen setting which filters and effects the
+        oscillator's sent through.
+    */
     std::function<void()> onShowFilterRouting;
     bool isPanOnly() const noexcept   { return panOnly; }
 
@@ -75,9 +78,11 @@ private:
     juce::Slider zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
     ChoiceButtons glideMode { { "Off", "Glide", "Legato" } };
-    juce::TextButton filtersButton { "Filters" };
+    juce::TextButton filtersButton { "Edit" };
     std::array<std::unique_ptr<juce::ParameterAttachment>, modulation::numFilters> sendAttachments;
     std::array<bool, modulation::numFilters> sends { true, true, true, true };
+    std::array<std::unique_ptr<juce::ParameterAttachment>, Patch::numEffects> effectSendAttachments;
+    std::array<bool, Patch::numEffects> effectSends {};
     juce::Slider glideTimeSlider;
 
     // After the sliders, so they're let go of before the sliders go.

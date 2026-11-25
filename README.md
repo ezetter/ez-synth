@@ -17,7 +17,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **The window** has two rows of cards across the top, the grid under them, and the volume, envelopes and filters
   under that. Down the right, from the cards to the filters, is a tall panel with the chosen oscillator's
   harmonics, with big dials, or what the chosen LFO moves. Left of the grid is the oscillator's own panel, with
-  its pan, unison, tune, glide and routing, from top to bottom. The window can be resized, down to 1420 by 900.
+  its pan, unison, tune, glide and routing, from top to bottom. The **Effects** button in the header opens the
+  effects' screen. The window can be resized, down to 1420 by 900.
 - **Choose an oscillator or LFO.** Across the top are the oscillators' cards, then the LFOs'. Three of the
   six oscillators show at a time: swipe sideways on the trackpad over the row, turn a mouse wheel, or drag the
   thin scroll bar under it to see the others, as with the LFOs. Click a card to show its wave on the grid; its
@@ -60,17 +61,35 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   pan, each can be right-clicked to have an LFO, envelope, velocity or the mod wheel move it, such as an LFO
   swinging the spread, or velocity adding voices to harder notes; the figures beside them follow. Voices added
   or taken away fade in or out over 20 ms, so changing them mid-note doesn't click. Noise has no unison.
-- **Route an oscillator through the filters** you choose: click **Filters**, on the **Routing** row at the
+- **Route an oscillator through the filters and effects** you choose: click **Edit**, on the **Routing** row at the
   foot of the oscillator's panel, left of the grid, below the glide. A screen opens over the synth, with buttons along the top
-  to choose the oscillator, and a switch for each filter, beside its type and cutoff. The filters run in a
+  to choose the oscillator, a switch for each filter, beside its type and cutoff, and under them a switch for
+  the reverb, beside its settings. The filters run in a
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
-  as they were. The chain the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Out*, is
-  spelled out above the switches, and the Routing row says which filters it's sent through. Each pitch set
-  can route its oscillators differently. **Done**, or Escape, goes back to the synth. The screen has room
-  for more kinds of routing later.
+  as they were. After the filters, an oscillator sent through the reverb plays out through it; none is to
+  begin with. The path the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Reverb → Out*, is
+  spelled out above the switches, and the Routing row says which filters it's sent through, and the reverb,
+  if it is. Each pitch set can route its oscillators differently. The reverb's **Settings** button opens the
+  effects' screen. **Done**, or Escape, goes back to the synth.
 
-![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter](docs/images/routing.png)
+![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the reverb's switch under them](docs/images/routing.png)
+
+- **Add reverb**: click **Effects** in the header. A screen opens over the synth with the reverb's four dials:
+  **Delay**, the pre-delay before the first reflection, from 0 to 200 ms; **Size**, the room, from 1, a small
+  box, to 100, a large hall, which spaces the reflections and the echoes its tail is made of; **Decay**, how
+  long the tail takes to fall 60 dB, from 0.1 to 20 seconds, its highs fading twice as fast, as in a real
+  room; and **Mix**, how much of what comes out is the reverb, the rest being the dry sound. Under them is a
+  switch for each oscillator, sending it through the reverb, the same switches as on the routing screen. An
+  oscillator sent through it rings on after its note ends; one that isn't plays straight out, dry. Held, a
+  sound at full mix is about as loud as it is dry, in any room. Moving the dials while it rings glides them,
+  so nothing clicks; changing the size bends the tail's pitch a little as it glides. The reverb is one for the
+  whole synth, set the same for every pitch set, though each pitch set chooses which of its oscillators go
+  through it. It's saved with presets, and a preset from before there was a reverb sends nothing through it.
+  Double-click a dial to set it back to where it starts. Its dials can't be moved by LFOs or envelopes, as
+  they belong to every note at once.
+
+![The effects screen: the reverb's delay, size, decay and mix dials, with oscillators 1 and 2 switched to be sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -814,7 +833,19 @@ save pictures of the window showing several waves.
   do to begin with, so routing costs nothing until an oscillator's routed differently. Each lane has its own
   memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
   A send that's switched fades over 20 ms, so switching it mid-note doesn't click; an oscillator that moves
-  to a lane of its own carries on from the memories of the lane it left.
+  to a lane of its own carries on from the memories of the lane it left. Each lane, filtered, then goes
+  straight out or to the reverb, fading over 20 ms when it's switched: each voice plays into four channels,
+  a pair straight out and a pair for the reverb, which are added up after the reverb has played its pair.
+- **Reverb** (`Source/Reverb.cpp`). The pair sent to it waits for the pre-delay, then six early reflections
+  each side, at times spaced by the room's size, come back off the walls, some turned over. Meanwhile it goes
+  through two allpass diffusers each side into a feedback delay network: eight delay lines from 30 to 73 ms
+  in the largest room, down to 8% of that in the smallest, fed back through a Householder matrix, so each
+  echo feeds every other and the tail grows dense. Each line keeps 10^(−3 × its length / decay) of what goes
+  round, so the tail falls 60 dB over the decay, through a one-pole filter that keeps less of the highs, as
+  if the decay were half as long. As much goes in as the tail keeps from fading, √(1 − g²), so a steady
+  sound comes out about as loud however long it rings. Each side hears the lines in its own blend of signs,
+  so the two sides differ. The settings glide over about 50 ms; the lines' lengths are read between samples,
+  so the size can glide. Once it's rung out and nothing's sent to it, it rests.
 - **Filtering.** Each note goes through its own four filters, from the first to the last
   (`Source/FilterStage.cpp`), so an LFO that runs once can sweep each note's filter separately. Each is a
   state variable filter, 12 dB an octave, made with the topology-preserving transform, which works out the
@@ -866,7 +897,9 @@ save pictures of the window showing several waves.
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/OscillatorPanel.*` | The oscillator's panel left of the grid: its pan, its unison's voices, detune and spread, its tune slider, with its intervals marked, and the zoom slider above it, then its glide and routing rows |
-| `Source/RoutingScreen.*` | The routing screen, setting which filters each oscillator's sent through |
+| `Source/RoutingScreen.*` | The routing screen, setting which filters and effects each oscillator's sent through |
+| `Source/EffectsScreen.*` | The effects' screen: the reverb's dials, and which oscillators are sent through it |
+| `Source/Reverb.*` | The reverb: its pre-delay, early reflections and feedback delay network |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |
 | `Source/ModulatableControls.*` | Dials, sliders and switches that open the modulation editor on a right-click |

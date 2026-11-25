@@ -42,8 +42,21 @@ RoutingScreen::RoutingScreen (SynthProcessor& processor)
     };
     addAndMakeVisible (oscillatorButtons);
 
-    for (auto& row : rows)
+    effectSettingsButton.setTooltip ("Set the reverb, on the effects' screen");
+    effectSettingsButton.setMouseClickGrabsKeyboardFocus (false);
+    effectSettingsButton.setWantsKeyboardFocus (false);
+    effectSettingsButton.onClick = [this]
     {
+        if (onShowEffects != nullptr)
+            onShowEffects();
+    };
+    addAndMakeVisible (effectSettingsButton);
+
+    static_assert (modulation::numFilters == 4 && Patch::numEffects == 1, "Each row's switch is set up");
+
+    for (auto* each : { &rows[0], &rows[1], &rows[2], &rows[3], &effectRows[0] })
+    {
+        auto& row = *each;
         row.sendSwitch.setMouseClickGrabsKeyboardFocus (false);
         row.sendSwitch.setWantsKeyboardFocus (false);
         row.sendSwitch.onStateChange = [this] { repaint(); };
@@ -67,6 +80,15 @@ void RoutingScreen::showOscillator (int newOscillator)
             synthProcessor.parameters, SynthProcessor::filterSendId (oscillator, (int) filter), row.sendSwitch);
     }
 
+    for (size_t effect = 0; effect < effectRows.size(); ++effect)
+    {
+        auto& row = effectRows[effect];
+        row.attachment.reset();
+        row.sendSwitch.setTitle ("Osc " + juce::String (oscillator + 1) + " to " + SynthProcessor::getEffectName ((int) effect).toLowerCase());
+        row.attachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+            synthProcessor.parameters, SynthProcessor::effectSendId (oscillator, (int) effect), row.sendSwitch);
+    }
+
     refresh();
     repaint();
 }
@@ -83,9 +105,39 @@ juce::String RoutingScreen::describeFilter (int filter) const
     return FilterStage::getName (type) + dot + synthProcessor.parameters.getParameter (ids.cutoff)->getCurrentValueAsText();
 }
 
+juce::String RoutingScreen::describeEffect (int) const
+{
+    const auto text = [this] (const char* id) { return synthProcessor.parameters.getParameter (id)->getCurrentValueAsText(); };
+    return text (SynthProcessor::reverbDelayId) + dot + "size " + text (SynthProcessor::reverbSizeId) + dot
+         + text (SynthProcessor::reverbDecayId) + dot + text (SynthProcessor::reverbMixId) + " wet";
+}
+
+juce::String RoutingScreen::describePath() const
+{
+    // The path the oscillator's sound takes, through the filters and effects it's sent through.
+    juce::String path = "Osc " + juce::String (oscillator + 1);
+
+    for (size_t filter = 0; filter < rows.size(); ++filter)
+        if (rows[filter].sendSwitch.getToggleState())
+            path += arrow + "Filter " + juce::String ((int) filter + 1);
+
+    for (size_t effect = 0; effect < effectRows.size(); ++effect)
+        if (effectRows[effect].sendSwitch.getToggleState())
+            path += arrow + SynthProcessor::getEffectName ((int) effect);
+
+    return path + arrow + "Out";
+}
+
 void RoutingScreen::refresh()
 {
     auto changed = false;
+
+    for (size_t effect = 0; effect < effectRows.size(); ++effect)
+    {
+        const auto settings = describeEffect ((int) effect);
+        changed = changed || settings != effectRows[effect].shownSettings;
+        effectRows[effect].shownSettings = settings;
+    }
 
     for (size_t filter = 0; filter < rows.size(); ++filter)
     {
@@ -126,6 +178,19 @@ void RoutingScreen::resized()
         row.sendSwitch.setBounds (inner.removeFromLeft (36).withSizeKeepingCentre (36, 22));
         area.removeFromTop (6);
     }
+
+    area.removeFromTop (14);
+    effectsCaptionArea = area.removeFromTop (18);
+    area.removeFromTop (8);
+
+    for (auto& row : effectRows)
+    {
+        row.area = area.removeFromTop (48);
+        auto inner = row.area.reduced (14, 0);
+        row.sendSwitch.setBounds (inner.removeFromLeft (36).withSizeKeepingCentre (36, 22));
+        effectSettingsButton.setBounds (inner.removeFromRight (90).withSizeKeepingCentre (90, 26));
+        area.removeFromTop (6);
+    }
 }
 
 void RoutingScreen::paint (juce::Graphics& g)
@@ -144,47 +209,52 @@ void RoutingScreen::paint (juce::Graphics& g)
     g.drawText ("ROUTING", titleArea, juce::Justification::centredLeft);
     g.drawText ("OSCILLATOR", oscillatorCaptionArea, juce::Justification::centredLeft);
     g.drawText ("FILTERS", filtersCaptionArea, juce::Justification::centredLeft);
+    g.drawText ("EFFECTS", effectsCaptionArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
     g.drawFittedText ("Where each oscillator's sound goes. The filters run in a chain, from the first to the last; an "
-                      "oscillator that isn't sent through a filter skips it, going straight on to the next.",
+                      "oscillator that isn't sent through a filter skips it, going straight on to the next. After them, "
+                      "one sent through the reverb plays out through it.",
                       subtitleArea, juce::Justification::centredLeft, 2);
 
-    // The path the oscillator's sound takes, through the filters it's sent through.
-    juce::String path = name;
-
-    for (size_t filter = 0; filter < rows.size(); ++filter)
-        if (rows[filter].sendSwitch.getToggleState())
-            path += arrow + "Filter " + juce::String ((int) filter + 1);
-
-    path += arrow + "Out";
     g.setColour (colours::text);
-    g.drawText (path, chainArea, juce::Justification::centredLeft);
+    g.drawText (describePath(), chainArea, juce::Justification::centredLeft);
 
     for (size_t filter = 0; filter < rows.size(); ++filter)
-    {
-        const auto& row = rows[filter];
-        const auto sent = row.sendSwitch.getToggleState();
+        paintRow (g, rows[filter], "Filter " + juce::String ((int) filter + 1), name + " is sent through it", name + " skips it");
 
-        g.setColour (colours::background.withAlpha (sent ? 0.5f : 0.25f));
-        g.fillRoundedRectangle (row.area.toFloat(), 6.0f);
+    for (size_t effect = 0; effect < effectRows.size(); ++effect)
+        paintRow (g, effectRows[effect], SynthProcessor::getEffectName ((int) effect), name + " is sent through it",
+                  name + " plays straight out");
+}
 
-        auto text = row.area.reduced (14, 0);
-        text.removeFromLeft (36 + 16);
-        auto status = text.removeFromRight (220);
+void RoutingScreen::paintRow (juce::Graphics& g, const Row& row, const juce::String& title, const juce::String& sentText,
+                              const juce::String& skipText) const
+{
+    const auto sent = row.sendSwitch.getToggleState();
 
-        g.setFont (fonts::body (14.0f).boldened());
-        g.setColour (sent ? colours::text : colours::dimText);
-        const auto title = "Filter " + juce::String ((int) filter + 1);
-        g.drawText (title, text.removeFromLeft (80), juce::Justification::centredLeft);
+    g.setColour (colours::background.withAlpha (sent ? 0.5f : 0.25f));
+    g.fillRoundedRectangle (row.area.toFloat(), 6.0f);
 
-        g.setFont (fonts::body (13.0f));
-        g.setColour (colours::dimText);
-        g.drawText (row.shownSettings, text, juce::Justification::centredLeft, true);
+    auto text = row.area.reduced (14, 0);
+    text.removeFromLeft (36 + 16);
 
-        g.setColour (sent ? colours::accent : colours::dimText);
-        g.drawText (sent ? name + " is sent through it" : name + " skips it", status, juce::Justification::centredRight);
-    }
+    // An effect's row has its Settings button at the end.
+    if (std::any_of (effectRows.begin(), effectRows.end(), [&row] (const Row& each) { return &each == &row; }))
+        text.removeFromRight (90 + 16);
+
+    auto status = text.removeFromRight (200);
+
+    g.setFont (fonts::body (14.0f).boldened());
+    g.setColour (sent ? colours::text : colours::dimText);
+    g.drawText (title, text.removeFromLeft (80), juce::Justification::centredLeft);
+
+    g.setFont (fonts::body (13.0f));
+    g.setColour (colours::dimText);
+    g.drawText (row.shownSettings, text, juce::Justification::centredLeft, true);
+
+    g.setColour (sent ? colours::accent : colours::dimText);
+    g.drawText (sent ? sentText : skipText, status, juce::Justification::centredRight);
 }
 
 bool RoutingScreen::keyPressed (const juce::KeyPress& key)

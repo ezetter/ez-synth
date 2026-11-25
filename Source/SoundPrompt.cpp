@@ -192,6 +192,8 @@ oscillator's tune.
 - `oscNToFilterM`, true or false, true to begin with, sends oscillator N through filter M (1 to 4). The filters run
   in a chain, 1 to 4; an oscillator that isn't sent through one skips it, going straight on to the next. Use it to
   filter one part of a sound and not another, such as a low-passed body under an unfiltered noise attack.
+- `oscNToReverb`, true or false, false to begin with, sends oscillator N through the reverb, after its filters.
+  One that isn't sent through it plays straight out. See the reverb below.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
 - The wave can be given as one of the presets, `"wave": "Sine"`, `"Sawtooth"`, `"Square"` or `"Triangle"`, with its
@@ -223,6 +225,17 @@ octave along its travel, about a tenth of the travel an octave.
 
 Filters suit sounds whose brightness changes over the note, such as a pluck or brass, and resonant bodies. For a
 steady tone, set the harmonics directly instead: it's more exact.
+
+### Reverb
+
+One stereo reverb, for the whole synth, that the oscillators sent through it (`oscNToReverb`) play out through:
+`reverbDelay`, the pre-delay before the first reflection, 0 to 200 ms (20 to begin with); `reverbSize`, the room,
+from 1 (a small box) to 100 (a large hall), 50 to begin with; `reverbDecay`, the seconds its tail takes to fall
+60 dB, 0.1 to 20 (2 to begin with), its highs fading twice as fast; and `reverbMix`, how much of what comes out of
+it is the reverb, 0 to 1 (0.3 to begin with), the rest being the dry sound. Held, a sound through it at full mix is
+about as loud as it is dry. It goes on ringing after the note ends, so the sound tool's measurements of a note's
+fade include it: leave every oscillator's `oscNToReverb` false when matching a dry sample, and use it for pads,
+plucks in a space, and anything a sample shows ringing in a room.
 
 ### Envelopes
 

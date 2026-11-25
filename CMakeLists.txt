@@ -48,6 +48,7 @@ target_sources(EZSynth
         Source/ChoiceButtons.cpp
         Source/Dropdown.cpp
         Source/Envelope.cpp
+        Source/EffectsScreen.cpp
         Source/EnvelopePanel.cpp
         Source/FilterPanel.cpp
         Source/FilterStage.cpp
@@ -67,6 +68,7 @@ target_sources(EZSynth
         Source/RoutingScreen.cpp
         Source/PresetBar.cpp
         Source/RandomWave.cpp
+        Source/Reverb.cpp
         Source/SoundAnalysis.cpp
         Source/SoundDescription.cpp
         Source/SoundPrompt.cpp
