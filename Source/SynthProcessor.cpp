@@ -228,14 +228,15 @@ namespace
         }
 
         // The delay, which every oscillator's sent through to begin with: repeating every 375 ms, a dotted eighth at
-        // 120 BPM, or a quarter note synced, each repeat at 35% of the one before, but none of it mixed in, so it's
-        // off until the mix is turned up.
+        // 120 BPM, or a quarter note synced, each repeat at 35% of the one before, half of it mixed in, but switched
+        // off, so what's sent through it plays dry until it's switched on.
         {
             juce::NormalisableRange<float> timeRange (Delay::shortestTime, Delay::longestSetTime);
             timeRange.setSkewForCentre (400.0f);
 
             layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
                 "delay", "Delay", " ",
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::delayOnId, 1 }, "Delay On", false),
                 std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::delaySyncId, 1 }, "Delay Sync", false),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::delayTimeId, 1 }, "Delay Time", timeRange, 375.0f,
@@ -253,11 +254,11 @@ namespace
                     juce::NormalisableRange<float> (0.0f, 1.0f), 0.35f, asPercentage()),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::delayMixId, 1 }, "Delay Mix",
-                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, asPercentage())));
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f, asPercentage())));
         }
 
         // The reverb, which every oscillator's sent through to begin with: a medium room, ringing for two seconds,
-        // but none of it mixed in, so it's off until the mix is turned up.
+        // half of it mixed in, but switched off, so what's sent through it plays dry until it's switched on.
         {
             juce::NormalisableRange<float> decayRange (Reverb::shortestDecay, Reverb::longestDecay);
             decayRange.setSkewForCentre (2.0f);
@@ -268,6 +269,7 @@ namespace
 
             layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
                 "reverb", "Reverb", " ",
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::reverbOnId, 1 }, "Reverb On", false),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::reverbDelayId, 1 }, "Reverb Pre-delay",
                     delayRange, 20.0f,
@@ -291,7 +293,7 @@ namespace
                         })),
                 std::make_unique<juce::AudioParameterFloat> (
                     juce::ParameterID { SynthProcessor::reverbMixId, 1 }, "Reverb Mix",
-                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, asPercentage())));
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f, asPercentage())));
         }
 
         // The filters start switched out, a low pass, a high pass, a mid pass and a notch, at cutoffs that change the
@@ -449,6 +451,8 @@ juce::String SynthProcessor::effectSendId (int oscillator, int effect)
     return "osc" + juce::String (oscillator + 1) + "To" + getEffectName (effect);
 }
 
+juce::String SynthProcessor::effectOnId (int effect)   { return effect == Patch::delayEffect ? delayOnId : reverbOnId; }
+
 juce::String SynthProcessor::getEffectName (int effect)
 {
     static_assert (Patch::numEffects == 2, "Each effect needs its name");
@@ -547,6 +551,8 @@ SynthProcessor::SynthProcessor()
     delayDivision = parameters.getRawParameterValue (delayDivisionId);
     delayFeedback = parameters.getRawParameterValue (delayFeedbackId);
     delayMix = parameters.getRawParameterValue (delayMixId);
+    delayOn = parameters.getRawParameterValue (delayOnId);
+    reverbOn = parameters.getRawParameterValue (reverbOnId);
 
     // Each pitch set's slot keeps its own copy of every parameter, starting as the host's do.
     for (auto* parameter : getParameters())
@@ -838,7 +844,9 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         constexpr auto delayed = 2 * (1 << Patch::delayEffect);
         constexpr auto reverberated = 2 * (1 << Patch::reverbEffect);
         constexpr auto both = 2 * ((1 << Patch::delayEffect) | (1 << Patch::reverbEffect));
-        const Delay::Settings delaySettings { getDelayTime(), delayFeedback->load(), delayMix->load() };
+        // An effect that's switched off has none of it mixed in, so what's sent through it plays dry, and it rests.
+        const auto mixOf = [] (const std::atomic<float>* on, const std::atomic<float>* mix) { return on->load() >= 0.5f ? mix->load() : 0.0f; };
+        const Delay::Settings delaySettings { getDelayTime(), delayFeedback->load(), mixOf (delayOn, delayMix) };
 
         delayOut.process (routedBuffer.getWritePointer (delayed), routedBuffer.getWritePointer (delayed + 1), numSamples, delaySettings);
         delayToReverb.process (routedBuffer.getWritePointer (both), routedBuffer.getWritePointer (both + 1), numSamples, delaySettings);
@@ -848,7 +856,7 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
         routedBuffer.clear (both + 1, 0, numSamples);
 
         reverb.process (routedBuffer.getWritePointer (reverberated), routedBuffer.getWritePointer (reverberated + 1), numSamples,
-                        { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), reverbMix->load() });
+                        { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), mixOf (reverbOn, reverbMix) });
 
         for (int pair = 0; pair < HarmonicVoice::routedChannels / 2; ++pair)
         {
@@ -2508,6 +2516,19 @@ void SynthProcessor::loadSoundState (juce::ValueTree state)
     for (auto parameter : state)
         if (parameter.hasProperty ("id"))
             parameter.setProperty ("id", modulation::updateKey (parameter["id"].toString()), nullptr);
+
+    // A save from before the effects could be switched on and off had them on as long as any of them was mixed in,
+    // which it now keeps.
+    for (const auto& [onId, mixId] : { std::pair (delayOnId, delayMixId), std::pair (reverbOnId, reverbMixId) })
+    {
+        if (const auto mix = state.getChildWithProperty ("id", mixId); mix.isValid() && ! state.getChildWithProperty ("id", onId).isValid())
+        {
+            juce::ValueTree on ("PARAM");
+            on.setProperty ("id", onId, nullptr);
+            on.setProperty ("value", (double) mix["value"] > 0.0 ? 1.0 : 0.0, nullptr);
+            state.appendChild (on, nullptr);
+        }
+    }
 
     // A save from before a control existed, such as an oscillator's tune, gives it its default, rather than leaving
     // it as it was.

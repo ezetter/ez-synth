@@ -8,7 +8,7 @@
 #include <deque>
 
 /** A screen of its own, over the window but for the keyboard, setting the effects oscillators can be sent through,
-    in the order they run: the delay, its time, in milliseconds or synced to the tempo, its feedback and mix, and
+    each with a switch, off to begin with, so what's sent through it plays dry, in the order they run: the delay, its time, in milliseconds or synced to the tempo, its feedback and mix, and
     then the reverb, its pre-delay, the room's size, how long it rings, and its mix. Under each is a switch for each
     oscillator, for whether it's sent through it, as on the routing screen. It's the Effects tab's; Escape goes
     back to the synth.
@@ -31,6 +31,9 @@ public:
 
     /** The switch sending an oscillator through an effect. */
     juce::ToggleButton& getSendSwitch (int effect, int oscillator)   { return sections[(size_t) effect].sends[(size_t) oscillator].sendSwitch; }
+
+    /** An effect's on/off switch. */
+    juce::ToggleButton& getOnSwitch (int effect)   { return sections[(size_t) effect].onSwitch; }
 
     /** The delay's choice of a time in milliseconds, 0, or synced to the tempo, 1. */
     ChoiceButtons& getDelaySyncButtons()   { return delaySync; }
@@ -60,7 +63,9 @@ private:
         int effect = 0;
         std::vector<Dial*> dials;
         std::array<Send, SynthProcessor::numOscillators> sends;
-        juce::Rectangle<int> area, captionArea, sendsCaptionArea, sendsNoteArea;
+        juce::ToggleButton onSwitch;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> onAttachment;
+        juce::Rectangle<int> area, captionArea, nameArea, sendsCaptionArea, sendsNoteArea;
     };
 
     Dial& addDial (Section&, const char* parameterId, const juce::String& caption, const juce::String& hint);
@@ -68,6 +73,9 @@ private:
     /** The dials shown: the delay's time or note, as it's synced or not. */
     std::vector<Dial*> getShownDials (const Section&) const;
     void showDelaySync();
+
+    /** Shows an effect that's switched off faintly, its settings kept, ready for when it's switched on. */
+    void showOnOff();
     void attachSends();
 
     SynthProcessor& synthProcessor;

@@ -72,8 +72,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
   as they were. After the filters, the effects carry on the chain, the delay then the reverb, so the delay's
-  repeats ring on in the reverb; every oscillator is sent through both to begin with, but each starts with
-  none of it mixed in, so it's off until its **Mix** is turned up. The path the oscillator's sound takes, such
+  repeats ring on in the reverb; every oscillator is sent through both to begin with, but each effect starts
+  switched off, so what's sent through it plays dry until it's switched on, on the Effects tab. The path the oscillator's sound takes, such
   as *Osc 2 → Filter 1 → Filter 3 → Delay → Reverb → Out*, is spelled out above the switches, and the Routing
   row says which filters and effects it's sent through. Each pitch set can route its oscillators differently.
   An effect's **Settings** button opens the effects' screen. **Done**, or Escape, goes back to the synth.
@@ -82,11 +82,13 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 - **Add delay and reverb**: click the **Effects** tab. A screen opens over the synth with each effect
   in the order they run, and under each a switch for each oscillator, sending it through, the same switches
-  as on the routing screen. Every oscillator, in every pitch set, is sent through both to begin with, and
-  each effect's mix starts at 0%, all dry, so it's off until you turn its mix up; with none of it mixed in it
-  doesn't run at all. Each effect is one for the whole synth, set the same for every pitch set, though each
+  as on the routing screen. Beside each effect's name is its on/off switch: off, what's sent through it plays
+  dry, and it doesn't run at all; switched on or off, it fades over about 50 ms, so it doesn't click. Every
+  oscillator, in every pitch set, is sent through both to begin with, and each effect starts switched off,
+  with its mix at 50%, ready to be switched on. An effect that's off is shown faintly, its settings kept. Each effect is one for the whole synth, set the same for every pitch set, though each
   pitch set chooses which of its oscillators go through it. They're saved with presets, and a preset from
-  before there were effects sends every oscillator through them with none mixed in, so it plays dry.
+  before there were effects sends every oscillator through them, switched off, so it plays dry. A save from
+  before the effects had switches has each on if any of it was mixed in, so it sounds as it did.
   Double-click a dial to set it back to where it starts. Their dials can't be moved by LFOs or envelopes, as
   they belong to every note at once. Moving them while sound rings through glides them, so nothing clicks.
 - **The delay** repeats what's sent through it. **Milliseconds** or **Synced** chooses how its **Time** is
@@ -105,7 +107,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   sent through it rings on after its note ends. Held, a sound at full mix is about as loud as it is dry, in
   any room. Changing the size bends the tail's pitch a little as it glides.
 
-![The effects screen: the delay synced to dotted eighths, 25% mixed in, every oscillator but the first sent through it, and under it the reverb's pre-delay, size, decay and mix dials, 30% mixed in, every oscillator but the third sent through it](docs/images/effects.png)
+![The effects screen, both effects switched on: the delay synced to dotted eighths, 25% mixed in, every oscillator but the first sent through it, and under it the reverb's pre-delay, size, decay and mix dials, 30% mixed in, every oscillator but the third sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -853,8 +855,8 @@ save pictures of the window showing several waves.
   channels, a pair for each set of effects, numbered by their bits, from the pair straight out to the pair
   through both. After the voices, the pair sent only through the delay plays through it and out; the pair
   sent through both plays through a second delay, set alike, and joins the pair sent only through the reverb,
-  which then plays through the reverb; then every pair's added up. A delay or reverb with none of it mixed in
-  is skipped.
+  which then plays through the reverb; then every pair's added up. A delay or reverb that's switched off
+  plays with none of it mixed in, gliding there, and once it's there, it's skipped.
 - **Delay** (`Source/Delay.cpp`). A stereo line up to 8 seconds long, read between samples so its time can
   glide, about 50 ms to settle. What's written back is what went in plus the feedback's share of what comes
   out, saturated, left as it is up to full scale and rounded off above it, short of twice that, so at 100%

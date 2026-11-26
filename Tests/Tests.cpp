@@ -3645,12 +3645,13 @@ namespace
             auto synth = std::make_unique<SynthProcessor>();
             setPreset (*synth, 0, waveform::Preset::sine);
             setParameter (*synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), sent ? 1.0f : 0.0f);
+            setParameter (*synth, SynthProcessor::reverbOnId, 1.0f);
             setParameter (*synth, SynthProcessor::reverbMixId, 0.3f);
             return synth;
         };
 
-        // To begin with, every oscillator's sent through the reverb, in every pitch set, but none of it's mixed in,
-        // so it's off: a note plays exactly as it would straight out, and stops when it does.
+        // To begin with, every oscillator's sent through the reverb, in every pitch set, half of it mixed in, but it's
+        // switched off: a note plays exactly as it would straight out, and stops when it does.
         {
             SynthProcessor fresh;
             auto allSent = true;
@@ -3663,8 +3664,9 @@ namespace
             for (int i = 0; i < SynthProcessor::numOscillators; ++i)
                 allSent = allSent && fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (i, Patch::reverbEffect))->load() >= 0.5f;
 
-            check (allSent && fresh.parameters.getRawParameterValue (SynthProcessor::reverbMixId)->load() == 0.0f,
-                   "to begin with, every oscillator in every pitch set is sent through the reverb, with none of it mixed in");
+            check (allSent && fresh.parameters.getRawParameterValue (SynthProcessor::reverbOnId)->load() < 0.5f
+                     && isNear (fresh.parameters.getRawParameterValue (SynthProcessor::reverbMixId)->load(), 0.5, 0.001),
+                   "to begin with, every oscillator in every pitch set is sent through the reverb, switched off, its mix at 50%");
 
             auto off = std::make_unique<SynthProcessor>();
             setPreset (*off, 0, waveform::Preset::sine);
@@ -3678,7 +3680,32 @@ namespace
             for (size_t i = 0; i < left.size(); ++i)
                 furthest = std::max ({ furthest, std::abs (left[i] - straightLeft[i]), std::abs (right[i] - straightRight[i]) });
 
-            check (peakOf (left) > 0.1f && furthest < 1.0e-6f, "...so it's off, and a note plays as it does straight out");
+            check (peakOf (left) > 0.1f && furthest < 1.0e-6f, "...so a note plays as it does straight out");
+
+            // Switched off, whatever its mix, it plays dry; switched on, the same note rings on.
+            setParameter (*off, SynthProcessor::reverbMixId, 1.0f);
+            const auto stillDry = playSides (*off, 69, 0.2, 1.0).first;
+            setParameter (*off, SynthProcessor::reverbOnId, 1.0f);
+            const auto switchedOn = playSides (*off, 69, 0.2, 1.0).first;
+            check (loudness (stillDry, 0.6, 1.0) < 1.0e-6 && loudness (switchedOn, 0.6, 1.0) > 1.0e-3,
+                   "switched off, it plays dry, however much is mixed in, and switched on, it rings");
+        }
+
+        // A save from before the effects could be switched on and off has an effect on if any of it's mixed in.
+        {
+            SynthProcessor older;
+            auto state = older.parameters.copyState();
+            state.removeChild (state.getChildWithProperty ("id", SynthProcessor::reverbOnId), nullptr);
+            state.removeChild (state.getChildWithProperty ("id", SynthProcessor::delayOnId), nullptr);
+            state.getChildWithProperty ("id", SynthProcessor::reverbMixId).setProperty ("value", 0.3, nullptr);
+            state.getChildWithProperty ("id", SynthProcessor::delayMixId).setProperty ("value", 0.0, nullptr);
+            const auto file = juce::File::createTempFile (".ezsynth");
+            state.createXml()->writeTo (file);
+            check (older.loadPreset (file)
+                     && older.parameters.getRawParameterValue (SynthProcessor::reverbOnId)->load() >= 0.5f
+                     && older.parameters.getRawParameterValue (SynthProcessor::delayOnId)->load() < 0.5f,
+                   "a save from before the effects had switches has those mixed in on, and the others off");
+            file.deleteFile();
         }
 
         const auto decibels = [] (double level) { return 20.0 * std::log10 (std::max (level, 1.0e-12)); };
@@ -3818,8 +3845,8 @@ namespace
                      && value (SynthProcessor::effectSendId (0, Patch::reverbEffect)) > 0.5f,
                    "a preset keeps the reverb's settings, and which oscillators are sent through it");
             check (loaded.loadFactoryPreset ("Acid Bass") && value (SynthProcessor::effectSendId (0, Patch::reverbEffect)) >= 0.5f
-                     && value (SynthProcessor::reverbMixId) == 0.0f,
-                   "...and a factory preset, saved before there was a reverb, sends everything through it, with none mixed in");
+                     && value (SynthProcessor::reverbOnId) < 0.5f,
+                   "...and a factory preset, saved before there was a reverb, sends everything through it, switched off");
             file.deleteFile();
         }
     }
@@ -3836,6 +3863,7 @@ namespace
             setParameter (*synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), 0.0f);
             setParameter (*synth, SynthProcessor::delayTimeId, milliseconds);
             setParameter (*synth, SynthProcessor::delayFeedbackId, feedback);
+            setParameter (*synth, SynthProcessor::delayOnId, 1.0f);
             setParameter (*synth, SynthProcessor::delayMixId, 0.5f);
             return synth;
         };
@@ -3848,8 +3876,9 @@ namespace
         {
             SynthProcessor fresh;
             check (fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (3, Patch::delayEffect))->load() >= 0.5f
-                     && fresh.parameters.getRawParameterValue (SynthProcessor::delayMixId)->load() == 0.0f,
-                   "to begin with, every oscillator's sent through the delay, with none of it mixed in, so it's off");
+                     && fresh.parameters.getRawParameterValue (SynthProcessor::delayOnId)->load() < 0.5f
+                     && isNear (fresh.parameters.getRawParameterValue (SynthProcessor::delayMixId)->load(), 0.5, 0.001),
+                   "to begin with, every oscillator's sent through the delay, switched off, its mix at 50%");
         }
 
         // With no feedback, the note comes back once, after the delay's time.
@@ -3895,6 +3924,7 @@ namespace
             auto onlyDelayed = delayed (500.0f, 0.0f);
             auto both = delayed (500.0f, 0.0f);
             setParameter (*both, SynthProcessor::effectSendId (0, Patch::reverbEffect), 1.0f);
+            setParameter (*both, SynthProcessor::reverbOnId, 1.0f);
             setParameter (*both, SynthProcessor::reverbMixId, 0.5f);
             const auto dry = playSides (*onlyDelayed, 69, 0.05, 2.0).first;
             const auto wet = playSides (*both, 69, 0.05, 2.0).first;
@@ -4219,6 +4249,14 @@ namespace
                      && isNear (shown.parameters.getRawParameterValue (SynthProcessor::reverbDecayId)->load(), 6.0, 0.01)
                      && isNear (shown.parameters.getRawParameterValue (SynthProcessor::delayFeedbackId)->load(), 0.6, 0.01),
                    "...and sets them, and the effects' dials");
+
+            // Each effect has its own switch, off to begin with.
+            check (! effects.getOnSwitch (Patch::delayEffect).getToggleState() && ! effects.getOnSwitch (Patch::reverbEffect).getToggleState(),
+                   "each effect's switch is off to begin with");
+            effects.getOnSwitch (Patch::reverbEffect).setToggleState (true, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::reverbOnId)->load() >= 0.5f
+                     && shown.parameters.getRawParameterValue (SynthProcessor::delayOnId)->load() < 0.5f,
+                   "...and switches its own effect on");
 
             // The delay's time is in milliseconds, or, synced, a note at the tempo, each with its own dial.
             check (effects.getDial (Patch::delayEffect, 0).isVisible() && ! effects.getDial (Patch::delayEffect, 1).isVisible(),
@@ -6761,6 +6799,8 @@ namespace
         setParameter (synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 0.0f);
         setParameter (synth, SynthProcessor::delaySyncId, 1.0f);
         setParameter (synth, SynthProcessor::delayDivisionId, 6.0f);
+        setParameter (synth, SynthProcessor::delayOnId, 1.0f);
+        setParameter (synth, SynthProcessor::reverbOnId, 1.0f);
         setParameter (synth, SynthProcessor::delayMixId, 0.25f);
         setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 0.0f);
         setParameter (synth, SynthProcessor::reverbMixId, 0.3f);
@@ -6771,10 +6811,12 @@ namespace
         save ("10g-effects");
         synthEditor.showEffectsScreen (false);
         setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 1.0f);
-        setParameter (synth, SynthProcessor::reverbMixId, 0.0f);
+        setParameter (synth, SynthProcessor::reverbMixId, 0.5f);
         setParameter (synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 1.0f);
         setParameter (synth, SynthProcessor::delaySyncId, 0.0f);
-        setParameter (synth, SynthProcessor::delayMixId, 0.0f);
+        setParameter (synth, SynthProcessor::delayMixId, 0.5f);
+        setParameter (synth, SynthProcessor::delayOnId, 0.0f);
+        setParameter (synth, SynthProcessor::reverbOnId, 0.0f);
 
         // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
         // added, waiting for its highest key.

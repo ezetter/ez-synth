@@ -74,8 +74,9 @@ public:
 
     /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which every
         one is to begin with. The effects run in a chain, the delay then the reverb; one sent through none plays
-        straight out. Each starts with none of it mixed in, so it's off.
+        straight out. Each effect starts switched off, so what's sent through it plays dry.
     */
+    static juce::String effectOnId (int effect);
     static juce::String effectSendId (int oscillator, int effect);
 
     /** The IDs of the reverb's settings: its pre-delay, from 0 to 1000 ms, the room's size, from 1 to 100, how long
@@ -83,6 +84,7 @@ public:
         the rest being what was sent through it. The reverb is one for the whole synth, so every pitch set plays
         through it as it's set.
     */
+    static constexpr auto reverbOnId = "reverbOn";
     static constexpr auto reverbDelayId = "reverbDelay";
     static constexpr auto reverbSizeId = "reverbSize";
     static constexpr auto reverbDecayId = "reverbDecay";
@@ -93,6 +95,7 @@ public:
         repeat comes back again, from 0 to 1, and how much of what comes out of it is the repeats. Like the reverb,
         it's one for the whole synth.
     */
+    static constexpr auto delayOnId = "delayOn";
     static constexpr auto delaySyncId = "delaySync";
     static constexpr auto delayTimeId = "delayTime";
     static constexpr auto delayDivisionId = "delayDivision";
@@ -102,8 +105,8 @@ public:
     /** Every effect's settings, which are the same for every pitch set. */
     static juce::StringArray getEffectSettingIds()
     {
-        return { delaySyncId, delayTimeId, delayDivisionId, delayFeedbackId, delayMixId,
-                 reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId };
+        return { delayOnId, delaySyncId, delayTimeId, delayDivisionId, delayFeedbackId, delayMixId,
+                 reverbOnId, reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId };
     }
 
     /** How long the delay waits, in milliseconds, as it's set, at the tempo it's playing at if it's synced. */
@@ -1058,6 +1061,8 @@ private:
     std::atomic<float>* delayDivision = nullptr;
     std::atomic<float>* delayFeedback = nullptr;
     std::atomic<float>* delayMix = nullptr;
+    std::atomic<float>* delayOn = nullptr;
+    std::atomic<float>* reverbOn = nullptr;
     std::atomic<float>* reverbDelay = nullptr;
     std::atomic<float>* reverbSize = nullptr;
     std::atomic<float>* reverbDecay = nullptr;

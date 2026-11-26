@@ -36,6 +36,15 @@ EffectsScreen::EffectsScreen (SynthProcessor& processor)
     {
         const auto name = SynthProcessor::getEffectName (section.effect).toLowerCase();
 
+        section.onSwitch.setTitle (SynthProcessor::getEffectName (section.effect) + " on");
+        section.onSwitch.setTooltip ("Switch the " + name + " on; off, what's sent through it plays dry");
+        section.onSwitch.setMouseClickGrabsKeyboardFocus (false);
+        section.onSwitch.setWantsKeyboardFocus (false);
+        section.onSwitch.onStateChange = [this] { showOnOff(); };
+        addAndMakeVisible (section.onSwitch);
+        section.onAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+            synthProcessor.parameters, SynthProcessor::effectOnId (section.effect), section.onSwitch);
+
         for (size_t i = 0; i < section.sends.size(); ++i)
         {
             auto& send = section.sends[i];
@@ -49,6 +58,24 @@ EffectsScreen::EffectsScreen (SynthProcessor& processor)
 
     attachSends();
     delaySyncAttachment->sendInitialUpdate();
+    showOnOff();
+}
+
+void EffectsScreen::showOnOff()
+{
+    for (auto& section : sections)
+    {
+        const auto on = section.onSwitch.getToggleState();
+        const auto colour = on ? colours::accent : colours::dimText.withAlpha (0.6f);
+
+        for (auto* dial : section.dials)
+            dial->knob.setColour (juce::Slider::rotarySliderFillColourId, colour);
+
+        if (section.effect == Patch::delayEffect)
+            delaySync.setAlpha (on ? 1.0f : 0.55f);
+    }
+
+    repaint();
 }
 
 EffectsScreen::Dial& EffectsScreen::addDial (Section& section, const char* parameterId, const juce::String& caption,
@@ -139,9 +166,13 @@ void EffectsScreen::resized()
         auto inside = section.area.reduced (16, 12);
 
         section.captionArea = inside.removeFromTop (24);
+        auto caption = section.captionArea;
+        section.onSwitch.setBounds (caption.removeFromLeft (36).withSizeKeepingCentre (36, 22));
+        caption.removeFromLeft (10);
+        section.nameArea = caption.removeFromLeft (80);
 
         if (section.effect == Patch::delayEffect)
-            delaySync.setBounds (section.captionArea.withTrimmedLeft (90).withWidth (220));
+            delaySync.setBounds (caption.withWidth (220));
 
         inside.removeFromTop (8);
 
@@ -203,7 +234,19 @@ void EffectsScreen::paint (juce::Graphics& g)
 
         g.setFont (fonts::caption());
         g.setColour (colours::dimText);
-        g.drawText (SynthProcessor::getEffectName (section.effect).toUpperCase(), section.captionArea, juce::Justification::centredLeft);
+        const auto on = section.onSwitch.getToggleState();
+        g.setColour (on ? colours::text : colours::dimText);
+        g.drawText (SynthProcessor::getEffectName (section.effect).toUpperCase(), section.nameArea, juce::Justification::centredLeft);
+
+        if (! on)
+        {
+            g.setFont (fonts::body (12.5f));
+            g.setColour (colours::dimText);
+            g.drawText ("Off, so what's sent through it plays dry", section.captionArea, juce::Justification::centredRight);
+            g.setFont (fonts::caption());
+        }
+
+        g.setColour (colours::dimText);
         g.drawText ("SENT THROUGH IT", section.sendsCaptionArea, juce::Justification::centredLeft);
 
         if (several)
@@ -220,7 +263,7 @@ void EffectsScreen::paint (juce::Graphics& g)
             g.drawText (dial->caption, dial->captionArea, juce::Justification::centred);
 
             g.setFont (fonts::body (14.0f));
-            g.setColour (colours::text);
+            g.setColour (on ? colours::text : colours::dimText);
             g.drawText (dial->knob.getTextFromValue (dial->knob.getValue()), dial->valueArea, juce::Justification::centred);
 
             g.setFont (fonts::body (12.0f));

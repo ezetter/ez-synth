@@ -118,6 +118,9 @@ juce::String RoutingScreen::describeEffect (int effect) const
 {
     const auto text = [this] (const char* id) { return synthProcessor.parameters.getParameter (id)->getCurrentValueAsText(); };
 
+    if (synthProcessor.parameters.getRawParameterValue (SynthProcessor::effectOnId (effect))->load() < 0.5f)
+        return "switched off, so it plays dry";
+
     if (effect == Patch::delayEffect)
     {
         const auto synced = synthProcessor.parameters.getRawParameterValue (SynthProcessor::delaySyncId)->load() >= 0.5f;

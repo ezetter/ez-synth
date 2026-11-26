@@ -194,7 +194,7 @@ oscillator's tune.
   filter one part of a sound and not another, such as a low-passed body under an unfiltered noise attack.
 - `oscNToDelay` and `oscNToReverb`, true or false, true to begin with, send oscillator N through the delay and
   the reverb, after its filters, in that order. One sent through neither plays straight out. See the effects
-  below; each starts with its mix at 0, so it's off.
+  below; each starts switched off, so it plays dry.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
 - The wave can be given as one of the presets, `"wave": "Sine"`, `"Sawtooth"`, `"Square"` or `"Triangle"`, with its
@@ -233,21 +233,22 @@ One stereo delay, for the whole synth, before the reverb, that the oscillators s
 play through. `delaySync` false (to begin with) sets its time by `delayTime`, from 1 to 2000 ms (375 to begin
 with); true sets it by `delayDivision`, a note at the tempo: "1/32", "1/16T", "1/16", "1/16D", "1/8T", "1/8",
 "1/8D", "1/4T", "1/4" (to begin with), "1/4D", "1/2T", "1/2", "1/2D", "1 bar" or "2 bars", T for triplet and D
-for dotted; the sound tool plays at 120 BPM. `delayFeedback`, from 0 to 1 (0.35 to begin with), is how much of
-each repeat comes back again, 1 repeating for ever. `delayMix`, from 0 (to begin with, so it's off) to 1, is how
-much of what comes out is the repeats, the rest dry. Like the reverb, its repeats go on after the note: leave
-`delayMix` at 0 when matching a dry sample.
+for dotted; the sound tool plays at 120 BPM. `delayOn`, false to begin with, switches it on; off, what's sent
+through it plays dry. `delayFeedback`, from 0 to 1 (0.35 to begin with), is how much of
+each repeat comes back again, 1 repeating for ever. `delayMix`, from 0 to 1 (0.5 to begin with), is how much of
+what comes out is the repeats, the rest dry. Like the reverb, its repeats go on after the note: leave `delayOn`
+false when matching a dry sample.
 
 ### Reverb
 
-One stereo reverb, for the whole synth, that the oscillators sent through it (`oscNToReverb`) play out through:
+One stereo reverb, for the whole synth, that the oscillators sent through it (`oscNToReverb`) play out through,
+once `reverbOn` switches it on (false to begin with, so what's sent through it plays dry):
 `reverbDelay`, the pre-delay before the first reflection, 0 to 1000 ms (20 to begin with); `reverbSize`, the room,
 from 1 (a small box) to 100 (a large hall), 50 to begin with; `reverbDecay`, the seconds its tail takes to fall
 60 dB, 0.1 to 20 (2 to begin with), its highs fading twice as fast; and `reverbMix`, how much of what comes out of
-it is the reverb, 0 to 1, the rest being the dry sound. It's 0 to begin with, so the reverb is off until it's
-turned up. Held, a sound through it at full mix is
+it is the reverb, 0 to 1 (0.5 to begin with), the rest being the dry sound. Held, a sound through it at full mix is
 about as loud as it is dry. It goes on ringing after the note ends, so the sound tool's measurements of a note's
-fade include it: leave `reverbMix` at 0 when matching a dry sample, and turn it up for pads, plucks in a space,
+fade include it: leave `reverbOn` false when matching a dry sample, and switch it on for pads, plucks in a space,
 and anything a sample shows ringing in a room; set an oscillator's `oscNToReverb` false to keep it dry.
 
 ### Envelopes
