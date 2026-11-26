@@ -17,8 +17,12 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **The window** has two rows of cards across the top, the grid under them, and the volume, envelopes and filters
   under that. Down the right, from the cards to the filters, is a tall panel with the chosen oscillator's
   harmonics, with big dials, or what the chosen LFO moves. Left of the grid is the oscillator's own panel, with
-  its pan, unison, tune, glide and routing, from top to bottom. The **Effects** button in the header opens the
-  effects' screen. The window can be resized, down to 1420 by 900.
+  its pan, unison, tune, glide and routing, from top to bottom. The window can be resized, down to 1420 by 900.
+- **Tabs** along the top, in the header between the preset and the note played, choose what the window shows:
+  **Synth**, the synth itself, **Effects**, **Pitch Sets** and **Modulation**, each a screen over the synth,
+  under the header, down to the keyboard, which stays in reach to play. The chosen tab is underlined. A
+  screen's **Done**, or Escape, goes back to the Synth tab. The routing screen, from an oscillator's Routing
+  row, belongs to the Synth tab, and goes when another tab's chosen.
 - **Choose an oscillator or LFO.** Across the top are the oscillators' cards, then the LFOs'. Three of the
   six oscillators show at a time: swipe sideways on the trackpad over the row, turn a mouse wheel, or drag the
   thin scroll bar under it to see the others, as with the LFOs. Click a card to show its wave on the grid; its
@@ -76,7 +80,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 
 ![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the delay's and reverb's switches under them](docs/images/routing.png)
 
-- **Add delay and reverb**: click **Effects** in the header. A screen opens over the synth with each effect
+- **Add delay and reverb**: click the **Effects** tab. A screen opens over the synth with each effect
   in the order they run, and under each a switch for each oscillator, sending it through, the same switches
   as on the routing screen. Every oscillator, in every pitch set, is sent through both to begin with, and
   each effect's mix starts at 0%, all dry, so it's off until you turn its mix up; with none of it mixed in it
@@ -463,8 +467,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 ![The modulation overview listing what each LFO, envelope, velocity and MIDI controller moves, with ranges and phases](docs/images/modulation-overview.png)
 
 
-- **See everything that moves a control** on one screen: click **Modulation** in the header, to the
-  right, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
+- **See everything that moves a control** on one screen: click the **Modulation** tab, or in the standalone app, choose **Modulation Overview...** from the **Options** menu at the top
   left of its window. It lists every link, grouped by
   what it comes from: each LFO and envelope, velocity, the mod wheel, and the MIDI controllers learned.
   Each row names the control and says what's done to it, such as *±20% of its travel, inverted, 90°
@@ -648,8 +651,8 @@ been edited since. Everything except the waves and what moves what can be automa
 Every setting can be different for a range of keys, so a sound can brighten towards the bass, or match several
 samples of one instrument, one for each part of the keyboard.
 
-- **Open the pitch sets** with **Pitch Sets** in the header, beside **Modulation**. The screen covers the
-  window but for the keyboard. A bar across its top shows which pitch set plays each key from C1 to C8, in
+- **Open the pitch sets** with the **Pitch Sets** tab, beside **Modulation**. The screen covers the
+  window but for the header and the keyboard. A bar across its top shows which pitch set plays each key from C1 to C8, in
   each pitch set's colour.
 - **There's always the Default** pitch set, which plays every key no other pitch set takes in. Each other has a
   range of keys, from its lowest to its highest. Where ranges overlap, the narrowest plays the key, so a pitch
@@ -661,8 +664,8 @@ samples of one instrument, one for each part of the keyboard.
   waiting for keys.
 - **The active pitch set**, with the filled dot, is the one every knob, wave, harmonic, LFO, envelope and
   modulation shows and sets, and what a host's automation moves. Click another pitch set to make it active.
-  Once there are pitch sets besides the default, the header's button is named after the active one, in its
-  colour, and the keys it plays are marked along their foot on the keyboard.
+  Once there are pitch sets besides the default, the Pitch Sets tab is in the active one's colour, and names
+  it when the mouse is over it, and the keys it plays are marked along their foot on the keyboard.
 - **Each note plays its key's pitch set** from start to end, even if you change pitch sets while it sounds.
   Looping LFOs run in each pitch set at its own rates.
 - **The moving displays follow the keys you play.** Where the LFOs and envelopes are, the waves the LFOs play,
@@ -913,6 +916,7 @@ save pictures of the window showing several waves.
 | `Source/HarmonicVoice.*` | A voice playing a note: its harmonics, filters and LFOs |
 | `Source/SynthProcessor.*` | The plugin: the oscillators, parameters, MIDI, saving and loading |
 | `Source/SynthEditor.*` | The window and its layout |
+| `Source/TabRow.*` | The tabs along the top of the window: Synth, Effects, Pitch Sets and Modulation |
 | `Source/SourceCard.*` | The oscillators' and LFOs' cards |
 | `Source/CardStrip.*` | A row of cards that scrolls sideways, for the LFOs' cards, the envelopes and the filters |
 | `Source/Dropdown.*` | A box that opens a menu of choices, for what moves a control |

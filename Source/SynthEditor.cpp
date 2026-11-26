@@ -161,11 +161,6 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     modulationOverview.onClose = [this] { showModulationOverview (false); };
     addChildComponent (modulationOverview);
 
-    modulationButton.setTooltip ("See everything that moves a control, or is linked to a MIDI controller, together");
-    modulationButton.setMouseClickGrabsKeyboardFocus (false);
-    modulationButton.setWantsKeyboardFocus (false);
-    modulationButton.onClick = [this] { showModulationOverview (! isModulationOverviewShown()); };
-    addAndMakeVisible (modulationButton);
 
     pitchSetScreen.onClose = [this] { showPitchSetScreen (false); };
 
@@ -189,17 +184,14 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     effectsScreen.onClose = [this] { showEffectsScreen (false); };
     addChildComponent (effectsScreen);
 
-    effectsButton.setTooltip ("Set the delay and reverb, and which oscillators are sent through them");
-    effectsButton.setMouseClickGrabsKeyboardFocus (false);
-    effectsButton.setWantsKeyboardFocus (false);
-    effectsButton.onClick = [this] { showEffectsScreen (! isEffectsScreenShown()); };
-    addAndMakeVisible (effectsButton);
-
-    pitchSetButton.setTooltip ("Set the sound differently for ranges of keys, and choose which pitch set the controls set");
-    pitchSetButton.setMouseClickGrabsKeyboardFocus (false);
-    pitchSetButton.setWantsKeyboardFocus (false);
-    pitchSetButton.onClick = [this] { showPitchSetScreen (! isPitchSetScreenShown()); };
-    addAndMakeVisible (pitchSetButton);
+    // The tabs along the top: the synth itself, and the screens over it.
+    tabs.setTitle ("Screens");
+    tabs.setTabTooltip ((int) Tab::synth, "The synth: its oscillators, LFOs, envelopes and filters");
+    tabs.setTabTooltip ((int) Tab::effects, "Set the delay and reverb, and which oscillators are sent through them");
+    tabs.setTabTooltip ((int) Tab::pitchSets, "Set the sound differently for ranges of keys");
+    tabs.setTabTooltip ((int) Tab::modulation, "See everything that moves a control, or is linked to a MIDI controller, together");
+    tabs.onChoose = [this] (int tab) { showTab ((Tab) tab); };
+    addAndMakeVisible (tabs);
 
     setResizable (true, true);
     setResizeLimits (1420, 900, 2200, 1400);
@@ -308,25 +300,20 @@ void SynthEditor::paintNote (juce::Graphics& g) const
 
 void SynthEditor::resized()
 {
-    modulationOverview.setBounds (getLocalBounds());
     auto area = getLocalBounds().reduced (18);
 
     auto header = area.removeFromTop (50);
     titleArea = header.removeFromLeft (250);
     noteArea = header.removeFromRight (220);
 
-    // The sound's preset after the title, and the buttons for the pitch sets' and modulation's screens before the
-    // note being played.
+    // The sound's preset after the title, and the tabs before the note being played, along the foot of the header.
     auto row = header.withSizeKeepingCentre (header.getWidth(), 34);
+    row.removeFromRight (20);
+    tabs.setBounds (row.removeFromRight (juce::jmin (tabs.getPreferredWidth() + 24, row.getWidth() - 400)).withHeight (header.getBottom() - row.getY()));
     row.removeFromRight (24);
-    modulationButton.setBounds (row.removeFromRight (116));
-    row.removeFromRight (10);
-    pitchSetButton.setBounds (row.removeFromRight (132));
-    row.removeFromRight (10);
-    effectsButton.setBounds (row.removeFromRight (96));
-    row.removeFromRight (32);
     row.removeFromLeft (8);
     presetBar.setBounds (row.withWidth (juce::jmin (row.getWidth(), 560)));
+    const auto screensTop = header.getBottom() + 6;
 
     area.removeFromTop (12);
 
@@ -341,9 +328,10 @@ void SynthEditor::resized()
     }
 
     keyboard.setBounds (keys);
-    pitchSetScreen.setBounds (getLocalBounds().withBottom (keys.getY() - 6));
+    pitchSetScreen.setBounds (getLocalBounds().withTop (screensTop).withBottom (keys.getY() - 6));
     routingScreen.setBounds (pitchSetScreen.getBounds());
     effectsScreen.setBounds (pitchSetScreen.getBounds());
+    modulationOverview.setBounds (pitchSetScreen.getBounds());
     area.removeFromBottom (12);
 
     // Down the right, from the cards to the filters, the chosen oscillator's harmonics, or what the chosen LFO moves,
@@ -752,75 +740,75 @@ void SynthEditor::showModulationEditor (int target, juce::Component& anchor)
                                             getLocalArea (&anchor, anchor.getLocalBounds()), this);
 }
 
-void SynthEditor::showRoutingScreen (bool visible, int oscillator)
+void SynthEditor::showTab (Tab tab)
 {
-    if (visible)
+    // Each tab but the synth's is a screen over the synth, under the header, so the tabs stay in reach, and over
+    // everything but the keyboard. The routing screen belongs to the synth's tab, and goes when another's chosen.
+    tabs.setChosen ((int) tab);
+    routingScreen.setVisible (false);
+    effectsScreen.setVisible (tab == Tab::effects);
+    pitchSetScreen.setVisible (tab == Tab::pitchSets);
+    modulationOverview.setVisible (tab == Tab::modulation);
+
+    juce::Component* screen = nullptr;
+
+    switch (tab)
     {
-        showModulationOverview (false);
-        showPitchSetScreen (false);
-        showEffectsScreen (false);
-        routingScreen.showOscillator (oscillator);
+        case Tab::effects:      effectsScreen.refresh(); screen = &effectsScreen; break;
+        case Tab::pitchSets:    screen = &pitchSetScreen; break;
+        case Tab::modulation:   screen = &modulationOverview; break;
+        case Tab::synth:        break;
     }
 
-    routingScreen.setVisible (visible);
-
-    if (visible)
+    if (screen != nullptr)
     {
-        routingScreen.toFront (true);
-        routingScreen.grabKeyboardFocus();
+        screen->toFront (true);
+        screen->grabKeyboardFocus();
     }
     else if (isShowing())
     {
         grabKeyboardFocus();
+    }
+}
+
+void SynthEditor::showRoutingScreen (bool visible, int oscillator)
+{
+    if (visible)
+    {
+        showTab (Tab::synth);
+        routingScreen.showOscillator (oscillator);
+        routingScreen.setVisible (true);
+        routingScreen.toFront (true);
+        routingScreen.grabKeyboardFocus();
+    }
+    else if (routingScreen.isVisible())
+    {
+        showTab (Tab::synth);
     }
 }
 
 void SynthEditor::showEffectsScreen (bool visible)
 {
     if (visible)
-    {
-        showModulationOverview (false);
-        showPitchSetScreen (false);
-        routingScreen.setVisible (false);
-        effectsScreen.refresh();
-    }
-
-    effectsScreen.setVisible (visible);
-    effectsButton.setToggleState (visible, juce::dontSendNotification);
-
-    if (visible)
-    {
-        effectsScreen.toFront (true);
-        effectsScreen.grabKeyboardFocus();
-    }
-    else if (isShowing())
-    {
-        grabKeyboardFocus();
-    }
+        showTab (Tab::effects);
+    else if (isEffectsScreenShown())
+        showTab (Tab::synth);
 }
 
 void SynthEditor::showPitchSetScreen (bool visible)
 {
     if (visible)
-    {
-        showModulationOverview (false);
-        routingScreen.setVisible (false);
-        effectsScreen.setVisible (false);
-        effectsButton.setToggleState (false, juce::dontSendNotification);
-    }
+        showTab (Tab::pitchSets);
+    else if (isPitchSetScreenShown())
+        showTab (Tab::synth);
+}
 
-    pitchSetScreen.setVisible (visible);
-    pitchSetButton.setToggleState (visible, juce::dontSendNotification);
-
+void SynthEditor::showModulationOverview (bool visible)
+{
     if (visible)
-    {
-        pitchSetScreen.toFront (true);
-        pitchSetScreen.grabKeyboardFocus();
-    }
-    else if (isShowing())
-    {
-        grabKeyboardFocus();
-    }
+        showTab (Tab::modulation);
+    else if (isModulationOverviewShown())
+        showTab (Tab::synth);
 }
 
 void SynthEditor::showPitchSets()
@@ -831,10 +819,12 @@ void SynthEditor::showPitchSets()
     shownPitchSetVersion = synthProcessor.getPitchSetVersion();
     const auto active = synthProcessor.getActivePitchSet();
 
-    // With only the default, the button says what it's for; with others, which pitch set the controls set.
+    // With others than the default, the Pitch Sets tab is in the colour of the pitch set the controls set, and
+    // names it.
     const auto several = synthProcessor.getNumPitchSets() > 1;
-    pitchSetButton.setButtonText (several ? synthProcessor.getPitchSetName (active) : juce::String ("Pitch Sets"));
-    pitchSetButton.setColour (juce::TextButton::textColourOffId, several ? PitchSetScreen::getColour (active).brighter (0.3f) : colours::text);
+    tabs.setLabelColour ((int) Tab::pitchSets, several ? std::optional (PitchSetScreen::getColour (active).brighter (0.3f)) : std::nullopt);
+    tabs.setTabTooltip ((int) Tab::pitchSets, several ? "The controls set " + synthProcessor.getPitchSetName (active)
+                                                      : juce::String ("Set the sound differently for ranges of keys"));
 
     // The keys the active pitch set plays are marked, unless it's the default with no others.
     std::bitset<128> keys;
@@ -845,28 +835,10 @@ void SynthEditor::showPitchSets()
     keyboard.setMarkedKeys (keys, PitchSetScreen::getColour (active));
 }
 
-void SynthEditor::showModulationOverview (bool visible)
+juce::String SynthEditor::getPitchSetText() const
 {
-    if (visible)
-    {
-        showPitchSetScreen (false);
-        routingScreen.setVisible (false);
-        effectsScreen.setVisible (false);
-        effectsButton.setToggleState (false, juce::dontSendNotification);
-    }
-
-    modulationOverview.setVisible (visible);
-    modulationButton.setToggleState (visible, juce::dontSendNotification);
-
-    if (visible)
-    {
-        modulationOverview.toFront (true);
-        modulationOverview.grabKeyboardFocus();
-    }
-    else if (isShowing())
-    {
-        grabKeyboardFocus();
-    }
+    return synthProcessor.getNumPitchSets() > 1 ? synthProcessor.getPitchSetName (synthProcessor.getActivePitchSet())
+                                                : juce::String ("Pitch Sets");
 }
 
 //==============================================================================

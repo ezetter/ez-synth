@@ -18,6 +18,7 @@
 #include "SynthLookAndFeel.h"
 #include "SynthProcessor.h"
 #include "OscillatorPanel.h"
+#include "TabRow.h"
 #include "WaveGrid.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -55,14 +56,14 @@ public:
     const CardStrip& getEnvelopeStrip() const noexcept   { return envelopeStrip; }
     const CardStrip& getFilterStrip() const noexcept     { return filterStrip; }
 
-    /** Shows the screen listing everything that moves a control, or is linked to one, over the synth, or hides it. */
+    /** Shows the Modulation tab's screen, listing everything that moves a control, or goes back to the synth. */
     void showModulationOverview (bool);
     bool isModulationOverviewShown() const   { return modulationOverview.isVisible(); }
 
     /** Loads a sound Claude made from the clipboard, from the standalone app's Options menu. */
     void pasteSoundFromClaude()   { presetBar.pasteFromClaude(); }
 
-    /** Shows the screen listing the pitch sets, over the synth but for the keyboard, or hides it. */
+    /** Shows the Pitch Sets tab's screen, or goes back to the synth. */
     void showPitchSetScreen (bool);
     bool isPitchSetScreenShown() const   { return pitchSetScreen.isVisible(); }
     PitchSetScreen& getPitchSetScreen() noexcept   { return pitchSetScreen; }
@@ -72,11 +73,21 @@ public:
     bool isRoutingScreenShown() const   { return routingScreen.isVisible(); }
     RoutingScreen& getRoutingScreen() noexcept   { return routingScreen; }
 
-    /** Shows the screen setting the effects, the reverb, over the synth but for the keyboard, or hides it. */
+    /** Shows the Effects tab's screen, setting the delay and reverb, or goes back to the synth. */
     void showEffectsScreen (bool);
     bool isEffectsScreenShown() const   { return effectsScreen.isVisible(); }
     EffectsScreen& getEffectsScreen() noexcept   { return effectsScreen; }
-    juce::String getPitchSetButtonText() const   { return pitchSetButton.getButtonText(); }
+
+    /** The tabs along the top, choosing the synth or a screen over it. */
+    enum class Tab { synth, effects, pitchSets, modulation };
+    void showTab (Tab);
+    Tab getShownTab() const noexcept   { return (Tab) tabs.getChosen(); }
+    TabRow& getTabs() noexcept   { return tabs; }
+
+    /** The pitch set the controls set, which the Pitch Sets tab is coloured for and names when the mouse is over
+        it, or "Pitch Sets" with only the default.
+    */
+    juce::String getPitchSetText() const;
 
     /** Command-Z undoes the last change to the sound, and Shift-Command-Z redoes it. */
     bool keyPressed (const juce::KeyPress&) override;
@@ -149,24 +160,20 @@ private:
     /** Only in the standalone app, which plays from MIDI devices itself. */
     std::unique_ptr<MidiPanel> midiPanel;
 
-    /** Over everything, while it's shown, and the header's button that shows it, which the plugins need, having no
-        Options menu.
-    */
+    /** The Modulation tab's screen, over everything but the header and the keyboard, while it's shown. */
     ModulationOverview modulationOverview { synthProcessor };
-    juce::TextButton modulationButton { "Modulation" };
 
-    /** Over everything but the keyboard, which plays the keys that set a pitch set's range, and the header's button
-        that shows it, named after the active pitch set once there are others than the default.
+    /** The Pitch Sets tab's screen, over everything but the header and the keyboard, which plays the keys that set
+        a pitch set's range. The tab's in the active pitch set's colour once there are others than the default.
     */
     PitchSetScreen pitchSetScreen { synthProcessor };
 
     /** Over everything but the keyboard, while it's shown, from the Filters button under an oscillator's glide. */
     RoutingScreen routingScreen { synthProcessor };
 
-    /** Over everything but the keyboard, while it's shown, from the header's Effects button. */
+    /** Over everything but the header and the keyboard, while it's shown, from the Effects tab. */
     EffectsScreen effectsScreen { synthProcessor };
-    juce::TextButton effectsButton { "Effects" };
-    juce::TextButton pitchSetButton { "Pitch Sets" };
+    TabRow tabs { { "Synth", "Effects", "Pitch Sets", "Modulation" } };
     int shownPitchSetVersion = -1;
     void showPitchSets();
 

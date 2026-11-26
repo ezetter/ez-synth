@@ -5188,7 +5188,7 @@ namespace
             SynthProcessor windowed;
             std::unique_ptr<juce::AudioProcessorEditor> editor (windowed.createEditorAndMakeActive());
             auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
-            check (synthEditor.getPitchSetButtonText() == "Pitch Sets", "the window's button says Pitch Sets with only the default");
+            check (synthEditor.getPitchSetText() == "Pitch Sets", "the window's button says Pitch Sets with only the default");
 
             synthEditor.showPitchSetScreen (true);
             auto& screen = synthEditor.getPitchSetScreen();
@@ -5199,7 +5199,7 @@ namespace
             synthEditor.refresh();
 
             check (! screen.isWaitingForKeys() && windowed.getNumPitchSets() == 2 && windowed.getPitchSetRange (1) == SynthProcessor::KeyRange { 48, 59 }
-                     && windowed.getActivePitchSet() == 1 && synthEditor.getPitchSetButtonText() == "C3 to B3",
+                     && windowed.getActivePitchSet() == 1 && synthEditor.getPitchSetText() == "C3 to B3",
                    "...takes the two keys pressed as its range, becomes active, and the button names it");
 
             screen.startSettingKeys (1);
@@ -5454,33 +5454,50 @@ namespace
                 overAll = dynamic_cast<juce::ResizableCornerComponent*> (children[i]) != nullptr
                        || dynamic_cast<juce::TooltipWindow*> (children[i]) != nullptr;
 
-            check (shown != nullptr && shown->getBounds() == editor->getLocalBounds() && overAll,
-                   "...covering the whole window, over everything but its resizing corner and tooltips");
+            // It covers everything under the header, where the tabs are, down to the keyboard.
+            auto& tabs = synthEditor.getTabs();
+            check (shown != nullptr && overAll && shown->getY() >= tabs.getBottom() && shown->getRight() == editor->getWidth()
+                     && shown->getBottom() < editor->getHeight() - 80,
+                   "...under the header and its tabs, over everything down to the keyboard, but the resizing corner and tooltips");
 
             if (shown != nullptr)
             {
                 shown->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey));
-                check (! synthEditor.isModulationOverviewShown(), "Escape goes back to the synth");
+                check (! synthEditor.isModulationOverviewShown() && synthEditor.getShownTab() == SynthEditor::Tab::synth,
+                       "Escape goes back to the synth, and its tab");
                 synthEditor.showModulationOverview (true);
+                check (synthEditor.getShownTab() == SynthEditor::Tab::modulation, "...and shown, the Modulation tab is chosen");
                 shown->doneButton.onClick();
                 check (! synthEditor.isModulationOverviewShown(), "...as Done does");
 
-                // The header's Modulation button, for the plugins, which have no Options menu, shows and hides it.
-                juce::Button* button = nullptr;
+                // The tabs along the top, Synth, Effects, Pitch Sets and Modulation, choose the screen shown.
+                check (tabs.isVisible() && tabs.getLabel (0) == "Synth" && tabs.getLabel (1) == "Effects"
+                         && tabs.getLabel (2) == "Pitch Sets" && tabs.getLabel (3) == "Modulation" && tabs.getChosen() == 0,
+                       "the header has tabs for the synth, the effects, the pitch sets and the modulation, the synth's chosen");
 
-                for (auto* child : editor->getChildren())
-                    if (auto* textButton = dynamic_cast<juce::TextButton*> (child); textButton != nullptr && textButton->getButtonText() == "Modulation")
-                        button = textButton;
-
-                check (button != nullptr && button->isVisible(), "the header has a Modulation button");
-
-                if (button != nullptr)
+                const auto click = [&tabs] (int tab)
                 {
-                    button->onClick();
-                    check (synthEditor.isModulationOverviewShown(), "...which shows the overview");
-                    button->onClick();
-                    check (! synthEditor.isModulationOverviewShown(), "...and, clicked again, hides it");
-                }
+                    tabs.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), tabs.getTabBounds (tab).getCentre().toFloat(),
+                                                      {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &tabs, &tabs, juce::Time::getCurrentTime(),
+                                                      tabs.getTabBounds (tab).getCentre().toFloat(), juce::Time::getCurrentTime(), 1, false));
+                };
+
+                click (3);
+                check (synthEditor.isModulationOverviewShown(), "...the Modulation tab showing the overview");
+                click (1);
+                check (synthEditor.isEffectsScreenShown() && ! synthEditor.isModulationOverviewShown(), "...the Effects tab the effects' screen, in its place");
+                click (2);
+                check (synthEditor.isPitchSetScreenShown() && ! synthEditor.isEffectsScreenShown(), "...the Pitch Sets tab the pitch sets'");
+                click (0);
+                check (! synthEditor.isPitchSetScreenShown() && ! synthEditor.isEffectsScreenShown() && ! synthEditor.isModulationOverviewShown(),
+                       "...and the Synth tab the synth");
+
+                // The routing screen belongs to the synth's tab, and goes when another's chosen.
+                synthEditor.showRoutingScreen (true, 0);
+                check (synthEditor.isRoutingScreenShown() && tabs.getChosen() == 0, "the routing screen is shown under the Synth tab");
+                click (1);
+                check (! synthEditor.isRoutingScreenShown() && synthEditor.isEffectsScreenShown(), "...and goes when another tab's chosen");
+                synthEditor.showEffectsScreen (false);
             }
 
             synth.editorBeingDeleted (editor.get());

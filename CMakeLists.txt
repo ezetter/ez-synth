@@ -76,6 +76,7 @@ target_sources(EZSynth
         Source/SourceCard.cpp
         Source/SynthEditor.cpp
         Source/SynthLookAndFeel.cpp
+        Source/TabRow.cpp
         Source/SynthProcessor.cpp
         Source/Tuning.cpp
         Source/OscillatorPanel.cpp
