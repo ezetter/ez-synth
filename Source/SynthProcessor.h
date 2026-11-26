@@ -2,6 +2,7 @@
 
 #include "HarmonicVoice.h"
 #include "Modulation.h"
+#include "Chorus.h"
 #include "Delay.h"
 #include "Patch.h"
 #include "Reverb.h"
@@ -81,8 +82,8 @@ public:
     static juce::String filterSendId (int oscillator, int filter);
 
     /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which every
-        one is to begin with. The effects run in a chain, the delay then the reverb; one sent through none plays
-        straight out. Each effect starts switched off, so what's sent through it plays dry.
+        one is to begin with. The effects run in a chain, the chorus, the delay, then the reverb; one sent through
+        none plays straight out. Each effect starts switched off, so what's sent through it plays dry.
     */
     static juce::String effectOnId (int effect);
     static juce::String effectSendId (int oscillator, int effect);
@@ -97,6 +98,18 @@ public:
     static constexpr auto reverbSizeId = "reverbSize";
     static constexpr auto reverbDecayId = "reverbDecay";
     static constexpr auto reverbMixId = "reverbMix";
+
+    /** The IDs of the chorus's settings: how fast its LFO sweeps the time, from 0.05 to 10 Hz, how far the time
+        swings either side of its delay, as a share of it, the delay it swings around, from 1 to 40 ms, how much of
+        the copy comes back round, from 0 to 95%, and how much of what comes out of it is the copy. Like the other
+        effects, it's one for the whole synth.
+    */
+    static constexpr auto chorusOnId = "chorusOn";
+    static constexpr auto chorusRateId = "chorusRate";
+    static constexpr auto chorusDepthId = "chorusDepth";
+    static constexpr auto chorusDelayId = "chorusDelay";
+    static constexpr auto chorusFeedbackId = "chorusFeedback";
+    static constexpr auto chorusMixId = "chorusMix";
 
     /** The IDs of the delay's settings: whether its time is synced to the tempo, its time in milliseconds, from 1
         to 2000, when it isn't, and the length of a note it waits when it is, such as "1/8D", how much of each
@@ -113,7 +126,8 @@ public:
     /** Every effect's settings, which are the same for every pitch set. */
     static juce::StringArray getEffectSettingIds()
     {
-        return { delayOnId, delaySyncId, delayTimeId, delayDivisionId, delayFeedbackId, delayMixId,
+        return { chorusOnId, chorusRateId, chorusDepthId, chorusDelayId, chorusFeedbackId, chorusMixId,
+                 delayOnId, delaySyncId, delayTimeId, delayDivisionId, delayFeedbackId, delayMixId,
                  reverbOnId, reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId };
     }
 
@@ -1059,14 +1073,22 @@ private:
 
     ModWheelSynthesiser synth { patches };
 
-    // The voices' sound, split by where it goes, straight out and through each effect, and the reverb, played
-    // through as it's set, before everything's added up.
+    // The voices' sound, split by where it goes, straight out and through each set of effects, before
+    // everything's added up.
     juce::AudioBuffer<float> routedBuffer;
-    Reverb reverb;
 
-    // The delay, twice: one for the sound that plays straight out from it, and one for the sound going on to the
-    // reverb, set alike, so what each plays can go its own way.
-    Delay delayOut, delayToReverb;
+    // The effects, each played once for every set of the effects after it in the chain that the sound can go on
+    // through, so what each plays can go its own way: the chorus with a line for each of the four, its one LFO
+    // sweeping them all alike, the delay twice, for the sound going on to the reverb or not, and the reverb once.
+    Chorus chorus;
+    std::array<Delay, 2> delays;
+    Reverb reverb;
+    std::atomic<float>* chorusOn = nullptr;
+    std::atomic<float>* chorusRate = nullptr;
+    std::atomic<float>* chorusDepth = nullptr;
+    std::atomic<float>* chorusDelay = nullptr;
+    std::atomic<float>* chorusFeedback = nullptr;
+    std::atomic<float>* chorusMix = nullptr;
     std::atomic<float>* delaySync = nullptr;
     std::atomic<float>* delayTime = nullptr;
     std::atomic<float>* delayDivision = nullptr;

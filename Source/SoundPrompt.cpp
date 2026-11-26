@@ -194,8 +194,8 @@ oscillator's tune.
 - `oscNToFilterM`, true or false, true to begin with, sends oscillator N through filter M (1 to 4). The filters run
   in a chain, 1 to 4; an oscillator that isn't sent through one skips it, going straight on to the next. Use it to
   filter one part of a sound and not another, such as a low-passed body under an unfiltered noise attack.
-- `oscNToDelay` and `oscNToReverb`, true or false, true to begin with, send oscillator N through the delay and
-  the reverb, after its filters, in that order. One sent through neither plays straight out. See the effects
+- `oscNToChorus`, `oscNToDelay` and `oscNToReverb`, true or false, true to begin with, send oscillator N through
+  the chorus, the delay and the reverb, after its filters, in that order. One sent through none plays straight out. See the effects
   below; each starts switched off, so it plays dry.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
@@ -229,9 +229,22 @@ octave along its travel, about a tenth of the travel an octave.
 Filters suit sounds whose brightness changes over the note, such as a pluck or brass, and resonant bodies. For a
 steady tone, set the harmonics directly instead: it's more exact.
 
+### Chorus
+
+One stereo chorus, for the whole synth, first in the effects' chain, that the oscillators sent through it
+(`oscNToChorus`) play through, once `chorusOn` switches it on (false to begin with, so what's sent through it
+plays dry). It mixes in a copy delayed by a few milliseconds, the time swept up and down by a sine LFO, so the
+copy drifts sharp and flat against the sound, its sides sweeping a quarter of a cycle apart, which widens it:
+`chorusRate`, the sweep's rate, 0.05 to 10 Hz (0.8 to begin with); `chorusDepth`, from 0 to 1 (0.5 to begin with),
+how far the time swings either side of the delay, as a share of it; `chorusDelay`, the time it swings around,
+1 to 40 ms (7 to begin with); `chorusFeedback`, from 0 to 0.95 (0 to begin with), how much of the copy goes round
+again, sharpening it towards a flanger; and `chorusMix`, from 0 to 1 (0.5 to begin with), how much of what comes
+out is the copy, 1 being a vibrato. Use it for ensemble strings, pads and detuned-sounding leads, though unison
+is often the closer match for a supersaw.
+
 ### Delay
 
-One stereo delay, for the whole synth, before the reverb, that the oscillators sent through it (`oscNToDelay`)
+One stereo delay, for the whole synth, after the chorus and before the reverb, that the oscillators sent through it (`oscNToDelay`)
 play through. `delaySync` false (to begin with) sets its time by `delayTime`, from 1 to 2000 ms (375 to begin
 with); true sets it by `delayDivision`, a note at the tempo: "1/32", "1/16T", "1/16", "1/16D", "1/8T", "1/8",
 "1/8D", "1/4T", "1/4" (to begin with), "1/4D", "1/2T", "1/2", "1/2D", "1 bar" or "2 bars", T for triplet and D

@@ -68,29 +68,37 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Route an oscillator through the filters and effects** you choose: click **Edit**, on the **Routing** row at the
   foot of the oscillator's panel, left of the grid, below the glide. A screen opens over the synth, with buttons along the top
   to choose the oscillator, a switch for each filter, beside its type and cutoff, and under them a switch for
-  each effect, the delay and the reverb, beside its settings. The filters run in a
+  each effect, the chorus, the delay and the reverb, beside its settings. The filters run in a
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
-  as they were. After the filters, the effects carry on the chain, the delay then the reverb, so the delay's
-  repeats ring on in the reverb; every oscillator is sent through both to begin with, but each effect starts
+  as they were. After the filters, the effects carry on the chain, the chorus, the delay, then the reverb, so the
+  delay repeats the chorused sound and its repeats ring on in the reverb; every oscillator is sent through each to begin with, but each effect starts
   switched off, so what's sent through it plays dry until it's switched on, on the Effects tab. The path the oscillator's sound takes, such
-  as *Osc 2 → Filter 1 → Filter 3 → Delay → Reverb → Out*, is spelled out above the switches, and the Routing
+  as *Osc 2 → Filter 1 → Filter 3 → Chorus → Delay → Reverb → Out*, is spelled out above the switches, and the Routing
   row says which filters and effects it's sent through. Each pitch set can route its oscillators differently.
   An effect's **Settings** button opens the effects' screen. **Done**, or Escape, goes back to the synth.
 
-![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the delay's and reverb's switches under them](docs/images/routing.png)
+![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the chorus's, delay's and reverb's switches under them](docs/images/routing.png)
 
-- **Add delay and reverb**: click the **Effects** tab. A screen opens over the synth with each effect
-  in the order they run, and under each a switch for each oscillator, sending it through, the same switches
+- **Add chorus, delay and reverb**: click the **Effects** tab. A screen opens over the synth with a row for each
+  effect, in the order they run, its dials across it, and beside them a switch for each oscillator, sending it through, the same switches
   as on the routing screen. Beside each effect's name is its on/off switch: off, what's sent through it plays
   dry, and it doesn't run at all; switched on or off, it fades over about 50 ms, so it doesn't click. Every
-  oscillator, in every pitch set, is sent through both to begin with, and each effect starts switched off,
+  oscillator, in every pitch set, is sent through every effect to begin with, and each effect starts switched off,
   with its mix at 50%, ready to be switched on. An effect that's off is shown faintly, its settings kept. Each effect is one for the whole synth, set the same for every pitch set, though each
   pitch set chooses which of its oscillators go through it. They're saved with presets, and a preset from
   before there were effects sends every oscillator through them, switched off, so it plays dry. A save from
   before the effects had switches has each on if any of it was mixed in, so it sounds as it did.
   Double-click a dial to set it back to where it starts. Their dials can't be moved by LFOs or envelopes, as
   they belong to every note at once. Moving them while sound rings through glides them, so nothing clicks.
+- **The chorus** mixes in a copy of what's sent through it, a few milliseconds late, the time swept up and down
+  by a slow sine wave, so the copy drifts a little sharp and flat against the sound, as an ensemble of players
+  does; its left side sweeps a quarter of a cycle ahead of its right, which widens the sound. **Rate** is how
+  fast it sweeps, from 0.05 to 10 Hz; **Depth**, how far the time swings either side of the delay, as a share
+  of it, from 0 to 100%, which swings it from no time to twice the delay; **Delay**, the time it swings around,
+  from 1 to 40 ms; **Feedback**, from 0 to 95%, how much of the copy goes round again, sharpening it towards a
+  flanger; and **Mix**, how much of what comes out is the copy, the rest the dry sound: 50% is the classic
+  chorus, and 100% a pure vibrato. It starts at 0.8 Hz, 50% deep around 7 ms, with no feedback.
 - **The delay** repeats what's sent through it. **Milliseconds** or **Synced** chooses how its **Time** is
   set: from 1 ms to 2 seconds, or a note at the tempo, the host's or 120 BPM in the standalone app, from a
   1/32 to 2 bars, plain, triplet (T) or dotted (D), such as 1/8D. **Feedback**, from 0 to 100%, is how much of
@@ -107,7 +115,7 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   sent through it rings on after its note ends. Held, a sound at full mix is about as loud as it is dry, in
   any room. Changing the size bends the tail's pitch a little as it glides.
 
-![The effects screen, both effects switched on: the delay synced to dotted eighths, 25% mixed in, every oscillator but the first sent through it, and under it the reverb's pre-delay, size, decay and mix dials, 30% mixed in, every oscillator but the third sent through it](docs/images/effects.png)
+![The effects screen, every effect switched on, a row for each: the chorus's rate, depth, delay, feedback and mix dials, sweeping at 0.6 Hz, 40% deep; the delay synced to dotted eighths, 25% mixed in, every oscillator but the first sent through it; and the reverb's pre-delay, size, decay and mix dials, 30% mixed in, every oscillator but the third sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -857,12 +865,20 @@ save pictures of the window showing several waves.
   memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
   A send that's switched fades over 20 ms, so switching it mid-note doesn't click; an oscillator that moves
   to a lane of its own carries on from the memories of the lane it left. Each lane, filtered, then goes the
-  way through the effects it's sent, fading over 20 ms when that's switched: each voice plays into eight
+  way through the effects it's sent, fading over 20 ms when that's switched: each voice plays into sixteen
   channels, a pair for each set of effects, numbered by their bits, from the pair straight out to the pair
-  through both. After the voices, the pair sent only through the delay plays through it and out; the pair
-  sent through both plays through a second delay, set alike, and joins the pair sent only through the reverb,
-  which then plays through the reverb; then every pair's added up. A delay or reverb that's switched off
-  plays with none of it mixed in, gliding there, and once it's there, it's skipped.
+  through all three. After the voices, the effects play in the chain's order: each plays every pair going
+  through it, then adds each into the pair going through just the effects after it that it was sent through
+  too, or straight out, so in the end everything comes out of the first pair. The chorus plays four pairs,
+  with a line each, all swept by its one LFO; the delay plays two, with a delay set alike for each, for the
+  sound going on to the reverb or not; and the reverb plays one. An effect that's switched off plays with none
+  of it mixed in, gliding there, and once it's there, it's skipped, as is a pair that's silent with nothing
+  left ringing in it.
+- **Chorus** (`Source/Chorus.cpp`). A stereo line for each pair, up to 80 ms long, read between samples by
+  cubic interpolation, so the sweep doesn't dull the highs. The time read is the delay times one plus the
+  depth times a sine LFO, the left side's a quarter of a cycle ahead of the right's. What's written back is
+  what went in plus the feedback's share of the copy, saturated as the delay's is. Its settings glide, about
+  50 ms to settle.
 - **Delay** (`Source/Delay.cpp`). A stereo line up to 8 seconds long, read between samples so its time can
   glide, about 50 ms to settle. What's written back is what went in plus the feedback's share of what comes
   out, saturated, left as it is up to full scale and rounded off above it, short of twice that, so at 100%
@@ -931,7 +947,8 @@ save pictures of the window showing several waves.
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/OscillatorPanel.*` | The oscillator's panel left of the grid: its pan, its unison's voices, detune and spread, its tune slider, with its intervals marked, and the zoom slider above it, then its glide and routing rows |
 | `Source/RoutingScreen.*` | The routing screen, setting which filters and effects each oscillator's sent through |
-| `Source/EffectsScreen.*` | The effects' screen: the delay's and reverb's dials, and which oscillators are sent through each |
+| `Source/EffectsScreen.*` | The effects' screen: the chorus's, delay's and reverb's dials, and which oscillators are sent through each |
+| `Source/Chorus.*` | The chorus: its swept lines, one LFO for all of them |
 | `Source/Delay.*` | The delay: its line, feedback and synced note lengths |
 | `Source/Reverb.*` | The reverb: its pre-delay, early reflections and feedback delay network |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |

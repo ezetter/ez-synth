@@ -121,6 +121,10 @@ juce::String RoutingScreen::describeEffect (int effect) const
     if (synthProcessor.parameters.getRawParameterValue (SynthProcessor::effectOnId (effect))->load() < 0.5f)
         return "switched off, so it plays dry";
 
+    if (effect == Patch::chorusEffect)
+        return text (SynthProcessor::chorusRateId) + dot + text (SynthProcessor::chorusDepthId) + " deep" + dot
+             + text (SynthProcessor::chorusDelayId) + dot + text (SynthProcessor::chorusMixId) + " wet";
+
     if (effect == Patch::delayEffect)
     {
         const auto synced = synthProcessor.parameters.getRawParameterValue (SynthProcessor::delaySyncId)->load() >= 0.5f;
@@ -234,7 +238,7 @@ void RoutingScreen::paint (juce::Graphics& g)
     g.setFont (fonts::body (13.0f));
     g.drawFittedText ("Where each oscillator's sound goes. The filters run in a chain, from the first to the last; an "
                       "oscillator that isn't sent through a filter or effect skips it, going straight on to the next. After "
-                      "the filters come the effects, the delay then the reverb.",
+                      "the filters come the effects, the chorus, the delay, then the reverb.",
                       subtitleArea, juce::Justification::centredLeft, 2);
 
     g.setColour (colours::text);

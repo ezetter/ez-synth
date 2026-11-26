@@ -3938,6 +3938,127 @@ namespace
         }
     }
 
+    void testChorus()
+    {
+        std::cout << "Chorus" << std::endl;
+
+        // A sine sent only through the chorus.
+        const auto chorused = [] (float depth, float mix)
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 0.0f);
+            setParameter (*synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), 0.0f);
+            setParameter (*synth, SynthProcessor::chorusOnId, 1.0f);
+            setParameter (*synth, SynthProcessor::chorusDepthId, depth);
+            setParameter (*synth, SynthProcessor::chorusMixId, mix);
+            return synth;
+        };
+
+        {
+            SynthProcessor fresh;
+            const auto value = [&fresh] (const char* id) { return fresh.parameters.getRawParameterValue (id)->load(); };
+            check (fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (5, Patch::chorusEffect))->load() >= 0.5f
+                     && value (SynthProcessor::chorusOnId) < 0.5f && isNear (value (SynthProcessor::chorusMixId), 0.5, 0.001)
+                     && isNear (value (SynthProcessor::chorusRateId), 0.8, 0.001) && isNear (value (SynthProcessor::chorusDepthId), 0.5, 0.001)
+                     && isNear (value (SynthProcessor::chorusDelayId), 7.0, 0.001) && value (SynthProcessor::chorusFeedbackId) < 0.001f,
+                   "to begin with, every oscillator's sent through the chorus, switched off, at 0.8 Hz, 50% deep around 7 ms, "
+                   "without feedback, its mix at 50%");
+            check (fresh.parameters.getParameter (SynthProcessor::chorusDelayId)->getCurrentValueAsText() == "7.0 ms"
+                     && fresh.parameters.getParameter (SynthProcessor::chorusRateId)->getCurrentValueAsText() == "0.80 Hz",
+                   "...shown as 7.0 ms and 0.80 Hz");
+        }
+
+        // Switched off, or with no depth and nothing but the copy, it's what went in, then just later.
+        {
+            auto off = chorused (0.5f, 0.5f);
+            setParameter (*off, SynthProcessor::chorusOnId, 0.0f);
+            auto dry = chorused (0.5f, 0.5f);
+            setParameter (*dry, SynthProcessor::effectSendId (0, Patch::chorusEffect), 0.0f);
+            const auto a = playSides (*off, 69, 0.5, 0.6).first;
+            const auto b = playSides (*dry, 69, 0.5, 0.6).first;
+            auto difference = 0.0f;
+
+            for (size_t i = 0; i < std::min (a.size(), b.size()); ++i)
+                difference = std::max (difference, std::abs (a[i] - b[i]));
+
+            check (difference < 1.0e-5f, "switched off, what's sent through the chorus plays dry");
+        }
+
+        // All copy, it's a vibrato: the pitch swings with the sweep, sharp then flat, by about what the depth sets.
+        // At 0.8 Hz, swinging 3.5 ms either way, the time changes by up to 2π · 0.8 · 3.5 ms a second, 1.76%.
+        {
+            const auto signal = playSides (*chorused (0.5f, 1.0f), 69, 2.0, 2.2).first;
+            auto lowest = 1.0e9, highest = 0.0;
+
+            for (auto start = 0.2; start + 0.1 < 1.9; start += 0.05)
+            {
+                const auto frequency = frequencyOf (slice (signal, start, start + 0.1));
+                lowest = std::min (lowest, frequency);
+                highest = std::max (highest, frequency);
+            }
+
+            check (highest > 440.0 * 1.012 && highest < 440.0 * 1.024 && lowest < 440.0 / 1.012 && lowest > 440.0 / 1.024,
+                   "all copy, the chorus sweeps the pitch sharp and flat, by about as much as its depth and rate set");
+
+            const auto still = playSides (*chorused (0.0f, 1.0f), 69, 1.0, 1.2).first;
+            check (isNear (frequencyOf (slice (still, 0.3, 0.8)), 440.0, 0.5), "...and with no depth, it doesn't");
+        }
+
+        // Half and half, the copy beats against what went in, so the level swells and falls.
+        {
+            const auto signal = playSides (*chorused (0.5f, 0.5f), 69, 2.0, 2.2).first;
+            auto quietest = 1.0e9, loudest = 0.0;
+
+            for (auto start = 0.2; start + 0.05 < 1.9; start += 0.025)
+            {
+                const auto level = loudness (signal, start, start + 0.05);
+                quietest = std::min (quietest, level);
+                loudest = std::max (loudest, level);
+            }
+
+            check (loudest > quietest * 1.5, "half the copy and half dry, the sound swells and falls as it sweeps");
+        }
+
+        // Its sides sweep a quarter of a cycle apart, so the sound's wide.
+        {
+            auto synth = chorused (0.5f, 1.0f);
+            setParameter (*synth, SynthProcessor::panId (0), 0.5f);
+            const auto [left, right] = playSides (*synth, 69, 1.0, 1.2);
+            auto apart = 0.0f;
+
+            for (size_t i = 0; i < std::min (left.size(), right.size()); ++i)
+                apart = std::max (apart, std::abs (left[i] - right[i]));
+
+            check (apart > 0.01f, "its two sides sweep apart, so it's wide");
+        }
+
+        // Feedback rings the copy on after the note.
+        {
+            const auto ring = [&chorused] (float feedback)
+            {
+                auto synth = chorused (0.0f, 0.5f);
+                setParameter (*synth, SynthProcessor::chorusDelayId, 40.0f);
+                setParameter (*synth, SynthProcessor::chorusFeedbackId, feedback);
+                const auto signal = playSides (*synth, 69, 0.05, 1.0).first;
+                return loudness (signal, 0.5, 0.6);
+            };
+
+            check (ring (0.0f) < 1.0e-6 && ring (0.9f) > 1.0e-4, "with feedback, the copy comes round again after the note");
+        }
+
+        // The effects run in a chain: sent through the chorus and the delay, the chorused sound repeats.
+        {
+            auto both = chorused (0.5f, 0.5f);
+            setParameter (*both, SynthProcessor::effectSendId (0, Patch::delayEffect), 1.0f);
+            setParameter (*both, SynthProcessor::delayOnId, 1.0f);
+            setParameter (*both, SynthProcessor::delayTimeId, 500.0f);
+            setParameter (*both, SynthProcessor::delayFeedbackId, 0.0f);
+            const auto signal = playSides (*both, 69, 0.05, 1.0).first;
+            check (peakOf (slice (signal, 0.5, 0.6)) > 0.02f, "sent through the chorus and the delay, the chorused note repeats");
+        }
+    }
+
     void testDelay()
     {
         std::cout << "Delay" << std::endl;
@@ -4304,13 +4425,18 @@ namespace
             screen.showOscillator (4);
             check (screen.getSendSwitch (1).getToggleState(), "...and another oscillator's switches are its own");
 
-            // Its effects' switches send the oscillator through the delay and the reverb, after its filters.
+            // Its effects' switches send the oscillator through the chorus, the delay and the reverb, after its filters.
             screen.showOscillator (2);
             const juce::String arrow (juce::CharPointer_UTF8 ("  \xe2\x86\x92  "));
-            check (screen.describePath() == "Osc 3" + arrow + "Filter 1" + arrow + "Filter 3" + arrow + "Filter 4" + arrow + "Delay"
-                                                 + arrow + "Reverb" + arrow + "Out"
+            check (screen.describePath() == "Osc 3" + arrow + "Filter 1" + arrow + "Filter 3" + arrow + "Filter 4" + arrow + "Chorus"
+                                                 + arrow + "Delay" + arrow + "Reverb" + arrow + "Out"
+                     && screen.getEffectSwitch (Patch::chorusEffect).getToggleState()
                      && screen.getEffectSwitch (Patch::delayEffect).getToggleState() && screen.getEffectSwitch (Patch::reverbEffect).getToggleState(),
-                   "...which spells out the path the oscillator takes, through the delay and the reverb, after its filters, to begin with");
+                   "...which spells out the path the oscillator takes, through the chorus, the delay and the reverb, after its filters, to begin with");
+            screen.getEffectSwitch (Patch::chorusEffect).setToggleState (false, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::chorusEffect))->load() < 0.5f
+                     && screen.describePath().endsWith ("Filter 4" + arrow + "Delay" + arrow + "Reverb" + arrow + "Out"),
+                   "...and whose chorus switch takes it out of the chorus");
             screen.getEffectSwitch (Patch::reverbEffect).setToggleState (false, juce::sendNotificationSync);
             check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::reverbEffect))->load() < 0.5f
                      && screen.describePath().endsWith ("Filter 4" + arrow + "Delay" + arrow + "Out"),
@@ -4332,13 +4458,18 @@ namespace
             effects.getSendSwitch (Patch::reverbEffect, 0).setToggleState (false, juce::sendNotificationSync);
             effects.getDial (Patch::reverbEffect, 2).setValue (6.0, juce::sendNotificationSync);
             effects.getDial (Patch::delayEffect, 2).setValue (0.6, juce::sendNotificationSync);
+            effects.getDial (Patch::chorusEffect, 0).setValue (2.5, juce::sendNotificationSync);
+            check (isNear (shown.parameters.getRawParameterValue (SynthProcessor::chorusRateId)->load(), 2.5, 0.01)
+                     && effects.getDial (Patch::chorusEffect, 4).isVisible(),
+                   "the Effects screen sets the chorus, its five dials shown");
             check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (0, Patch::reverbEffect))->load() < 0.5f
                      && isNear (shown.parameters.getRawParameterValue (SynthProcessor::reverbDecayId)->load(), 6.0, 0.01)
                      && isNear (shown.parameters.getRawParameterValue (SynthProcessor::delayFeedbackId)->load(), 0.6, 0.01),
                    "...and sets them, and the effects' dials");
 
             // Each effect has its own switch, off to begin with.
-            check (! effects.getOnSwitch (Patch::delayEffect).getToggleState() && ! effects.getOnSwitch (Patch::reverbEffect).getToggleState(),
+            check (! effects.getOnSwitch (Patch::chorusEffect).getToggleState() && ! effects.getOnSwitch (Patch::delayEffect).getToggleState()
+                     && ! effects.getOnSwitch (Patch::reverbEffect).getToggleState(),
                    "each effect's switch is off to begin with");
             effects.getOnSwitch (Patch::reverbEffect).setToggleState (true, juce::sendNotificationSync);
             check (shown.parameters.getRawParameterValue (SynthProcessor::reverbOnId)->load() >= 0.5f
@@ -6880,12 +7011,15 @@ namespace
         setParameter (synth, SynthProcessor::filterSendId (1, 1), 1.0f);
         setParameter (synth, SynthProcessor::filterSendId (1, 3), 1.0f);
 
-        // The effects screen: the delay synced to dotted eighths, 25% of it mixed in, with every oscillator but the
+        // The effects screen: the chorus on, sweeping at 0.6 Hz, 40% deep, the delay synced to dotted eighths, 25% of it mixed in, with every oscillator but the
         // first sent through it, and every one but the third sent through the reverb, a larger room ringing for
         // 3.5 seconds, 30% of it mixed in.
         setParameter (synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 0.0f);
         setParameter (synth, SynthProcessor::delaySyncId, 1.0f);
         setParameter (synth, SynthProcessor::delayDivisionId, 6.0f);
+        setParameter (synth, SynthProcessor::chorusOnId, 1.0f);
+        setParameter (synth, SynthProcessor::chorusRateId, 0.6f);
+        setParameter (synth, SynthProcessor::chorusDepthId, 0.4f);
         setParameter (synth, SynthProcessor::delayOnId, 1.0f);
         setParameter (synth, SynthProcessor::reverbOnId, 1.0f);
         setParameter (synth, SynthProcessor::delayMixId, 0.25f);
@@ -6904,6 +7038,9 @@ namespace
         setParameter (synth, SynthProcessor::delayMixId, 0.5f);
         setParameter (synth, SynthProcessor::delayOnId, 0.0f);
         setParameter (synth, SynthProcessor::reverbOnId, 0.0f);
+        setParameter (synth, SynthProcessor::chorusOnId, 0.0f);
+        setParameter (synth, SynthProcessor::chorusRateId, 0.8f);
+        setParameter (synth, SynthProcessor::chorusDepthId, 0.5f);
 
         // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
         // added, waiting for its highest key.
@@ -7143,6 +7280,19 @@ namespace
         synth.editedSource = 0;
         setNumHarmonics (synth, 16, 0);
         save ("8a-smallest-16-harmonics");
+
+        // The effects and routing screens, at the smallest, with every effect on.
+        for (int effect = 0; effect < Patch::numEffects; ++effect)
+            setParameter (synth, SynthProcessor::effectOnId (effect), 1.0f);
+
+        synthEditor.showEffectsScreen (true);
+        synthEditor.refresh();
+        save ("8b-smallest-effects");
+        synthEditor.showEffectsScreen (false);
+        synthEditor.showRoutingScreen (true, 0);
+        synthEditor.refresh();
+        save ("8c-smallest-routing");
+        synthEditor.showRoutingScreen (false);
     }
 }
 
@@ -7179,6 +7329,7 @@ int main (int argc, char* argv[])
     testFilterRouting();
     testUnison();
     testReverb();
+    testChorus();
     testDelay();
     testMidiInputs();
     testMidiLearn();

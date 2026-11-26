@@ -10,17 +10,24 @@ EffectsScreen::EffectsScreen (SynthProcessor& processor)
     for (size_t effect = 0; effect < sections.size(); ++effect)
         sections[effect].effect = (int) effect;
 
+    auto& chorus = sections[(size_t) Patch::chorusEffect];
+    addDial (chorus, SynthProcessor::chorusRateId, "RATE", { "Of the sweep, up and down", "Of the sweep" });
+    addDial (chorus, SynthProcessor::chorusDepthId, "DEPTH", { "How far the time swings", "How far it swings" });
+    addDial (chorus, SynthProcessor::chorusDelayId, "DELAY", { "The time it swings around", "It swings around" });
+    addDial (chorus, SynthProcessor::chorusFeedbackId, "FEEDBACK", { "Of the copy, again" });
+    addDial (chorus, SynthProcessor::chorusMixId, "MIX", { "Of the copy, the rest dry", "Of the copy" });
+
     auto& delay = sections[(size_t) Patch::delayEffect];
-    addDial (delay, SynthProcessor::delayTimeId, "TIME", "Before each repeat");
-    addDial (delay, SynthProcessor::delayDivisionId, "TIME", "A note at the tempo");
-    addDial (delay, SynthProcessor::delayFeedbackId, "FEEDBACK", "Of each repeat, again");
-    addDial (delay, SynthProcessor::delayMixId, "MIX", "Of the repeats, the rest dry");
+    addDial (delay, SynthProcessor::delayTimeId, "TIME", { "Before each repeat" });
+    addDial (delay, SynthProcessor::delayDivisionId, "TIME", { "A note at the tempo" });
+    addDial (delay, SynthProcessor::delayFeedbackId, "FEEDBACK", { "Of each repeat, again", "Of each repeat" });
+    addDial (delay, SynthProcessor::delayMixId, "MIX", { "Of the repeats, the rest dry", "Of the repeats" });
 
     auto& reverb = sections[(size_t) Patch::reverbEffect];
-    addDial (reverb, SynthProcessor::reverbDelayId, "PRE-DELAY", "Before the first reflection");
-    addDial (reverb, SynthProcessor::reverbSizeId, "SIZE", "Of the room, from a box to a hall");
-    addDial (reverb, SynthProcessor::reverbDecayId, "DECAY", "For the tail to fall 60 dB");
-    addDial (reverb, SynthProcessor::reverbMixId, "MIX", "Of the reverb, the rest dry");
+    addDial (reverb, SynthProcessor::reverbDelayId, "PRE-DELAY", { "Before the first reflection", "Before reflections" });
+    addDial (reverb, SynthProcessor::reverbSizeId, "SIZE", { "Of the room, from a box to a hall", "Of the room" });
+    addDial (reverb, SynthProcessor::reverbDecayId, "DECAY", { "For the tail to fall 60 dB", "To fall 60 dB" });
+    addDial (reverb, SynthProcessor::reverbMixId, "MIX", { "Of the reverb, the rest dry", "Of the reverb" });
 
     delaySync.setTitle ("Delay time");
     delaySync.onChoose = [this] (int chosen) { delaySyncAttachment->setValueAsCompleteGesture ((float) chosen); };
@@ -79,12 +86,12 @@ void EffectsScreen::showOnOff()
 }
 
 EffectsScreen::Dial& EffectsScreen::addDial (Section& section, const char* parameterId, const juce::String& caption,
-                                             const juce::String& hint)
+                                             const juce::StringArray& hints)
 {
     auto& dial = allDials.emplace_back();
     const auto& parameter = *synthProcessor.parameters.getParameter (parameterId);
     dial.caption = caption;
-    dial.hint = hint;
+    dial.hints = hints;
     dial.knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     dial.knob.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     dial.knob.setTitle (SynthProcessor::getEffectName (section.effect) + " " + caption.toLowerCase());
@@ -148,60 +155,73 @@ void EffectsScreen::refresh()
 
 void EffectsScreen::resized()
 {
-    panelArea = getLocalBounds().reduced (24).withSizeKeepingCentre (juce::jmin (760, getWidth() - 48), getHeight() - 48);
+    panelArea = getLocalBounds().reduced (24).withSizeKeepingCentre (juce::jmin (1240, getWidth() - 48), getHeight() - 48);
     auto area = panelArea.reduced (24, 20);
 
     titleArea = area.removeFromTop (30);
     subtitleArea = area.removeFromTop (40);
     area.removeFromTop (12);
 
-    // Each effect in turn, as they run: its dials side by side, each with its caption, value and what it sets, and
-    // under them which oscillators are sent through it. They share the height, up to as much as they need.
-    const auto sectionHeight = juce::jmin (270, (area.getHeight() - 12 * ((int) sections.size() - 1)) / (int) sections.size());
+    // A row for each effect, as they run: its switch and name, then its dials side by side, each with its caption,
+    // value and what it sets, in columns that line up from one to the next, and last which oscillators are sent
+    // through it. They share the height, up to as much as they need.
+    const auto gap = 10;
+    const auto sectionHeight = juce::jmin (200, (area.getHeight() - gap * ((int) sections.size() - 1)) / (int) sections.size());
+    constexpr auto nameWidth = 190, sendsWidth = 300, mostDials = 5;
 
     for (auto& section : sections)
     {
         section.area = area.removeFromTop (sectionHeight);
-        area.removeFromTop (12);
+        area.removeFromTop (gap);
         auto inside = section.area.reduced (16, 12);
 
-        section.captionArea = inside.removeFromTop (24);
+        auto left = inside.removeFromLeft (nameWidth);
+        inside.removeFromLeft (16);
+        section.captionArea = left.removeFromTop (24);
         auto caption = section.captionArea;
         section.onSwitch.setBounds (caption.removeFromLeft (36).withSizeKeepingCentre (36, 22));
         caption.removeFromLeft (10);
-        section.nameArea = caption.removeFromLeft (80);
+        section.nameArea = caption;
+        left.removeFromTop (10);
 
         if (section.effect == Patch::delayEffect)
-            delaySync.setBounds (caption.withWidth (220));
+        {
+            delaySync.setBounds (left.removeFromTop (28));
+            left.removeFromTop (8);
+        }
 
-        inside.removeFromTop (8);
+        section.offArea = left.withHeight (juce::jmin (left.getHeight(), 34));
 
-        auto sends = inside.removeFromBottom (34);
-        inside.removeFromBottom (6);
-        section.sendsCaptionArea = inside.removeFromBottom (18);
-        section.sendsNoteArea = section.sendsCaptionArea.withTrimmedLeft (160);
-        inside.removeFromBottom (8);
+        // The oscillators' switches, three to a row.
+        auto sends = inside.removeFromRight (sendsWidth);
+        inside.removeFromRight (16);
+        constexpr auto perRow = 3, rowHeight = 28;
+        const auto rows = ((int) section.sends.size() + perRow - 1) / perRow;
+        sends = sends.withSizeKeepingCentre (sends.getWidth(), juce::jmin (sends.getHeight(), 18 + 6 + rows * rowHeight));
+        section.sendsCaptionArea = sends.removeFromTop (18);
+        section.sendsNoteArea = section.sendsCaptionArea.withTrimmedLeft (130);
+        sends.removeFromTop (6);
 
-        const auto dials = getShownDials (section);
-        const auto dialWidth = inside.getWidth() / 4;
+        for (size_t i = 0; i < section.sends.size(); ++i)
+        {
+            auto& send = section.sends[i];
+            auto cell = juce::Rectangle<int> (sends.getX() + ((int) i % perRow) * sends.getWidth() / perRow,
+                                              sends.getY() + ((int) i / perRow) * rowHeight,
+                                              sends.getWidth() / perRow, rowHeight);
+            send.sendSwitch.setBounds (cell.removeFromLeft (36).withSizeKeepingCentre (36, 22));
+            cell.removeFromLeft (8);
+            send.labelArea = cell;
+        }
 
-        for (auto* dial : dials)
+        const auto dialWidth = inside.getWidth() / mostDials;
+
+        for (auto* dial : getShownDials (section))
         {
             auto column = inside.removeFromLeft (dialWidth);
             dial->captionArea = column.removeFromTop (16);
             dial->hintArea = column.removeFromBottom (16);
             dial->valueArea = column.removeFromBottom (20);
             dial->knob.setBounds (column.withSizeKeepingCentre (juce::jmin (column.getWidth(), 96), column.getHeight()));
-        }
-
-        const auto sendWidth = sends.getWidth() / (int) section.sends.size();
-
-        for (auto& send : section.sends)
-        {
-            auto cell = sends.removeFromLeft (sendWidth).reduced (4, 0);
-            send.sendSwitch.setBounds (cell.removeFromLeft (36).withSizeKeepingCentre (36, 22));
-            cell.removeFromLeft (8);
-            send.labelArea = cell;
         }
     }
 }
@@ -220,10 +240,10 @@ void EffectsScreen::paint (juce::Graphics& g)
     g.drawText ("EFFECTS", titleArea, juce::Justification::centredLeft);
 
     g.setFont (fonts::body (13.0f));
-    g.drawFittedText ("Effects the oscillators can be sent through, after their filters, in a chain: the delay, then the reverb. "
-                      "Each is set the same for every pitch set. Choose which oscillators go through each here, or on each "
-                      "oscillator's routing screen; one sent through none plays straight out.",
-                      subtitleArea, juce::Justification::centredLeft, 2);
+    g.drawFittedText ("Effects the oscillators can be sent through, after their filters, in a chain: the chorus, then the delay, "
+                      "then the reverb. Each is set the same for every pitch set. Choose which oscillators go through each here, "
+                      "or on each oscillator's routing screen; one sent through none plays straight out.",
+                      subtitleArea, juce::Justification::centredLeft, 2, 1.0f);
 
     const auto several = synthProcessor.getNumPitchSets() > 1;
 
@@ -232,9 +252,8 @@ void EffectsScreen::paint (juce::Graphics& g)
         g.setColour (colours::background.withAlpha (0.5f));
         g.fillRoundedRectangle (section.area.toFloat(), 8.0f);
 
-        g.setFont (fonts::caption());
-        g.setColour (colours::dimText);
         const auto on = section.onSwitch.getToggleState();
+        g.setFont (fonts::caption());
         g.setColour (on ? colours::text : colours::dimText);
         g.drawText (SynthProcessor::getEffectName (section.effect).toUpperCase(), section.nameArea, juce::Justification::centredLeft);
 
@@ -242,18 +261,18 @@ void EffectsScreen::paint (juce::Graphics& g)
         {
             g.setFont (fonts::body (12.5f));
             g.setColour (colours::dimText);
-            g.drawText ("Off, so what's sent through it plays dry", section.captionArea, juce::Justification::centredRight);
-            g.setFont (fonts::caption());
+            g.drawFittedText ("Off, so what's sent through it plays dry", section.offArea, juce::Justification::topLeft, 2, 1.0f);
         }
 
+        g.setFont (fonts::caption());
         g.setColour (colours::dimText);
         g.drawText ("SENT THROUGH IT", section.sendsCaptionArea, juce::Justification::centredLeft);
 
         if (several)
         {
             g.setFont (fonts::body (12.5f));
-            g.drawText ("For " + synthProcessor.getPitchSetName (synthProcessor.getActivePitchSet()), section.sendsNoteArea,
-                        juce::Justification::centredRight);
+            fonts::drawFirstThatFits (g, { "For " + synthProcessor.getPitchSetName (synthProcessor.getActivePitchSet()) },
+                                      section.sendsNoteArea, juce::Justification::centredRight);
         }
 
         for (auto* dial : getShownDials (section))
@@ -268,7 +287,7 @@ void EffectsScreen::paint (juce::Graphics& g)
 
             g.setFont (fonts::body (12.0f));
             g.setColour (colours::dimText);
-            fonts::drawFirstThatFits (g, { dial->hint }, dial->hintArea, juce::Justification::centred);
+            fonts::drawFirstThatFits (g, dial->hints, dial->hintArea, juce::Justification::centred);
         }
 
         for (size_t i = 0; i < section.sends.size(); ++i)

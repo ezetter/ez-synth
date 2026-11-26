@@ -46,6 +46,7 @@ target_sources(EZSynth
     PRIVATE
         Source/CardStrip.cpp
         Source/ChoiceButtons.cpp
+        Source/Chorus.cpp
         Source/Delay.cpp
         Source/Dropdown.cpp
         Source/Envelope.cpp

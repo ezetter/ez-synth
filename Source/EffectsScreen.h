@@ -8,10 +8,11 @@
 #include <deque>
 
 /** A screen of its own, over the window but for the keyboard, setting the effects oscillators can be sent through,
-    each with a switch, off to begin with, so what's sent through it plays dry, in the order they run: the delay, its time, in milliseconds or synced to the tempo, its feedback and mix, and
-    then the reverb, its pre-delay, the room's size, how long it rings, and its mix. Under each is a switch for each
-    oscillator, for whether it's sent through it, as on the routing screen. It's the Effects tab's; Escape goes
-    back to the synth.
+    a row for each, in the order they run, with a switch, off to begin with, so what's sent through it plays dry:
+    the chorus, its rate, depth, delay, feedback and mix, the delay, its time, in milliseconds or synced to the
+    tempo, its feedback and mix, and then the reverb, its pre-delay, the room's size, how long it rings, and its
+    mix. Beside each is a switch for each oscillator, for whether it's sent through it, as on the routing screen.
+    It's the Effects tab's; Escape goes back to the synth.
 */
 class EffectsScreen final : public juce::Component
 {
@@ -24,8 +25,8 @@ public:
     /** Brings what's shown up to date with the synth, such as which pitch set the switches set. */
     void refresh();
 
-    /** An effect's dials, in the order shown: the delay's time, its note when synced, its feedback and mix, and the
-        reverb's pre-delay, size, decay and mix.
+    /** An effect's dials, in the order shown: the chorus's rate, depth, delay, feedback and mix, the delay's time,
+        its note when synced, its feedback and mix, and the reverb's pre-delay, size, decay and mix.
     */
     juce::Slider& getDial (int effect, int index)   { return sections[(size_t) effect].dials[(size_t) index]->knob; }
 
@@ -46,7 +47,10 @@ private:
     struct Dial
     {
         juce::Slider knob;
-        juce::String caption, hint;
+        juce::String caption;
+
+        /** What it sets, and shorter ways of saying it, for when there isn't room. */
+        juce::StringArray hints;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
         juce::Rectangle<int> captionArea, valueArea, hintArea;
     };
@@ -65,10 +69,10 @@ private:
         std::array<Send, SynthProcessor::numOscillators> sends;
         juce::ToggleButton onSwitch;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> onAttachment;
-        juce::Rectangle<int> area, captionArea, nameArea, sendsCaptionArea, sendsNoteArea;
+        juce::Rectangle<int> area, captionArea, nameArea, offArea, sendsCaptionArea, sendsNoteArea;
     };
 
-    Dial& addDial (Section&, const char* parameterId, const juce::String& caption, const juce::String& hint);
+    Dial& addDial (Section&, const char* parameterId, const juce::String& caption, const juce::StringArray& hints);
 
     /** The dials shown: the delay's time or note, as it's synced or not. */
     std::vector<Dial*> getShownDials (const Section&) const;

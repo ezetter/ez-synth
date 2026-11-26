@@ -233,9 +233,47 @@ namespace
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); })),
                 std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::effectSendId (i, Patch::chorusEffect), 1 }, name + " to Chorus", true),
+                std::make_unique<juce::AudioParameterBool> (
                     juce::ParameterID { SynthProcessor::effectSendId (i, Patch::delayEffect), 1 }, name + " to Delay", true),
                 std::make_unique<juce::AudioParameterBool> (
                     juce::ParameterID { SynthProcessor::effectSendId (i, Patch::reverbEffect), 1 }, name + " to Reverb", true)));
+        }
+
+        // The chorus, which every oscillator's sent through to begin with: swept at 0.8 Hz, half its 7 ms delay
+        // either way, with nothing fed back, half of it mixed in, but switched off, so what's sent through it plays
+        // dry until it's switched on.
+        {
+            juce::NormalisableRange<float> rateRange (Chorus::slowestRate, Chorus::fastestRate);
+            rateRange.setSkewForCentre (1.0f);
+            juce::NormalisableRange<float> delayRange (Chorus::shortestDelay, Chorus::longestDelay);
+            delayRange.setSkewForCentre (10.0f);
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "chorus", "Chorus", " ",
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::chorusOnId, 1 }, "Chorus On", false),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::chorusRateId, 1 }, "Chorus Rate", rateRange, 0.8f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float hertz, int) { return juce::String (hertz, hertz < 1.005f ? 2 : 1) + " Hz"; })
+                        .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::chorusDepthId, 1 }, "Chorus Depth",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f, asPercentage()),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::chorusDelayId, 1 }, "Chorus Delay", delayRange, 7.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float milliseconds, int)
+                        {
+                            return juce::String (milliseconds, milliseconds < 9.95f ? 1 : 0) + " ms";
+                        })
+                        .withValueFromStringFunction ([] (const juce::String& text) { return text.retainCharacters ("0123456789.").getFloatValue(); })),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::chorusFeedbackId, 1 }, "Chorus Feedback",
+                    juce::NormalisableRange<float> (0.0f, Chorus::mostFeedback), 0.0f, asPercentage()),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::chorusMixId, 1 }, "Chorus Mix",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f, asPercentage())));
         }
 
         // The delay, which every oscillator's sent through to begin with: repeating every 375 ms, a dotted eighth at
@@ -462,12 +500,16 @@ juce::String SynthProcessor::effectSendId (int oscillator, int effect)
     return "osc" + juce::String (oscillator + 1) + "To" + getEffectName (effect);
 }
 
-juce::String SynthProcessor::effectOnId (int effect)   { return effect == Patch::delayEffect ? delayOnId : reverbOnId; }
+juce::String SynthProcessor::effectOnId (int effect)
+{
+    static_assert (Patch::numEffects == 3, "Each effect needs its switch");
+    return effect == Patch::chorusEffect ? chorusOnId : effect == Patch::delayEffect ? delayOnId : reverbOnId;
+}
 
 juce::String SynthProcessor::getEffectName (int effect)
 {
-    static_assert (Patch::numEffects == 2, "Each effect needs its name");
-    return effect == Patch::delayEffect ? "Delay" : "Reverb";
+    static_assert (Patch::numEffects == 3, "Each effect needs its name");
+    return effect == Patch::chorusEffect ? "Chorus" : effect == Patch::delayEffect ? "Delay" : "Reverb";
 }
 
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
@@ -563,6 +605,12 @@ SynthProcessor::SynthProcessor()
     delayFeedback = parameters.getRawParameterValue (delayFeedbackId);
     delayMix = parameters.getRawParameterValue (delayMixId);
     delayOn = parameters.getRawParameterValue (delayOnId);
+    chorusOn = parameters.getRawParameterValue (chorusOnId);
+    chorusRate = parameters.getRawParameterValue (chorusRateId);
+    chorusDepth = parameters.getRawParameterValue (chorusDepthId);
+    chorusDelay = parameters.getRawParameterValue (chorusDelayId);
+    chorusFeedback = parameters.getRawParameterValue (chorusFeedbackId);
+    chorusMix = parameters.getRawParameterValue (chorusMixId);
     reverbOn = parameters.getRawParameterValue (reverbOnId);
 
     // Each pitch set's slot keeps its own copy of every parameter, starting as the host's do.
@@ -658,7 +706,8 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
                                         { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
                                           find (filterSendId (i, 3)) },
                                         find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)),
-                                        { find (effectSendId (i, Patch::delayEffect)), find (effectSendId (i, Patch::reverbEffect)) } };
+                                        { find (effectSendId (i, Patch::chorusEffect)), find (effectSendId (i, Patch::delayEffect)),
+                                          find (effectSendId (i, Patch::reverbEffect)) } };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -710,9 +759,12 @@ void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     playingSampleRate = sampleRate;
     synth.setCurrentPlaybackSampleRate (sampleRate);
     routedBuffer.setSize (HarmonicVoice::routedChannels, std::max (1, samplesPerBlock));
+    chorus.prepare (sampleRate, HarmonicVoice::routedChannels / 4);
+
+    for (auto& delay : delays)
+        delay.prepare (sampleRate);
+
     reverb.prepare (sampleRate);
-    delayOut.prepare (sampleRate);
-    delayToReverb.prepare (sampleRate);
 
     // The looping LFOs carry on where they were: a host may prepare again whenever its transport starts or loops,
     // and they're never sent back to the start of their cycles.
@@ -846,44 +898,78 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     // The voices play the sound going each way through the effects on its own pair of channels, numbered by the
-    // effects' bits. Each plays through its effects in the chain's order, the delay then the reverb, before
-    // everything's added up. What's sent through both is delayed, then joins what's sent only through the reverb.
+    // effects' bits. The effects play in the chain's order, the chorus, the delay, then the reverb: each plays every
+    // pair going through it, then passes each on to the pair going through the effects after it that it was sent
+    // through too, or straight out, so in the end everything comes out of the first pair.
     if (buffer.getNumChannels() > 0)
     {
         routedBuffer.setSize (HarmonicVoice::routedChannels, numSamples, false, false, true);
         routedBuffer.clear();
         synth.renderNextBlock (routedBuffer, midi, 0, numSamples);
 
-        static_assert (Patch::numEffects == 2, "Each way through the effects is played");
-        constexpr auto delayed = 2 * (1 << Patch::delayEffect);
-        constexpr auto reverberated = 2 * (1 << Patch::reverbEffect);
-        constexpr auto both = 2 * ((1 << Patch::delayEffect) | (1 << Patch::reverbEffect));
+        static_assert (Patch::numEffects == 3, "Each effect is played");
+        constexpr auto numRoutes = HarmonicVoice::routedChannels / 2;
+
+        // The pairs going through an effect, as it comes in the chain: those sent through it and through none of
+        // the effects before it, which have passed them on already. Each is numbered among them by the effects
+        // after it they go on through.
+        const auto goesThrough = [] (int route, int effect) { return (route & ((2 << effect) - 1)) == (1 << effect); };
+        const auto passOn = [this, numSamples] (int route, int effect)
+        {
+            const auto to = route & ~(1 << effect);
+
+            for (int side = 0; side < 2; ++side)
+            {
+                routedBuffer.addFrom (2 * to + side, 0, routedBuffer, 2 * route + side, 0, numSamples);
+                routedBuffer.clear (2 * route + side, 0, numSamples);
+            }
+        };
+
         // An effect that's switched off has none of it mixed in, so what's sent through it plays dry, and it rests.
         const auto mixOf = [] (const std::atomic<float>* on, const std::atomic<float>* mix) { return on->load() >= 0.5f ? mix->load() : 0.0f; };
+
+        std::array<Chorus::Pair, numRoutes / 2> chorusPairs;
+
+        for (int route = 0; route < numRoutes; ++route)
+            if (goesThrough (route, Patch::chorusEffect))
+                chorusPairs[(size_t) (route >> (Patch::chorusEffect + 1))] = { routedBuffer.getWritePointer (2 * route),
+                                                                                routedBuffer.getWritePointer (2 * route + 1) };
+
+        chorus.process (chorusPairs.data(), (int) chorusPairs.size(), numSamples,
+                        { chorusRate->load(), chorusDepth->load(), chorusDelay->load(), chorusFeedback->load(),
+                          mixOf (chorusOn, chorusMix) });
+
+        for (int route = 0; route < numRoutes; ++route)
+            if (goesThrough (route, Patch::chorusEffect))
+                passOn (route, Patch::chorusEffect);
+
         const Delay::Settings delaySettings { getDelayTime(), delayFeedback->load(), mixOf (delayOn, delayMix) };
 
-        delayOut.process (routedBuffer.getWritePointer (delayed), routedBuffer.getWritePointer (delayed + 1), numSamples, delaySettings);
-        delayToReverb.process (routedBuffer.getWritePointer (both), routedBuffer.getWritePointer (both + 1), numSamples, delaySettings);
-        routedBuffer.addFrom (reverberated, 0, routedBuffer, both, 0, numSamples);
-        routedBuffer.addFrom (reverberated + 1, 0, routedBuffer, both + 1, 0, numSamples);
-        routedBuffer.clear (both, 0, numSamples);
-        routedBuffer.clear (both + 1, 0, numSamples);
-
-        reverb.process (routedBuffer.getWritePointer (reverberated), routedBuffer.getWritePointer (reverberated + 1), numSamples,
-                        { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), mixOf (reverbOn, reverbMix) });
-
-        for (int pair = 0; pair < HarmonicVoice::routedChannels / 2; ++pair)
+        for (int route = 0; route < numRoutes; ++route)
         {
-            if (buffer.getNumChannels() == 1)
+            if (goesThrough (route, Patch::delayEffect))
             {
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples, 0.5f);
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair + 1, 0, numSamples, 0.5f);
+                delays[(size_t) (route >> (Patch::delayEffect + 1))].process (routedBuffer.getWritePointer (2 * route),
+                                                                             routedBuffer.getWritePointer (2 * route + 1),
+                                                                             numSamples, delaySettings);
+                passOn (route, Patch::delayEffect);
             }
-            else
-            {
-                buffer.addFrom (0, 0, routedBuffer, 2 * pair, 0, numSamples);
-                buffer.addFrom (1, 0, routedBuffer, 2 * pair + 1, 0, numSamples);
-            }
+        }
+
+        constexpr auto reverberated = 1 << Patch::reverbEffect;
+        reverb.process (routedBuffer.getWritePointer (2 * reverberated), routedBuffer.getWritePointer (2 * reverberated + 1), numSamples,
+                        { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), mixOf (reverbOn, reverbMix) });
+        passOn (reverberated, Patch::reverbEffect);
+
+        if (buffer.getNumChannels() == 1)
+        {
+            buffer.addFrom (0, 0, routedBuffer, 0, 0, numSamples, 0.5f);
+            buffer.addFrom (0, 0, routedBuffer, 1, 0, numSamples, 0.5f);
+        }
+        else
+        {
+            buffer.addFrom (0, 0, routedBuffer, 0, 0, numSamples);
+            buffer.addFrom (1, 0, routedBuffer, 1, 0, numSamples);
         }
     }
 
@@ -2582,7 +2668,8 @@ void SynthProcessor::loadSoundState (juce::ValueTree state)
 
     // A save from before the effects could be switched on and off had them on as long as any of them was mixed in,
     // which it now keeps.
-    for (const auto& [onId, mixId] : { std::pair (delayOnId, delayMixId), std::pair (reverbOnId, reverbMixId) })
+    for (const auto& [onId, mixId] : { std::pair (chorusOnId, chorusMixId), std::pair (delayOnId, delayMixId),
+                                         std::pair (reverbOnId, reverbMixId) })
     {
         if (const auto mix = state.getChildWithProperty ("id", mixId); mix.isValid() && ! state.getChildWithProperty ("id", onId).isValid())
         {
