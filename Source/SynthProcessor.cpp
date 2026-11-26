@@ -155,6 +155,17 @@ namespace
             juce::ParameterID { SynthProcessor::volumeId, 1 }, "Volume", juce::NormalisableRange<float> (0.0f, 1.0f), 0.75f,
             asPercentage()));
 
+        // Every oscillator glides alike to begin with, which is not at all.
+        layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+            "glide", "Glide", " ",
+            std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::glideAllId, 1 }, "Glide All", true),
+            std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::sharedGlideId, 1 }, "Glide",
+                                                          SynthProcessor::getGlideNames(), 0),
+            std::make_unique<juce::AudioParameterFloat> (
+                juce::ParameterID { SynthProcessor::sharedGlideTimeId, 1 }, "Glide Time", SynthProcessor::glideTimeRange(), 0.2f,
+                juce::AudioParameterFloatAttributes()
+                    .withStringFromValueFunction ([] (float seconds, int) { return SynthProcessor::glideTimeToText (seconds); }))));
+
         // Only the first oscillator plays to begin with.
         for (int i = 0; i < SynthProcessor::numOscillators; ++i)
         {
@@ -636,6 +647,9 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
 {
     ParameterSet set;
     set.volume = find (volumeId);
+    set.glideAll = find (glideAllId);
+    set.glide = find (sharedGlideId);
+    set.glideTime = find (sharedGlideTimeId);
 
     for (int i = 0; i < numOscillators; ++i)
         set.oscillators[(size_t) i] = { find (onId (i)), find (levelId (i)), find (harmonicsId (i)), find (tuneId (i)),
@@ -1356,6 +1370,7 @@ void SynthProcessor::updatePatch (int slotNumber)
     }
 
     const auto& settings = slotParameters[slot];
+    const auto glideAll = settings.glideAll->load() >= 0.5f;
 
     for (size_t i = 0; i < (size_t) numOscillators; ++i)
     {
@@ -1366,8 +1381,9 @@ void SynthProcessor::updatePatch (int slotNumber)
         oscillator.numHarmonics = juce::jlimit (1, waveform::maxHarmonics, juce::roundToInt (source.numHarmonics->load()));
         oscillator.tune = source.tune->load();
         oscillator.tuneReach = tuning::zoomToReach (source.tuneZoom->load());
-        oscillator.glide = (Patch::Glide) juce::jlimit (0, 2, juce::roundToInt (source.glide->load()));
-        oscillator.glideSeconds = source.glideTime->load();
+        // Every oscillator glides alike, or each as its own glide is set.
+        oscillator.glide = (Patch::Glide) juce::jlimit (0, 2, juce::roundToInt ((glideAll ? settings.glide : source.glide)->load()));
+        oscillator.glideSeconds = (glideAll ? settings.glideTime : source.glideTime)->load();
         oscillator.noise = source.noise->load() >= 0.5f;
         oscillator.pan = source.pan->load();
         oscillator.unisonVoices = juce::jlimit (1, Patch::maxUnisonVoices, juce::roundToInt (source.unisonVoices->load()));
@@ -2516,6 +2532,53 @@ void SynthProcessor::loadSoundState (juce::ValueTree state)
     for (auto parameter : state)
         if (parameter.hasProperty ("id"))
             parameter.setProperty ("id", modulation::updateKey (parameter["id"].toString()), nullptr);
+
+    // A save from before the oscillators could all glide alike glides them alike if every one that's on glides the
+    // same way, as they then did, and otherwise each as its own is set.
+    if (! state.getChildWithProperty ("id", glideAllId).isValid())
+    {
+        const auto valueOf = [&state] (const juce::String& id, double fallback)
+        {
+            const auto parameter = state.getChildWithProperty ("id", id);
+            return parameter.isValid() ? (double) parameter["value"] : fallback;
+        };
+
+        std::optional<std::pair<int, double>> common;
+        auto alike = true;
+
+        for (int i = 0; i < numOscillators; ++i)
+        {
+            if (valueOf (onId (i), i == 0 ? 1.0 : 0.0) < 0.5)
+                continue;
+
+            const std::pair glide { juce::roundToInt (valueOf (glideId (i), 0.0)), valueOf (glideTimeId (i), 0.2) };
+            const auto same = [&glide] (const std::pair<int, double>& other)
+            {
+                return other.first == glide.first && (glide.first == 0 || std::abs (other.second - glide.second) < 1.0e-6);
+            };
+
+            if (! common.has_value())
+                common = glide;
+            else
+                alike = alike && same (*common);
+        }
+
+        const auto add = [&state] (const juce::String& id, double value)
+        {
+            juce::ValueTree parameter ("PARAM");
+            parameter.setProperty ("id", id, nullptr);
+            parameter.setProperty ("value", value, nullptr);
+            state.appendChild (parameter, nullptr);
+        };
+
+        add (glideAllId, alike ? 1.0 : 0.0);
+
+        if (alike && common.has_value())
+        {
+            add (sharedGlideId, common->first);
+            add (sharedGlideTimeId, common->second);
+        }
+    }
 
     // A save from before the effects could be switched on and off had them on as long as any of them was mixed in,
     // which it now keeps.

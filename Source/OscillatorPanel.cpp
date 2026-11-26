@@ -110,6 +110,17 @@ OscillatorPanel::OscillatorPanel()
     glideTimeSlider.onValueChange = [this] { repaint (glideValueArea); };
     addAndMakeVisible (glideTimeSlider);
 
+    glideAllSwitch.setTitle ("Glide all oscillators alike");
+    glideAllSwitch.setTooltip ("On, every oscillator glides alike, as set here; off, each glides as its own glide is set");
+    glideAllSwitch.setMouseClickGrabsKeyboardFocus (false);
+    glideAllSwitch.setWantsKeyboardFocus (false);
+    glideAllSwitch.onStateChange = [this]
+    {
+        if (shownParameters != nullptr && glideAllSwitch.getToggleState() != glideAllShown)
+            attachGlide();
+    };
+    addAndMakeVisible (glideAllSwitch);
+
     filtersButton.setTooltip ("Choose which filters and effects this oscillator is sent through");
     filtersButton.setMouseClickGrabsKeyboardFocus (false);
     filtersButton.setWantsKeyboardFocus (false);
@@ -136,8 +147,6 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
     spreadSlider.setTitle (name + " unison spread");
     modulatable::setTarget (spreadSlider, modulation::unisonSpreadTarget (oscillator));
     zoomSlider.setTitle (name + " tune zoom");
-    glideMode.setTitle (name + " glide");
-    glideTimeSlider.setTitle (name + " glide time");
     modulatable::setTarget (slider, modulation::oscillatorTuneTarget (oscillator));
 
     attachment.reset();
@@ -148,6 +157,7 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
     zoomAttachment.reset();
     glideModeAttachment.reset();
     glideTimeAttachment.reset();
+    glideAllAttachment.reset();
 
     for (auto& sendAttachment : sendAttachments)
         sendAttachment.reset();
@@ -171,19 +181,11 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
     zoomAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::tuneZoomId (oscillator)),
                                                                         zoomSlider);
 
-    // The glide's time is greyed out while it's off.
-    glideModeAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (SynthProcessor::glideId (oscillator)),
-                                                                       [this] (float value)
-                                                                       {
-                                                                           glideMode.setChosen (juce::roundToInt (value));
-                                                                           glideTimeSlider.setEnabled (juce::roundToInt (value) != 0);
-                                                                           glideTimeSlider.setAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f);
-                                                                           repaint();
-                                                                       });
-    glideModeAttachment->sendInitialUpdate();
-    glideTimeAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (SynthProcessor::glideTimeId (oscillator)),
-                                                                             glideTimeSlider);
-    glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
+    shownParameters = &parameters;
+    shownOscillator = oscillator;
+    glideAllAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (parameters, SynthProcessor::glideAllId,
+                                                                                                 glideAllSwitch);
+    attachGlide();
 
     // Which filters and effects it's sent through, shown beside the Edit button.
     filtersButton.setTitle (name + " routing");
@@ -215,6 +217,35 @@ void OscillatorPanel::setOscillator (juce::AudioProcessorValueTreeState& paramet
     moveWindow();
 }
 
+void OscillatorPanel::attachGlide()
+{
+    // Every oscillator's glide, while they glide alike, or this one's own.
+    auto& parameters = *shownParameters;
+    glideAllShown = glideAllSwitch.getToggleState();
+    const auto modeId = glideAllShown ? juce::String (SynthProcessor::sharedGlideId) : SynthProcessor::glideId (shownOscillator);
+    const auto timeId = glideAllShown ? juce::String (SynthProcessor::sharedGlideTimeId) : SynthProcessor::glideTimeId (shownOscillator);
+    const auto name = glideAllShown ? juce::String ("Every oscillator's") : "Osc " + juce::String (shownOscillator + 1);
+    glideMode.setTitle (name + " glide");
+    glideTimeSlider.setTitle (name + " glide time");
+
+    glideModeAttachment.reset();
+    glideTimeAttachment.reset();
+
+    // The glide's time is greyed out while it's off.
+    glideModeAttachment = std::make_unique<juce::ParameterAttachment> (*parameters.getParameter (modeId),
+                                                                       [this] (float value)
+                                                                       {
+                                                                           glideMode.setChosen (juce::roundToInt (value));
+                                                                           glideTimeSlider.setEnabled (juce::roundToInt (value) != 0);
+                                                                           glideTimeSlider.setAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f);
+                                                                           repaint();
+                                                                       });
+    glideModeAttachment->sendInitialUpdate();
+    glideTimeAttachment = std::make_unique<juce::SliderParameterAttachment> (*parameters.getParameter (timeId), glideTimeSlider);
+    glideTimeSlider.setDoubleClickReturnValue (true, 0.2);
+    repaint();
+}
+
 void OscillatorPanel::setPanOnly (bool shouldBePanOnly)
 {
     if (panOnly == shouldBePanOnly)
@@ -222,7 +253,7 @@ void OscillatorPanel::setPanOnly (bool shouldBePanOnly)
 
     panOnly = shouldBePanOnly;
 
-    for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider,
+    for (auto* component : std::initializer_list<juce::Component*> { &slider, &zoomSlider, &glideMode, &glideTimeSlider, &glideAllSwitch,
                                                                      &voicesSlider, &detuneSlider, &spreadSlider })
         component->setVisible (! panOnly);
 
@@ -357,11 +388,19 @@ void OscillatorPanel::resized()
     tickArea = area.removeFromTop (16);
     divide();
 
+    // All goes to the right of the glide's buttons, or, where they'd be squeezed, of its time.
     auto glideRow = area.removeFromTop (22);
     glideCaptionArea = glideRow.removeFromLeft (52);
-    glideMode.setBounds (glideRow.removeFromLeft (juce::jmin (156, glideRow.getWidth())));
     area.removeFromTop (rowGap);
     auto timeRow = area.removeFromTop (sliderHeight);
+    constexpr auto allWidth = 62, buttonsWidth = 150;
+    const auto besideButtons = glideRow.getWidth() >= buttonsWidth + 8 + allWidth;
+    auto allArea = (besideButtons ? glideRow : timeRow).removeFromRight (allWidth);
+    (besideButtons ? glideRow : timeRow).removeFromRight (8);
+    glideAllSwitch.setBounds (allArea.removeFromLeft (36).withSizeKeepingCentre (36, 22));
+    allArea.removeFromLeft (6);
+    glideAllArea = allArea;
+    glideMode.setBounds (glideRow.removeFromLeft (juce::jmin (156, glideRow.getWidth())));
     glideValueArea = timeRow.removeFromRight (64);
     timeRow.removeFromRight (8);
     glideTimeSlider.setBounds (timeRow);
@@ -450,6 +489,11 @@ void OscillatorPanel::paint (juce::Graphics& g)
     g.setColour (colours::dimText);
     g.drawText ("TUNE", captionArea, juce::Justification::centredLeft);
     g.drawText ("GLIDE", glideCaptionArea, juce::Justification::centredLeft);
+    g.setFont (fonts::body (13.0f).boldened());
+    g.setColour (glideAllSwitch.getToggleState() ? colours::text : colours::dimText);
+    g.drawText ("All", glideAllArea, juce::Justification::centredLeft);
+    g.setFont (fonts::caption());
+    g.setColour (colours::dimText);
 
     g.setFont (fonts::body (13.0f));
     g.setColour (colours::text);

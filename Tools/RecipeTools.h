@@ -137,8 +137,11 @@ namespace recipe
 
     enum class Glide { off, always, legato };
 
+    /** Glides some oscillators, each as it's set, rather than every oscillator alike. */
     inline void setGlide (SynthProcessor& synth, std::initializer_list<int> oscillators, Glide glide, float seconds)
     {
+        setParameter (synth, SynthProcessor::glideAllId, 0.0f);
+
         for (const auto oscillator : oscillators)
         {
             setParameter (synth, SynthProcessor::glideId (oscillator), (float) glide);

@@ -128,13 +128,19 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   right out, a full range spans the whole four octaves; zoomed right in, to a semitone either side, an LFO at
   100% swings the tune a semitone either side of where it's set, so a range of 10% is a gentle vibrato of a
   tenth of a semitone. Zooming in or out while a sound plays rescales its modulation to match.
-- **Glide** into each note with the **Glide** row under the tune slider, separately for each oscillator.
+- **Glide** into each note with the **Glide** row under the tune slider, for every oscillator at once or
+  separately for each.
   **Off** plays each note at its pitch straight away. **Glide** slides the oscillator into every note from
   the pitch of the note played before, even one already let go. **Legato** slides only into a note played
   while another key's still held, so playing smoothly glides and playing detached doesn't. A note played
   mid-glide slides on from wherever the glide had got to. The slider beside the buttons sets how long the
-  slide takes, from 5 ms to 5 seconds; double-click it for 200 ms. Since each oscillator has its own, one
-  can glide while another jumps straight to the note, or two can glide at different speeds.
+  slide takes, from 5 ms to 5 seconds; double-click it for 200 ms. The **All** switch, at the end of the
+  glide's row, or of its time's in a narrow window, is on to begin with: every oscillator then glides alike,
+  and the glide's buttons and slider set it for them all, whichever oscillator's shown. Switch it off to
+  give each oscillator its own glide, so one can glide while another jumps straight to the note, or two can
+  glide at different speeds; each keeps its own glide while All is on, ready for when it's switched off. A
+  sound saved before there was an All switch has it on if every oscillator that's on glides the same way,
+  and otherwise off, so it glides as it did.
 - **Noise.** The **Noise** switch at the top of the grid, left of the preset waves, makes the oscillator play
   white noise instead of its harmonics: every frequency at once, a new random value from −1 to 1 every
   sample. The preset waves and the drawing controls go, and so do the harmonics, the unison, the tune and the

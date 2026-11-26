@@ -174,7 +174,9 @@ oscillator's tune.
   semitones either side its slider reaches, from 24 at 0 down to 1 at 1, as 24 × (1/24)^zoom. An LFO with a range
   of R swings the tune R × reach semitones either way, so at a zoom of 1 an LFO range of 0.1 is a vibrato of 10
   cents either way. An envelope with a range of R raises it by up to 2 × R × reach semitones.
-- `oscNGlide` and `oscNGlideTime` slide into each note from the one before; they don't matter for a single note.
+- `glide` ("Off", "Glide" or "Legato") and `glideTime` slide every oscillator into each note from the one before,
+  while `glideAll` is true, as it is to begin with; with it false, each oscillator glides as its own `oscNGlide`
+  and `oscNGlideTime` are set (giving any of those sets it false). They don't matter for a single note.
 - `oscNNoise`, true or false, makes the oscillator play white noise, evenly from -1 to 1 at its level, instead of
   its harmonics; its wave, harmonics, tune and glide then don't matter. Use it for breath, bow and hammer noise,
   wind, cymbals and the attack of drums, shaped with the filters (a mid pass for a band of noise) and with an

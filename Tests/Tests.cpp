@@ -3356,11 +3356,12 @@ namespace
 
         const auto hertz = [] (double note) { return 440.0 * std::pow (2.0, (note - 69.0) / 12.0); };
 
-        // An oscillator set to glide, a sine, over 0.2 seconds. An A3, then, after it's let go, an A4.
+        // An oscillator set to glide on its own, a sine, over 0.2 seconds. An A3, then, after it's let go, an A4.
         const auto gliding = [] (int mode, float seconds = 0.2f)
         {
             auto synth = std::make_unique<SynthProcessor>();
             setPreset (*synth, 0, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::glideAllId, 0.0f);
             setParameter (*synth, SynthProcessor::glideId (0), (float) mode);
             setParameter (*synth, SynthProcessor::glideTimeId (0), seconds);
             return synth;
@@ -3432,6 +3433,84 @@ namespace
             check (amplitudeAt (early, 880.0) > 0.5 * amplitudeAt (slice (played, 1.0, 1.1), 880.0)
                      && amplitudeAt (early, 440.0) < 0.2 * amplitudeAt (slice (played, 1.0, 1.1), 440.0),
                    "one oscillator can glide while another plays the note straight away");
+
+            // With All on, every oscillator glides alike, as the glide shared by them all is set, whatever its own:
+            // here the first's own glides and the second's doesn't, an octave up.
+            const auto pair = [] (float sharedGlide)
+            {
+                auto both = std::make_unique<SynthProcessor>();
+                setPreset (*both, 0, waveform::Preset::sine);
+                setPreset (*both, 1, waveform::Preset::sine);
+                setParameter (*both, SynthProcessor::onId (1), 1.0f);
+                setParameter (*both, SynthProcessor::tuneId (1), 12.0f);
+                setParameter (*both, SynthProcessor::glideId (0), 1.0f);
+                setParameter (*both, SynthProcessor::sharedGlideId, sharedGlide);
+                return both;
+            };
+
+            const auto alike = playEvents (*pair (1.0f), apart, 1.2);
+            const auto alikeEarly = slice (alike, 0.62, 0.66);
+            check (amplitudeAt (alikeEarly, 880.0) < 0.2 * amplitudeAt (slice (alike, 1.0, 1.1), 880.0)
+                     && amplitudeAt (alikeEarly, 440.0) < 0.5 * amplitudeAt (slice (alike, 1.0, 1.1), 440.0),
+                   "with All on, every oscillator glides alike, as the shared glide's set");
+
+            const auto none = playEvents (*pair (0.0f), apart, 1.2);
+            const auto noneEarly = slice (none, 0.62, 0.66);
+            check (amplitudeAt (noneEarly, 880.0) > 0.5 * amplitudeAt (slice (none, 1.0, 1.1), 880.0)
+                     && amplitudeAt (noneEarly, 440.0) > 0.5 * amplitudeAt (slice (none, 1.0, 1.1), 440.0),
+                   "...even if that's not at all, whatever each's own");
+        }
+
+        {
+            SynthProcessor fresh;
+            check (fresh.parameters.getRawParameterValue (SynthProcessor::glideAllId)->load() >= 0.5f
+                     && juce::roundToInt (fresh.parameters.getRawParameterValue (SynthProcessor::sharedGlideId)->load()) == 0,
+                   "to begin with, every oscillator glides alike, which is not at all");
+        }
+
+        // A save from before every oscillator could glide alike does if every oscillator that's on glides the same
+        // way, and otherwise each glides as its own is set.
+        {
+            const auto loadOlder = [] (const std::function<void (SynthProcessor&)>& set)
+            {
+                SynthProcessor older;
+                set (older);
+                auto state = older.parameters.copyState();
+
+                for (const auto* id : { SynthProcessor::glideAllId, SynthProcessor::sharedGlideId, SynthProcessor::sharedGlideTimeId })
+                    state.removeChild (state.getChildWithProperty ("id", id), nullptr);
+
+                const auto file = juce::File::createTempFile (".ezsynth");
+                state.createXml()->writeTo (file);
+                auto loaded = std::make_unique<SynthProcessor>();
+                loaded->loadPreset (file);
+                file.deleteFile();
+                return loaded;
+            };
+
+            const auto value = [] (SynthProcessor& synth, const juce::String& id) { return synth.parameters.getRawParameterValue (id)->load(); };
+
+            const auto same = loadOlder ([] (SynthProcessor& synth)
+            {
+                setParameter (synth, SynthProcessor::onId (1), 1.0f);
+
+                for (int i : { 0, 1, 4 })
+                {
+                    setParameter (synth, SynthProcessor::glideId (i), 2.0f);
+                    setParameter (synth, SynthProcessor::glideTimeId (i), 0.06f);
+                }
+            });
+            check (value (*same, SynthProcessor::glideAllId) >= 0.5f && juce::roundToInt (value (*same, SynthProcessor::sharedGlideId)) == 2
+                     && isNear (value (*same, SynthProcessor::sharedGlideTimeId), 0.06, 0.01),
+                   "a save from before, every oscillator that's on gliding the same way, glides them all alike that way");
+
+            const auto different = loadOlder ([] (SynthProcessor& synth)
+            {
+                setParameter (synth, SynthProcessor::onId (1), 1.0f);
+                setParameter (synth, SynthProcessor::glideId (0), 2.0f);
+            });
+            check (value (*different, SynthProcessor::glideAllId) < 0.5f && juce::roundToInt (value (*different, SynthProcessor::glideId (0))) == 2,
+                   "...and one where they glide differently glides each as its own is set");
         }
 
         {
@@ -3440,9 +3519,17 @@ namespace
             OscillatorPanel oscillatorPanel;
             oscillatorPanel.setBounds (0, 0, 348, OscillatorPanel::preferredHeight);
             oscillatorPanel.setOscillator (shown.parameters, 2);
-            check (oscillatorPanel.getGlideMode() == 0, "the tune slider shows the oscillator's glide");
+            check (oscillatorPanel.getGlideMode() == 0 && oscillatorPanel.getGlideAllSwitch().getToggleState(),
+                   "the panel shows the glide every oscillator shares, with All on");
+            setParameter (shown, SynthProcessor::sharedGlideId, 1.0f);
+            check (oscillatorPanel.getGlideMode() == 1, "...and follows it as it's set from elsewhere");
             setParameter (shown, SynthProcessor::glideId (2), 2.0f);
-            check (oscillatorPanel.getGlideMode() == 2, "...and follows it as it's set from elsewhere");
+            oscillatorPanel.getGlideAllSwitch().setToggleState (false, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::glideAllId)->load() < 0.5f && oscillatorPanel.getGlideMode() == 2,
+                   "with All switched off, it shows and sets the oscillator's own glide");
+            setParameter (shown, SynthProcessor::glideAllId, 1.0f);
+            check (oscillatorPanel.getGlideMode() == 1 && juce::roundToInt (shown.parameters.getRawParameterValue (SynthProcessor::glideId (2))->load()) == 2,
+                   "...and switched back on, the shared glide again, keeping the oscillator's own as it was");
 
             // The number of harmonics is set with a slider from 1 to 16, which follows the oscillator it's switched to.
             HarmonicSelector selector (*shown.parameters.getParameter (SynthProcessor::harmonicsId (0)));
@@ -7002,8 +7089,8 @@ namespace
 
             setParameter (tuned, SynthProcessor::tuneId (0), 7.0f);
             oscillatorPanel.setZoom (0.5f);
-            setParameter (tuned, SynthProcessor::glideId (0), 2.0f);
-            setParameter (tuned, SynthProcessor::glideTimeId (0), 0.35f);
+            setParameter (tuned, SynthProcessor::sharedGlideId, 2.0f);
+            setParameter (tuned, SynthProcessor::sharedGlideTimeId, 0.35f);
             modulatable::setLivePosition (*oscillatorPanel.getChildComponent (0), std::nullopt);
             saveOscillatorPanel ("13b-tune-zoomed-partway-legato");
             oscillatorPanel.setLookAndFeel (nullptr);

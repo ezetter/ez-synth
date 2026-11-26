@@ -53,6 +53,14 @@ public:
     */
     static juce::String glideId (int oscillator);
     static juce::String glideTimeId (int oscillator);
+
+    /** The IDs of whether every oscillator glides alike, which they do to begin with, and of how they glide then:
+        Off, Glide or Legato, and how long the glide takes. With it off, each glides as its own glide is set; those
+        are kept as they are while it's on.
+    */
+    static constexpr auto glideAllId = "glideAll";
+    static constexpr auto sharedGlideId = "glide";
+    static constexpr auto sharedGlideTimeId = "glideTime";
     static juce::StringArray getGlideNames();
     static juce::NormalisableRange<float> glideTimeRange();
 
@@ -893,6 +901,9 @@ private:
         std::array<LfoParameters, numLfos> lfos;
         std::array<EnvelopeParameters, numEnvelopes> envelopes;
         std::atomic<float>* volume = nullptr;
+        std::atomic<float>* glideAll = nullptr;
+        std::atomic<float>* glide = nullptr;
+        std::atomic<float>* glideTime = nullptr;
     };
 
     ParameterSet makeParameterSet (const std::function<std::atomic<float>* (const juce::String&)>&);

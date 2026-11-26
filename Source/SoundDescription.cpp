@@ -369,6 +369,17 @@ namespace sound
 
             if (parameters.isObject())
             {
+                // A sound that glides its oscillators each as it's set, without saying whether they glide alike,
+                // glides them each as it's set.
+                auto ownGlide = false;
+
+                for (const auto& property : parameters.getDynamicObject()->getProperties())
+                    ownGlide = ownGlide || property.name.toString().matchesWildcard ("osc*Glide*", true);
+
+                if (ownGlide && ! parameters.getDynamicObject()->hasProperty (SynthProcessor::glideAllId))
+                    if (auto* all = findParameter (synth, SynthProcessor::glideAllId))
+                        all->setValueNotifyingHost (0.0f);
+
                 for (const auto& property : parameters.getDynamicObject()->getProperties())
                 {
                     if (auto* parameter = findParameter (synth, property.name.toString()))

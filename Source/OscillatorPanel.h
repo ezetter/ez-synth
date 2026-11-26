@@ -26,7 +26,8 @@
     across as much of the scale as is shown.
 
     Its glide: Off, Glide, to slide into every note from the pitch of the one before, or Legato, to slide only into
-    notes played while another key's still held, and how long the slide takes.
+    notes played while another key's still held, and how long the slide takes. Beside it, All, on to begin with,
+    glides every oscillator alike, so the glide shown and set is theirs; off, it's this oscillator's own.
 
     At the foot, its routing: an Edit button for the screen setting where its sound goes, which filters and effects
     it's sent through, with which those are beside it.
@@ -55,6 +56,9 @@ public:
     std::function<void()> onShowFilterRouting;
     bool isPanOnly() const noexcept   { return panOnly; }
 
+    /** The switch gliding every oscillator alike. */
+    juce::ToggleButton& getGlideAllSwitch() noexcept   { return glideAllSwitch; }
+
     /** Which glide button is chosen: 0 for Off, 1 for Glide, 2 for Legato. */
     int getGlideMode() const noexcept;
 
@@ -74,6 +78,9 @@ private:
 
     void showUnison();
 
+    /** Shows and sets every oscillator's glide, or this one's own, as All is switched. */
+    void attachGlide();
+
     ModulatableSlider slider, panSlider, voicesSlider, detuneSlider, spreadSlider;
     juce::Slider zoomSlider;
     std::unique_ptr<juce::ParameterAttachment> attachment;
@@ -84,6 +91,11 @@ private:
     std::array<std::unique_ptr<juce::ParameterAttachment>, Patch::numEffects> effectSendAttachments;
     std::array<bool, Patch::numEffects> effectSends {};
     juce::Slider glideTimeSlider;
+    juce::ToggleButton glideAllSwitch;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> glideAllAttachment;
+    juce::AudioProcessorValueTreeState* shownParameters = nullptr;
+    int shownOscillator = 0;
+    bool glideAllShown = false;
 
     // After the sliders, so they're let go of before the sliders go.
     std::unique_ptr<juce::SliderParameterAttachment> panAttachment, voicesAttachment, detuneAttachment, spreadAttachment,
@@ -94,7 +106,7 @@ private:
     bool dragging = false;
     bool panOnly = false;
     juce::Rectangle<int> routingCaptionArea, routingValueArea, panCaptionArea, unisonCaptionArea, voicesCaptionArea,
-                         detuneCaptionArea, spreadCaptionArea, captionArea, zoomCaptionArea, tickArea, glideCaptionArea, glideValueArea;
+                         detuneCaptionArea, spreadCaptionArea, captionArea, zoomCaptionArea, tickArea, glideCaptionArea, glideValueArea, glideAllArea;
     std::vector<juce::Rectangle<int>> dividers;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OscillatorPanel)
