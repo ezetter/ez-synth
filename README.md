@@ -64,35 +64,44 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
 - **Route an oscillator through the filters and effects** you choose: click **Edit**, on the **Routing** row at the
   foot of the oscillator's panel, left of the grid, below the glide. A screen opens over the synth, with buttons along the top
   to choose the oscillator, a switch for each filter, beside its type and cutoff, and under them a switch for
-  the reverb, beside its settings. The filters run in a
+  each effect, the delay and the reverb, beside its settings. The filters run in a
   chain, from the first to the last, and every oscillator is sent through every one to begin with; switch a
   filter off and the oscillator skips it, going straight on to the next, while the others are still filtered
-  as they were. After the filters, an oscillator sent through the reverb plays out through it; every one is
-  to begin with, but the reverb starts with none of it mixed in, so it's off until its **Mix** is turned up. The path the oscillator's sound takes, such as *Osc 2 → Filter 1 → Filter 3 → Reverb → Out*, is
-  spelled out above the switches, and the Routing row says which filters it's sent through, and the reverb,
-  if it is. Each pitch set can route its oscillators differently. The reverb's **Settings** button opens the
-  effects' screen. **Done**, or Escape, goes back to the synth.
+  as they were. After the filters, the effects carry on the chain, the delay then the reverb, so the delay's
+  repeats ring on in the reverb; every oscillator is sent through both to begin with, but each starts with
+  none of it mixed in, so it's off until its **Mix** is turned up. The path the oscillator's sound takes, such
+  as *Osc 2 → Filter 1 → Filter 3 → Delay → Reverb → Out*, is spelled out above the switches, and the Routing
+  row says which filters and effects it's sent through. Each pitch set can route its oscillators differently.
+  An effect's **Settings** button opens the effects' screen. **Done**, or Escape, goes back to the synth.
 
-![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the reverb's switch under them](docs/images/routing.png)
+![The routing screen for oscillator 2, sent through filters 1 and 3 and skipping 2 and 4, with the chain it takes spelled out above a switch for each filter, and the delay's and reverb's switches under them](docs/images/routing.png)
 
-- **Add reverb**: click **Effects** in the header. A screen opens over the synth with the reverb's four dials:
+- **Add delay and reverb**: click **Effects** in the header. A screen opens over the synth with each effect
+  in the order they run, and under each a switch for each oscillator, sending it through, the same switches
+  as on the routing screen. Every oscillator, in every pitch set, is sent through both to begin with, and
+  each effect's mix starts at 0%, all dry, so it's off until you turn its mix up; with none of it mixed in it
+  doesn't run at all. Each effect is one for the whole synth, set the same for every pitch set, though each
+  pitch set chooses which of its oscillators go through it. They're saved with presets, and a preset from
+  before there were effects sends every oscillator through them with none mixed in, so it plays dry.
+  Double-click a dial to set it back to where it starts. Their dials can't be moved by LFOs or envelopes, as
+  they belong to every note at once. Moving them while sound rings through glides them, so nothing clicks.
+- **The delay** repeats what's sent through it. **Milliseconds** or **Synced** chooses how its **Time** is
+  set: from 1 ms to 2 seconds, or a note at the tempo, the host's or 120 BPM in the standalone app, from a
+  1/32 to 2 bars, plain, triplet (T) or dotted (D), such as 1/8D. **Feedback**, from 0 to 100%, is how much of
+  each repeat comes back again: at 0% the sound comes back once, at 50% each repeat is half as loud as the
+  one before, and at 100% it repeats for ever. Repeats that build up at a high feedback are rounded off
+  rather than growing without end. **Mix** is how much of what comes out is the repeats, the rest the dry
+  sound. Changing the time while it repeats bends the repeats' pitch a little as it glides, as a tape
+  delay's does.
+- **The reverb** has four dials:
   **Pre-delay**, the time before the first reflection, from 0 to 1000 ms, the first 200 ms taking half the dial; **Size**, the room, from 1, a small
   box, to 100, a large hall, which spaces the reflections and the echoes its tail is made of; **Decay**, how
   long the tail takes to fall 60 dB, from 0.1 to 20 seconds, its highs fading twice as fast, as in a real
-  room; and **Mix**, how much of what comes out is the reverb, the rest being the dry sound. Under them is a
-  switch for each oscillator, sending it through the reverb, the same switches as on the routing screen. Every
-  oscillator, in every pitch set, is sent through it to begin with, and the mix starts at 0%, all dry, so the
-  reverb is off until you turn the mix up; with none of it mixed in it doesn't run at all. An oscillator sent
-  through it rings on after its note ends; one that isn't plays straight out, dry. Held, a
-  sound at full mix is about as loud as it is dry, in any room. Moving the dials while it rings glides them,
-  so nothing clicks; changing the size bends the tail's pitch a little as it glides. The reverb is one for the
-  whole synth, set the same for every pitch set, though each pitch set chooses which of its oscillators go
-  through it. It's saved with presets, and a preset from before there was a reverb sends every oscillator
-  through it with none mixed in, so it plays dry.
-  Double-click a dial to set it back to where it starts. Its dials can't be moved by LFOs or envelopes, as
-  they belong to every note at once.
+  room; and **Mix**, how much of what comes out is the reverb, the rest being the dry sound. An oscillator
+  sent through it rings on after its note ends. Held, a sound at full mix is about as loud as it is dry, in
+  any room. Changing the size bends the tail's pitch a little as it glides.
 
-![The effects screen: the reverb's pre-delay, size, decay and mix dials, turned up to 30%, with every oscillator but the third switched to be sent through it](docs/images/effects.png)
+![The effects screen: the delay synced to dotted eighths, 25% mixed in, every oscillator but the first sent through it, and under it the reverb's pre-delay, size, decay and mix dials, 30% mixed in, every oscillator but the third sent through it](docs/images/effects.png)
 
 - **Zoom in on the tune** with the **Zoom** slider just above it, to set small tunings. Drag it right to
   zoom in, from two octaves either side down to a semitone either side, and left to zoom out; double-click it
@@ -836,9 +845,18 @@ save pictures of the window showing several waves.
   do to begin with, so routing costs nothing until an oscillator's routed differently. Each lane has its own
   memories in each filter, its integrators, left and right, so filtering one lane doesn't disturb another.
   A send that's switched fades over 20 ms, so switching it mid-note doesn't click; an oscillator that moves
-  to a lane of its own carries on from the memories of the lane it left. Each lane, filtered, then goes
-  straight out or to the reverb, fading over 20 ms when it's switched: each voice plays into four channels,
-  a pair straight out and a pair for the reverb, which are added up after the reverb has played its pair.
+  to a lane of its own carries on from the memories of the lane it left. Each lane, filtered, then goes the
+  way through the effects it's sent, fading over 20 ms when that's switched: each voice plays into eight
+  channels, a pair for each set of effects, numbered by their bits, from the pair straight out to the pair
+  through both. After the voices, the pair sent only through the delay plays through it and out; the pair
+  sent through both plays through a second delay, set alike, and joins the pair sent only through the reverb,
+  which then plays through the reverb; then every pair's added up. A delay or reverb with none of it mixed in
+  is skipped.
+- **Delay** (`Source/Delay.cpp`). A stereo line up to 8 seconds long, read between samples so its time can
+  glide, about 50 ms to settle. What's written back is what went in plus the feedback's share of what comes
+  out, saturated, left as it is up to full scale and rounded off above it, short of twice that, so at 100%
+  repeats stay as loud for ever, and a build-up stays bounded. A synced time is the note's beats at the
+  tempo, held to 8 seconds. Once its repeats have fallen 60 dB, with nothing more sent in, it rests.
 - **Reverb** (`Source/Reverb.cpp`). The pair sent to it waits for the pre-delay, then six early reflections
   each side, at times spaced by the room's size, come back off the walls, some turned over. Meanwhile it goes
   through two allpass diffusers each side into a feedback delay network: eight delay lines from 30 to 73 ms
@@ -901,7 +919,8 @@ save pictures of the window showing several waves.
 | `Source/Tuning.*` | Semitones, the intervals they make, snapping to them, and the part of the scale zoomed in on |
 | `Source/OscillatorPanel.*` | The oscillator's panel left of the grid: its pan, its unison's voices, detune and spread, its tune slider, with its intervals marked, and the zoom slider above it, then its glide and routing rows |
 | `Source/RoutingScreen.*` | The routing screen, setting which filters and effects each oscillator's sent through |
-| `Source/EffectsScreen.*` | The effects' screen: the reverb's dials, and which oscillators are sent through it |
+| `Source/EffectsScreen.*` | The effects' screen: the delay's and reverb's dials, and which oscillators are sent through each |
+| `Source/Delay.*` | The delay: its line, feedback and synced note lengths |
 | `Source/Reverb.*` | The reverb: its pre-delay, early reflections and feedback delay network |
 | `Source/Modulation.*` | The controls LFOs can move, and how an LFO moves one |
 | `Source/Patch.h` | Everything the notes need to play a block, for each pitch set |

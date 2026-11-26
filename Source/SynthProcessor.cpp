@@ -222,7 +222,38 @@ namespace
                     juce::AudioParameterFloatAttributes()
                         .withStringFromValueFunction ([] (float spread, int) { return SynthProcessor::unisonSpreadToText (spread); })),
                 std::make_unique<juce::AudioParameterBool> (
+                    juce::ParameterID { SynthProcessor::effectSendId (i, Patch::delayEffect), 1 }, name + " to Delay", true),
+                std::make_unique<juce::AudioParameterBool> (
                     juce::ParameterID { SynthProcessor::effectSendId (i, Patch::reverbEffect), 1 }, name + " to Reverb", true)));
+        }
+
+        // The delay, which every oscillator's sent through to begin with: repeating every 375 ms, a dotted eighth at
+        // 120 BPM, or a quarter note synced, each repeat at 35% of the one before, but none of it mixed in, so it's
+        // off until the mix is turned up.
+        {
+            juce::NormalisableRange<float> timeRange (Delay::shortestTime, Delay::longestSetTime);
+            timeRange.setSkewForCentre (400.0f);
+
+            layout.add (std::make_unique<juce::AudioProcessorParameterGroup> (
+                "delay", "Delay", " ",
+                std::make_unique<juce::AudioParameterBool> (juce::ParameterID { SynthProcessor::delaySyncId, 1 }, "Delay Sync", false),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::delayTimeId, 1 }, "Delay Time", timeRange, 375.0f,
+                    juce::AudioParameterFloatAttributes()
+                        .withStringFromValueFunction ([] (float milliseconds, int) { return formatTime (milliseconds / 1000.0f); })
+                        .withValueFromStringFunction ([] (const juce::String& text)
+                        {
+                            const auto number = text.retainCharacters ("0123456789.").getFloatValue();
+                            return text.containsIgnoreCase ("ms") || ! text.containsIgnoreCase ("s") ? number : number * 1000.0f;
+                        })),
+                std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { SynthProcessor::delayDivisionId, 1 }, "Delay Note",
+                                                              Delay::getDivisionNames(), Delay::quarterDivision),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::delayFeedbackId, 1 }, "Delay Feedback",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.35f, asPercentage()),
+                std::make_unique<juce::AudioParameterFloat> (
+                    juce::ParameterID { SynthProcessor::delayMixId, 1 }, "Delay Mix",
+                    juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f, asPercentage())));
         }
 
         // The reverb, which every oscillator's sent through to begin with: a medium room, ringing for two seconds,
@@ -415,12 +446,14 @@ juce::String SynthProcessor::filterSendId (int oscillator, int filter)
 
 juce::String SynthProcessor::effectSendId (int oscillator, int effect)
 {
-    static_assert (Patch::numEffects == 1, "Each effect needs its name");
-    juce::ignoreUnused (effect);
-    return "osc" + juce::String (oscillator + 1) + "To" + getEffectName (Patch::reverbEffect);
+    return "osc" + juce::String (oscillator + 1) + "To" + getEffectName (effect);
 }
 
-juce::String SynthProcessor::getEffectName (int)   { return "Reverb"; }
+juce::String SynthProcessor::getEffectName (int effect)
+{
+    static_assert (Patch::numEffects == 2, "Each effect needs its name");
+    return effect == Patch::delayEffect ? "Delay" : "Reverb";
+}
 
 juce::String SynthProcessor::panId (int oscillator)         { return modulation::getKey (modulation::oscillatorPanTarget (oscillator)); }
 
@@ -509,6 +542,11 @@ SynthProcessor::SynthProcessor()
     reverbSize = parameters.getRawParameterValue (reverbSizeId);
     reverbDecay = parameters.getRawParameterValue (reverbDecayId);
     reverbMix = parameters.getRawParameterValue (reverbMixId);
+    delaySync = parameters.getRawParameterValue (delaySyncId);
+    delayTime = parameters.getRawParameterValue (delayTimeId);
+    delayDivision = parameters.getRawParameterValue (delayDivisionId);
+    delayFeedback = parameters.getRawParameterValue (delayFeedbackId);
+    delayMix = parameters.getRawParameterValue (delayMixId);
 
     // Each pitch set's slot keeps its own copy of every parameter, starting as the host's do.
     for (auto* parameter : getParameters())
@@ -600,7 +638,7 @@ SynthProcessor::ParameterSet SynthProcessor::makeParameterSet (const std::functi
                                         { find (filterSendId (i, 0)), find (filterSendId (i, 1)), find (filterSendId (i, 2)),
                                           find (filterSendId (i, 3)) },
                                         find (unisonVoicesId (i)), find (unisonDetuneId (i)), find (unisonSpreadId (i)),
-                                        { find (effectSendId (i, Patch::reverbEffect)) } };
+                                        { find (effectSendId (i, Patch::delayEffect)), find (effectSendId (i, Patch::reverbEffect)) } };
 
     for (int filter = 0; filter < modulation::numFilters; ++filter)
     {
@@ -653,6 +691,8 @@ void SynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     synth.setCurrentPlaybackSampleRate (sampleRate);
     routedBuffer.setSize (HarmonicVoice::routedChannels, std::max (1, samplesPerBlock));
     reverb.prepare (sampleRate);
+    delayOut.prepare (sampleRate);
+    delayToReverb.prepare (sampleRate);
 
     // The looping LFOs carry on where they were: a host may prepare again whenever its transport starts or loops,
     // and they're never sent back to the start of their cycles.
@@ -785,16 +825,29 @@ void SynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiB
             periodsSinceLastNote[i] += numSamples / patch.getLfoPeriodSamples (i);
     }
 
-    // The voices play what's sent through each effect on its own pair of channels, which plays through the effect
-    // before everything's added up.
+    // The voices play the sound going each way through the effects on its own pair of channels, numbered by the
+    // effects' bits. Each plays through its effects in the chain's order, the delay then the reverb, before
+    // everything's added up. What's sent through both is delayed, then joins what's sent only through the reverb.
     if (buffer.getNumChannels() > 0)
     {
         routedBuffer.setSize (HarmonicVoice::routedChannels, numSamples, false, false, true);
         routedBuffer.clear();
         synth.renderNextBlock (routedBuffer, midi, 0, numSamples);
 
-        constexpr auto reverbPair = 2 * (1 + Patch::reverbEffect);
-        reverb.process (routedBuffer.getWritePointer (reverbPair), routedBuffer.getWritePointer (reverbPair + 1), numSamples,
+        static_assert (Patch::numEffects == 2, "Each way through the effects is played");
+        constexpr auto delayed = 2 * (1 << Patch::delayEffect);
+        constexpr auto reverberated = 2 * (1 << Patch::reverbEffect);
+        constexpr auto both = 2 * ((1 << Patch::delayEffect) | (1 << Patch::reverbEffect));
+        const Delay::Settings delaySettings { getDelayTime(), delayFeedback->load(), delayMix->load() };
+
+        delayOut.process (routedBuffer.getWritePointer (delayed), routedBuffer.getWritePointer (delayed + 1), numSamples, delaySettings);
+        delayToReverb.process (routedBuffer.getWritePointer (both), routedBuffer.getWritePointer (both + 1), numSamples, delaySettings);
+        routedBuffer.addFrom (reverberated, 0, routedBuffer, both, 0, numSamples);
+        routedBuffer.addFrom (reverberated + 1, 0, routedBuffer, both + 1, 0, numSamples);
+        routedBuffer.clear (both, 0, numSamples);
+        routedBuffer.clear (both + 1, 0, numSamples);
+
+        reverb.process (routedBuffer.getWritePointer (reverberated), routedBuffer.getWritePointer (reverberated + 1), numSamples,
                         { reverbDelay->load(), reverbSize->load(), reverbDecay->load(), reverbMix->load() });
 
         for (int pair = 0; pair < HarmonicVoice::routedChannels / 2; ++pair)
@@ -2638,16 +2691,25 @@ void SynthProcessor::activate (int index)
     activePitchSet = index;
     activeSlot = pitchSets[(size_t) index].slot;
     auto sound = pitchSets[(size_t) index].sound.createCopy();
-    keepReverbIn (sound);
+    keepEffectsIn (sound);
     loadSoundState (sound);
     pitchSets[(size_t) index].sound = {};
     presetEdited = edited;
     ++pitchSetVersion;
 }
 
-void SynthProcessor::keepReverbIn (juce::ValueTree& sound) const
+float SynthProcessor::getDelayTime() const
 {
-    for (const auto& id : getReverbIds())
+    if (delaySync->load() < 0.5f)
+        return delayTime->load();
+
+    const auto tempo = playingTempo > 0.0 ? playingTempo : modulation::defaultTempo;
+    return (float) (Delay::getDivisionBeats (juce::roundToInt (delayDivision->load())) * 60000.0 / tempo);
+}
+
+void SynthProcessor::keepEffectsIn (juce::ValueTree& sound) const
+{
+    for (const auto& id : getEffectSettingIds())
     {
         auto parameter = sound.getChildWithProperty ("id", id);
 

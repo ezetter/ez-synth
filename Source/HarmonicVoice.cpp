@@ -428,23 +428,20 @@ void HarmonicVoice::renderChunk (juce::AudioBuffer<float>& output, int startSamp
         }
     }
 
-    // Where each oscillator's sound goes: straight out, unless it's sent through an effect and the output has
-    // channels for the effects.
+    // Where each oscillator's sound goes: through the set of effects it's sent through, the pair numbered by their
+    // bits, or straight out, the first, if it's sent through none or the output hasn't channels for the effects.
     const auto routed = output.getNumChannels() >= routedChannels;
     std::array<std::array<float, numRoutes>, modulation::numOscillators> routeTargets {};
 
     for (size_t i = 0; i < routeTargets.size(); ++i)
     {
-        auto anyEffect = false;
+        size_t route = 0;
 
         for (size_t effect = 0; effect < (size_t) Patch::numEffects; ++effect)
-        {
-            const auto sent = routed && targets.effectSends[i][effect];
-            routeTargets[i][effect + 1] = sent ? 1.0f : 0.0f;
-            anyEffect = anyEffect || sent;
-        }
+            if (routed && targets.effectSends[i][effect])
+                route |= (size_t) 1 << effect;
 
-        routeTargets[i][0] = anyEffect ? 0.0f : 1.0f;
+        routeTargets[i][route] = 1.0f;
     }
 
     if (startingNote)

@@ -410,14 +410,21 @@ void OscillatorPanel::paint (juce::Graphics& g)
     const auto shortFilters = sentTo.size() == (int) sends.size() ? juce::String ("All")
                             : sentTo.isEmpty()                  ? juce::String ("None")
                             : "F" + sentTo.joinIntoString (",");
-    juce::String effects;
+    juce::String effects, effectInitials;
 
     for (size_t effect = 0; effect < effectSends.size(); ++effect)
+    {
         if (effectSends[effect])
-            effects += juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + SynthProcessor::getEffectName ((int) effect);
+        {
+            const auto name = SynthProcessor::getEffectName ((int) effect);
+            effects += juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + name;
+            effectInitials += juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + name.substring (0, 3);
+        }
+    }
 
     g.setFont (fonts::body (12.0f));
-    fonts::drawFirstThatFits (g, { filters + effects, shortFilters + effects }, routingValueArea, juce::Justification::centredRight);
+    fonts::drawFirstThatFits (g, { filters + effects, shortFilters + effects, shortFilters + effectInitials },
+                              routingValueArea, juce::Justification::centredRight);
 
     if (panOnly)
         return;

@@ -6,10 +6,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 /** A screen of its own, over the window but for the keyboard, setting where an oscillator's sound goes: which
-    filters it's sent through, a switch for each, all on to begin with, and then which effects, for now the reverb,
-    off to begin with. The filters run in a chain, from the first to the last, and an oscillator that isn't sent
-    through one skips it, going straight on to the next. After them, one sent through the reverb plays out through
-    it, and one that isn't plays straight out. Buttons along the top choose the oscillator. Done, or Escape, goes
+    filters it's sent through, a switch for each, all on to begin with, and then which effects, the delay and the
+    reverb, on to begin with too. The filters run in a chain, from the first to the last, and then the effects, the
+    delay then the reverb; an oscillator that isn't sent through one skips it, going straight on to the next. Buttons along the top choose the oscillator. Done, or Escape, goes
     back to the synth.
 */
 class RoutingScreen final : public juce::Component
@@ -53,6 +52,9 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
         juce::Rectangle<int> area;
         juce::String shownSettings;
+
+        /** An effect's, which opens the effects' screen. */
+        std::unique_ptr<juce::TextButton> settingsButton;
     };
 
     juce::String describeFilter (int filter) const;
@@ -64,7 +66,6 @@ private:
     ChoiceButtons oscillatorButtons;
     std::array<Row, modulation::numFilters> rows;
     std::array<Row, Patch::numEffects> effectRows;
-    juce::TextButton effectSettingsButton { "Settings" };
     int oscillator = 0;
     juce::Rectangle<int> panelArea, titleArea, subtitleArea, oscillatorCaptionArea, filtersCaptionArea, effectsCaptionArea, chainArea;
 

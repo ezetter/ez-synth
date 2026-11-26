@@ -3824,6 +3824,97 @@ namespace
         }
     }
 
+    void testDelay()
+    {
+        std::cout << "Delay" << std::endl;
+
+        // A sine sent only through the delay, its repeats half of what goes out, a short note that's gone in 0.35 s.
+        const auto delayed = [] (float milliseconds, float feedback)
+        {
+            auto synth = std::make_unique<SynthProcessor>();
+            setPreset (*synth, 0, waveform::Preset::sine);
+            setParameter (*synth, SynthProcessor::effectSendId (0, Patch::reverbEffect), 0.0f);
+            setParameter (*synth, SynthProcessor::delayTimeId, milliseconds);
+            setParameter (*synth, SynthProcessor::delayFeedbackId, feedback);
+            setParameter (*synth, SynthProcessor::delayMixId, 0.5f);
+            return synth;
+        };
+
+        const auto peakAround = [] (const std::vector<float>& signal, double seconds)
+        {
+            return peakOf (slice (signal, seconds, seconds + 0.3));
+        };
+
+        {
+            SynthProcessor fresh;
+            check (fresh.parameters.getRawParameterValue (SynthProcessor::effectSendId (3, Patch::delayEffect))->load() >= 0.5f
+                     && fresh.parameters.getRawParameterValue (SynthProcessor::delayMixId)->load() == 0.0f,
+                   "to begin with, every oscillator's sent through the delay, with none of it mixed in, so it's off");
+        }
+
+        // With no feedback, the note comes back once, after the delay's time.
+        {
+            const auto signal = playSides (*delayed (800.0f, 0.0f), 69, 0.05, 2.0).first;
+            const auto note = peakAround (signal, 0.0);
+            check (note > 0.05f && peakOf (slice (signal, 0.45, 0.78)) < 1.0e-4f && isNear (peakAround (signal, 0.8), note, 0.1)
+                     && peakAround (signal, 1.6) < 1.0e-4f,
+                   "with no feedback, a note comes back once, as loud, after the delay's time");
+        }
+
+        // With feedback, each repeat comes back again, at its share.
+        {
+            const auto signal = playSides (*delayed (800.0f, 0.5f), 69, 0.05, 2.5).first;
+            check (isNear (peakAround (signal, 1.6) / peakAround (signal, 0.8), 0.5, 0.05),
+                   "with 50% feedback, each repeat is half as loud as the one before");
+        }
+
+        // At 100%, it repeats for ever, as loud each time.
+        {
+            const auto signal = playSides (*delayed (500.0f, 1.0f), 69, 0.05, 4.0).first;
+            check (isNear (peakAround (signal, 3.5), peakAround (signal, 0.5), 0.05),
+                   "at 100% feedback, it repeats for ever, without fading");
+        }
+
+        // Synced, it waits a note at the tempo: a quarter at 120 BPM is half a second.
+        {
+            auto synth = delayed (800.0f, 0.0f);
+            setParameter (*synth, SynthProcessor::delaySyncId, 1.0f);
+            setParameter (*synth, SynthProcessor::delayDivisionId, (float) Delay::quarterDivision);
+            check (isNear (synth->getDelayTime(), 500.0, 0.001), "synced, a quarter note at 120 BPM is 500 ms");
+            const auto signal = playSides (*synth, 69, 0.05, 1.5).first;
+            check (peakAround (signal, 0.5) > 0.05f && peakAround (signal, 0.8) < 1.0e-4f,
+                   "...and the note comes back then, rather than after its time in milliseconds");
+            setParameter (*synth, SynthProcessor::delayDivisionId, 6.0f);
+            check (synth->parameters.getParameter (SynthProcessor::delayDivisionId)->getCurrentValueAsText() == "1/8D"
+                     && isNear (synth->getDelayTime(), 375.0, 0.001),
+                   "...and a dotted eighth is 375 ms");
+        }
+
+        // The effects run in a chain: sent through both, the repeats go on through the reverb.
+        {
+            auto onlyDelayed = delayed (500.0f, 0.0f);
+            auto both = delayed (500.0f, 0.0f);
+            setParameter (*both, SynthProcessor::effectSendId (0, Patch::reverbEffect), 1.0f);
+            setParameter (*both, SynthProcessor::reverbMixId, 0.5f);
+            const auto dry = playSides (*onlyDelayed, 69, 0.05, 2.0).first;
+            const auto wet = playSides (*both, 69, 0.05, 2.0).first;
+            check (peakOf (slice (dry, 1.0, 1.5)) < 1.0e-4f && loudness (wet, 1.0, 1.5) > 1.0e-3,
+                   "sent through the delay and the reverb, the repeats ring on in the reverb");
+        }
+
+        // The delay is the same for every pitch set.
+        {
+            auto synth = delayed (800.0f, 0.0f);
+            setParameter (*synth, SynthProcessor::delayFeedbackId, 0.7f);
+            synth->setActivePitchSet (synth->addPitchSet ({ 60, 71 }));
+            setParameter (*synth, SynthProcessor::delayTimeId, 250.0f);
+            synth->setActivePitchSet (0);
+            check (isNear (synth->parameters.getRawParameterValue (SynthProcessor::delayFeedbackId)->load(), 0.7, 0.01)
+                     && isNear (synth->parameters.getRawParameterValue (SynthProcessor::delayTimeId)->load(), 250.0, 0.01),
+                   "the delay is set the same for every pitch set");
+        }
+    }
+
     void testUnison()
     {
         std::cout << "Unison" << std::endl;
@@ -4096,15 +4187,21 @@ namespace
             screen.showOscillator (4);
             check (screen.getSendSwitch (1).getToggleState(), "...and another oscillator's switches are its own");
 
-            // Its reverb switch sends the oscillator through the reverb, after its filters.
+            // Its effects' switches send the oscillator through the delay and the reverb, after its filters.
             screen.showOscillator (2);
-            check (screen.describePath() == juce::String (juce::CharPointer_UTF8 ("Osc 3  \xe2\x86\x92  Filter 1  \xe2\x86\x92  Filter 3  \xe2\x86\x92  Filter 4  \xe2\x86\x92  Reverb  \xe2\x86\x92  Out"))
-                     && screen.getEffectSwitch (Patch::reverbEffect).getToggleState(),
-                   "...which spells out the path the oscillator takes, through the reverb, after its filters, to begin with");
+            const juce::String arrow (juce::CharPointer_UTF8 ("  \xe2\x86\x92  "));
+            check (screen.describePath() == "Osc 3" + arrow + "Filter 1" + arrow + "Filter 3" + arrow + "Filter 4" + arrow + "Delay"
+                                                 + arrow + "Reverb" + arrow + "Out"
+                     && screen.getEffectSwitch (Patch::delayEffect).getToggleState() && screen.getEffectSwitch (Patch::reverbEffect).getToggleState(),
+                   "...which spells out the path the oscillator takes, through the delay and the reverb, after its filters, to begin with");
             screen.getEffectSwitch (Patch::reverbEffect).setToggleState (false, juce::sendNotificationSync);
             check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::reverbEffect))->load() < 0.5f
-                     && screen.describePath().endsWith (juce::String (juce::CharPointer_UTF8 ("Filter 4  \xe2\x86\x92  Out"))),
+                     && screen.describePath().endsWith ("Filter 4" + arrow + "Delay" + arrow + "Out"),
                    "...and whose reverb switch takes it out of the reverb");
+            screen.getEffectSwitch (Patch::delayEffect).setToggleState (false, juce::sendNotificationSync);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (2, Patch::delayEffect))->load() < 0.5f
+                     && screen.describePath().endsWith ("Filter 4" + arrow + "Out"),
+                   "...and whose delay switch takes it out of the delay");
 
             screen.doneButton.onClick();
             check (! synthEditor.isRoutingScreenShown(), "Done closes it");
@@ -4112,13 +4209,25 @@ namespace
             // The Effects screen sets the reverb, and which oscillators are sent through it.
             synthEditor.showEffectsScreen (true);
             auto& effects = synthEditor.getEffectsScreen();
-            check (synthEditor.isEffectsScreenShown() && ! effects.getSendSwitch (2).getToggleState() && effects.getSendSwitch (0).getToggleState(),
-                   "the Effects screen shows which oscillators are sent through the reverb");
-            effects.getSendSwitch (0).setToggleState (false, juce::sendNotificationSync);
-            effects.getReverbDial (2).setValue (6.0, juce::sendNotificationSync);
+            check (synthEditor.isEffectsScreenShown() && ! effects.getSendSwitch (Patch::reverbEffect, 2).getToggleState()
+                     && effects.getSendSwitch (Patch::reverbEffect, 0).getToggleState() && ! effects.getSendSwitch (Patch::delayEffect, 2).getToggleState(),
+                   "the Effects screen shows which oscillators are sent through each effect");
+            effects.getSendSwitch (Patch::reverbEffect, 0).setToggleState (false, juce::sendNotificationSync);
+            effects.getDial (Patch::reverbEffect, 2).setValue (6.0, juce::sendNotificationSync);
+            effects.getDial (Patch::delayEffect, 2).setValue (0.6, juce::sendNotificationSync);
             check (shown.parameters.getRawParameterValue (SynthProcessor::effectSendId (0, Patch::reverbEffect))->load() < 0.5f
-                     && isNear (shown.parameters.getRawParameterValue (SynthProcessor::reverbDecayId)->load(), 6.0, 0.01),
-                   "...and sets them, and the reverb's dials");
+                     && isNear (shown.parameters.getRawParameterValue (SynthProcessor::reverbDecayId)->load(), 6.0, 0.01)
+                     && isNear (shown.parameters.getRawParameterValue (SynthProcessor::delayFeedbackId)->load(), 0.6, 0.01),
+                   "...and sets them, and the effects' dials");
+
+            // The delay's time is in milliseconds, or, synced, a note at the tempo, each with its own dial.
+            check (effects.getDial (Patch::delayEffect, 0).isVisible() && ! effects.getDial (Patch::delayEffect, 1).isVisible(),
+                   "the delay's time is shown in milliseconds to begin with");
+            effects.getDelaySyncButtons().onChoose (1);
+            check (shown.parameters.getRawParameterValue (SynthProcessor::delaySyncId)->load() >= 0.5f
+                     && ! effects.getDial (Patch::delayEffect, 0).isVisible() && effects.getDial (Patch::delayEffect, 1).isVisible(),
+                   "...and synced, as a note, on a dial of its own");
+            effects.getDelaySyncButtons().onChoose (0);
             synthEditor.showRoutingScreen (true, 0);
             check (! synthEditor.isEffectsScreenShown(), "...and gives way to another screen");
             synthEditor.showRoutingScreen (false);
@@ -6629,8 +6738,13 @@ namespace
         setParameter (synth, SynthProcessor::filterSendId (1, 1), 1.0f);
         setParameter (synth, SynthProcessor::filterSendId (1, 3), 1.0f);
 
-        // The effects screen, every oscillator but the third sent through the reverb, a larger room ringing for
+        // The effects screen: the delay synced to dotted eighths, 25% of it mixed in, with every oscillator but the
+        // first sent through it, and every one but the third sent through the reverb, a larger room ringing for
         // 3.5 seconds, 30% of it mixed in.
+        setParameter (synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 0.0f);
+        setParameter (synth, SynthProcessor::delaySyncId, 1.0f);
+        setParameter (synth, SynthProcessor::delayDivisionId, 6.0f);
+        setParameter (synth, SynthProcessor::delayMixId, 0.25f);
         setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 0.0f);
         setParameter (synth, SynthProcessor::reverbMixId, 0.3f);
         setParameter (synth, SynthProcessor::reverbSizeId, 72.0f);
@@ -6641,6 +6755,9 @@ namespace
         synthEditor.showEffectsScreen (false);
         setParameter (synth, SynthProcessor::effectSendId (2, Patch::reverbEffect), 1.0f);
         setParameter (synth, SynthProcessor::reverbMixId, 0.0f);
+        setParameter (synth, SynthProcessor::effectSendId (0, Patch::delayEffect), 1.0f);
+        setParameter (synth, SynthProcessor::delaySyncId, 0.0f);
+        setParameter (synth, SynthProcessor::delayMixId, 0.0f);
 
         // Pitch sets for three samples' ranges, the highest active, its keys marked on the keyboard, then one being
         // added, waiting for its highest key.
@@ -6916,6 +7033,7 @@ int main (int argc, char* argv[])
     testFilterRouting();
     testUnison();
     testReverb();
+    testDelay();
     testMidiInputs();
     testMidiLearn();
     testEightLfosAndEnvelopes();

@@ -73,10 +73,12 @@ public:
     /** How many of the samples of white noise an oscillator played last it keeps, for the window to show. */
     static constexpr int recentNoiseLength = 512;
 
-    /** How many channels an output needs for the voices to play what's sent through each effect on its own pair,
-        after the pair played straight out. With fewer, every oscillator plays straight out.
+    /** How many channels an output needs for the voices to play the sound going each way through the effects on its
+        own pair: a pair for each set of effects an oscillator can be sent through, numbered by which, the effects'
+        bits, from the pair played straight out, 0, to the pair sent through every effect. With fewer channels,
+        every oscillator plays straight out.
     */
-    static constexpr int routedChannels = 2 * (1 + Patch::numEffects);
+    static constexpr int routedChannels = 2 * (1 << Patch::numEffects);
 
     /** Copies the last samples of white noise an oscillator played, from -1 to 1 before its level, oldest first. */
     void copyRecentNoise (int oscillator, float* destination, int count) const noexcept;
@@ -158,9 +160,9 @@ private:
     std::array<std::array<float, modulation::numFilters>, modulation::numOscillators> sendLevels {};
 
     // Where each oscillator's sound goes once it's filtered, gliding over 20 ms when it's switched: straight out, the
-    // first, or through each effect. Each goes to its own pair of the output's channels, when the output has enough
-    // for every effect; otherwise everything goes straight out.
-    static constexpr size_t numRoutes = 1 + (size_t) Patch::numEffects;
+    // first, or through the set of effects it's sent through, numbered by their bits. Each goes to its own pair of
+    // the output's channels, when the output has enough; otherwise everything goes straight out.
+    static constexpr size_t numRoutes = (size_t) 1 << Patch::numEffects;
     std::array<std::array<float, numRoutes>, modulation::numOscillators> routeLevels {};
 
     struct LaneMemory

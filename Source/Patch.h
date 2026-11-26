@@ -15,9 +15,12 @@ struct Patch
     /** The most voices an oscillator's unison can stack. */
     static constexpr int maxUnisonVoices = 8;
 
-    /** How many effects oscillators can be sent through, each on its own: for now, only the reverb. */
-    static constexpr int numEffects = 1;
-    static constexpr int reverbEffect = 0;
+    /** How many effects oscillators can be sent through, in a chain, as the filters are, in this order: the delay,
+        then the reverb.
+    */
+    static constexpr int numEffects = 2;
+    static constexpr int delayEffect = 0;
+    static constexpr int reverbEffect = 1;
 
     /** The furthest an oscillator's unison can detune its outermost voices, either way, in cents. */
     static constexpr float mostUnisonDetune = 100.0f;
@@ -58,7 +61,7 @@ struct Patch
         float unisonSpread = 0.5f;
 
         /** Whether it's sent through each effect, once it's filtered. One sent through none plays straight out. */
-        std::array<bool, numEffects> effectSends { true };
+        std::array<bool, numEffects> effectSends { true, true };
 
         /** Whether it's sent through each filter, or skips it, going straight on to the next. */
         std::array<bool, modulation::numFilters> filterSends { true, true, true, true };

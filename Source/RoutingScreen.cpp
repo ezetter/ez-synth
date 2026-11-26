@@ -42,19 +42,28 @@ RoutingScreen::RoutingScreen (SynthProcessor& processor)
     };
     addAndMakeVisible (oscillatorButtons);
 
-    effectSettingsButton.setTooltip ("Set the reverb, on the effects' screen");
-    effectSettingsButton.setMouseClickGrabsKeyboardFocus (false);
-    effectSettingsButton.setWantsKeyboardFocus (false);
-    effectSettingsButton.onClick = [this]
+    std::vector<Row*> allRows;
+
+    for (auto& row : rows)
+        allRows.push_back (&row);
+
+    for (size_t effect = 0; effect < effectRows.size(); ++effect)
     {
-        if (onShowEffects != nullptr)
-            onShowEffects();
-    };
-    addAndMakeVisible (effectSettingsButton);
+        auto& row = effectRows[effect];
+        allRows.push_back (&row);
+        row.settingsButton = std::make_unique<juce::TextButton> ("Settings");
+        row.settingsButton->setTooltip ("Set the " + SynthProcessor::getEffectName ((int) effect).toLowerCase() + ", on the effects' screen");
+        row.settingsButton->setMouseClickGrabsKeyboardFocus (false);
+        row.settingsButton->setWantsKeyboardFocus (false);
+        row.settingsButton->onClick = [this]
+        {
+            if (onShowEffects != nullptr)
+                onShowEffects();
+        };
+        addAndMakeVisible (*row.settingsButton);
+    }
 
-    static_assert (modulation::numFilters == 4 && Patch::numEffects == 1, "Each row's switch is set up");
-
-    for (auto* each : { &rows[0], &rows[1], &rows[2], &rows[3], &effectRows[0] })
+    for (auto* each : allRows)
     {
         auto& row = *each;
         row.sendSwitch.setMouseClickGrabsKeyboardFocus (false);
@@ -105,9 +114,17 @@ juce::String RoutingScreen::describeFilter (int filter) const
     return FilterStage::getName (type) + dot + synthProcessor.parameters.getParameter (ids.cutoff)->getCurrentValueAsText();
 }
 
-juce::String RoutingScreen::describeEffect (int) const
+juce::String RoutingScreen::describeEffect (int effect) const
 {
     const auto text = [this] (const char* id) { return synthProcessor.parameters.getParameter (id)->getCurrentValueAsText(); };
+
+    if (effect == Patch::delayEffect)
+    {
+        const auto synced = synthProcessor.parameters.getRawParameterValue (SynthProcessor::delaySyncId)->load() >= 0.5f;
+        return text (synced ? SynthProcessor::delayDivisionId : SynthProcessor::delayTimeId) + dot
+             + text (SynthProcessor::delayFeedbackId) + " feedback" + dot + text (SynthProcessor::delayMixId) + " wet";
+    }
+
     return text (SynthProcessor::reverbDelayId) + dot + "size " + text (SynthProcessor::reverbSizeId) + dot
          + text (SynthProcessor::reverbDecayId) + dot + text (SynthProcessor::reverbMixId) + " wet";
 }
@@ -188,7 +205,7 @@ void RoutingScreen::resized()
         row.area = area.removeFromTop (48);
         auto inner = row.area.reduced (14, 0);
         row.sendSwitch.setBounds (inner.removeFromLeft (36).withSizeKeepingCentre (36, 22));
-        effectSettingsButton.setBounds (inner.removeFromRight (90).withSizeKeepingCentre (90, 26));
+        row.settingsButton->setBounds (inner.removeFromRight (90).withSizeKeepingCentre (90, 26));
         area.removeFromTop (6);
     }
 }
@@ -213,8 +230,8 @@ void RoutingScreen::paint (juce::Graphics& g)
 
     g.setFont (fonts::body (13.0f));
     g.drawFittedText ("Where each oscillator's sound goes. The filters run in a chain, from the first to the last; an "
-                      "oscillator that isn't sent through a filter skips it, going straight on to the next. After them, "
-                      "one sent through the reverb plays out through it.",
+                      "oscillator that isn't sent through a filter or effect skips it, going straight on to the next. After "
+                      "the filters come the effects, the delay then the reverb.",
                       subtitleArea, juce::Justification::centredLeft, 2);
 
     g.setColour (colours::text);
@@ -225,7 +242,7 @@ void RoutingScreen::paint (juce::Graphics& g)
 
     for (size_t effect = 0; effect < effectRows.size(); ++effect)
         paintRow (g, effectRows[effect], SynthProcessor::getEffectName ((int) effect), name + " is sent through it",
-                  name + " plays straight out");
+                  name + " skips it");
 }
 
 void RoutingScreen::paintRow (juce::Graphics& g, const Row& row, const juce::String& title, const juce::String& sentText,
@@ -240,7 +257,7 @@ void RoutingScreen::paintRow (juce::Graphics& g, const Row& row, const juce::Str
     text.removeFromLeft (36 + 16);
 
     // An effect's row has its Settings button at the end.
-    if (std::any_of (effectRows.begin(), effectRows.end(), [&row] (const Row& each) { return &each == &row; }))
+    if (row.settingsButton != nullptr)
         text.removeFromRight (90 + 16);
 
     auto status = text.removeFromRight (200);

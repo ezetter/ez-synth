@@ -2,6 +2,7 @@
 
 #include "HarmonicVoice.h"
 #include "Modulation.h"
+#include "Delay.h"
 #include "Patch.h"
 #include "Reverb.h"
 #include "Tuning.h"
@@ -72,8 +73,8 @@ public:
     static juce::String filterSendId (int oscillator, int filter);
 
     /** The ID of whether an oscillator's sent through an effect, numbered from 0, once it's filtered, which every
-        one is to begin with. One sent through none plays straight out. For now the only effect is the reverb, which
-        starts with none of it mixed in.
+        one is to begin with. The effects run in a chain, the delay then the reverb; one sent through none plays
+        straight out. Each starts with none of it mixed in, so it's off.
     */
     static juce::String effectSendId (int oscillator, int effect);
 
@@ -86,7 +87,27 @@ public:
     static constexpr auto reverbSizeId = "reverbSize";
     static constexpr auto reverbDecayId = "reverbDecay";
     static constexpr auto reverbMixId = "reverbMix";
-    static juce::StringArray getReverbIds()   { return { reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId }; }
+
+    /** The IDs of the delay's settings: whether its time is synced to the tempo, its time in milliseconds, from 1
+        to 2000, when it isn't, and the length of a note it waits when it is, such as "1/8D", how much of each
+        repeat comes back again, from 0 to 1, and how much of what comes out of it is the repeats. Like the reverb,
+        it's one for the whole synth.
+    */
+    static constexpr auto delaySyncId = "delaySync";
+    static constexpr auto delayTimeId = "delayTime";
+    static constexpr auto delayDivisionId = "delayDivision";
+    static constexpr auto delayFeedbackId = "delayFeedback";
+    static constexpr auto delayMixId = "delayMix";
+
+    /** Every effect's settings, which are the same for every pitch set. */
+    static juce::StringArray getEffectSettingIds()
+    {
+        return { delaySyncId, delayTimeId, delayDivisionId, delayFeedbackId, delayMixId,
+                 reverbDelayId, reverbSizeId, reverbDecayId, reverbMixId };
+    }
+
+    /** How long the delay waits, in milliseconds, as it's set, at the tempo it's playing at if it's synced. */
+    float getDelayTime() const;
 
     /** The names of the effects, for the routing screen and the window. */
     static juce::String getEffectName (int effect);
@@ -1028,13 +1049,22 @@ private:
     // through as it's set, before everything's added up.
     juce::AudioBuffer<float> routedBuffer;
     Reverb reverb;
+
+    // The delay, twice: one for the sound that plays straight out from it, and one for the sound going on to the
+    // reverb, set alike, so what each plays can go its own way.
+    Delay delayOut, delayToReverb;
+    std::atomic<float>* delaySync = nullptr;
+    std::atomic<float>* delayTime = nullptr;
+    std::atomic<float>* delayDivision = nullptr;
+    std::atomic<float>* delayFeedback = nullptr;
+    std::atomic<float>* delayMix = nullptr;
     std::atomic<float>* reverbDelay = nullptr;
     std::atomic<float>* reverbSize = nullptr;
     std::atomic<float>* reverbDecay = nullptr;
     std::atomic<float>* reverbMix = nullptr;
 
-    /** Puts the reverb's settings as they are into a pitch set's sound, as the reverb is the same for them all. */
-    void keepReverbIn (juce::ValueTree& sound) const;
+    /** Puts the effects' settings as they are into a pitch set's sound, as the effects are the same for them all. */
+    void keepEffectsIn (juce::ValueTree& sound) const;
     std::atomic<int> lastNote { -1 };
     std::atomic<int> midiReceived { 0 };
     std::array<waveform::Drawing, numSources> drawings;

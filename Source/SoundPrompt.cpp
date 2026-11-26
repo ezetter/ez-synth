@@ -192,8 +192,9 @@ oscillator's tune.
 - `oscNToFilterM`, true or false, true to begin with, sends oscillator N through filter M (1 to 4). The filters run
   in a chain, 1 to 4; an oscillator that isn't sent through one skips it, going straight on to the next. Use it to
   filter one part of a sound and not another, such as a low-passed body under an unfiltered noise attack.
-- `oscNToReverb`, true or false, true to begin with, sends oscillator N through the reverb, after its filters.
-  One that isn't sent through it plays straight out. See the reverb below.
+- `oscNToDelay` and `oscNToReverb`, true or false, true to begin with, send oscillator N through the delay and
+  the reverb, after its filters, in that order. One sent through neither plays straight out. See the effects
+  below; each starts with its mix at 0, so it's off.
 - A harmonic can be switched off, so it stays silent whatever the number of harmonics, or on, so it plays even
   above the number. Leave these as they follow the number unless you need them.
 - The wave can be given as one of the presets, `"wave": "Sine"`, `"Sawtooth"`, `"Square"` or `"Triangle"`, with its
@@ -225,6 +226,17 @@ octave along its travel, about a tenth of the travel an octave.
 
 Filters suit sounds whose brightness changes over the note, such as a pluck or brass, and resonant bodies. For a
 steady tone, set the harmonics directly instead: it's more exact.
+
+### Delay
+
+One stereo delay, for the whole synth, before the reverb, that the oscillators sent through it (`oscNToDelay`)
+play through. `delaySync` false (to begin with) sets its time by `delayTime`, from 1 to 2000 ms (375 to begin
+with); true sets it by `delayDivision`, a note at the tempo: "1/32", "1/16T", "1/16", "1/16D", "1/8T", "1/8",
+"1/8D", "1/4T", "1/4" (to begin with), "1/4D", "1/2T", "1/2", "1/2D", "1 bar" or "2 bars", T for triplet and D
+for dotted; the sound tool plays at 120 BPM. `delayFeedback`, from 0 to 1 (0.35 to begin with), is how much of
+each repeat comes back again, 1 repeating for ever. `delayMix`, from 0 (to begin with, so it's off) to 1, is how
+much of what comes out is the repeats, the rest dry. Like the reverb, its repeats go on after the note: leave
+`delayMix` at 0 when matching a dry sample.
 
 ### Reverb
 

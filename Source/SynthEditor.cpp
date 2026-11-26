@@ -189,7 +189,7 @@ SynthEditor::SynthEditor (SynthProcessor& p)
     effectsScreen.onClose = [this] { showEffectsScreen (false); };
     addChildComponent (effectsScreen);
 
-    effectsButton.setTooltip ("Set the reverb, and which oscillators are sent through it");
+    effectsButton.setTooltip ("Set the delay and reverb, and which oscillators are sent through them");
     effectsButton.setMouseClickGrabsKeyboardFocus (false);
     effectsButton.setWantsKeyboardFocus (false);
     effectsButton.onClick = [this] { showEffectsScreen (! isEffectsScreenShown()); };
