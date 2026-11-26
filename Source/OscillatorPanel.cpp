@@ -402,7 +402,7 @@ void OscillatorPanel::resized()
     glideAllArea = allArea;
     glideMode.setBounds (glideRow.removeFromLeft (juce::jmin (156, glideRow.getWidth())));
     glideValueArea = timeRow.removeFromRight (64);
-    timeRow.removeFromRight (8);
+    timeRow.removeFromRight (4);
     glideTimeSlider.setBounds (timeRow);
     divide();
 
@@ -503,7 +503,7 @@ void OscillatorPanel::paint (juce::Graphics& g)
     // How far either side the scale reaches.
     drawCaption ("ZOOM", tuning::reachToText ((window.high - window.low) / 2.0f), zoomCaptionArea, false);
     g.setColour (colours::dimText.withAlpha (glideTimeSlider.isEnabled() ? 1.0f : 0.4f));
-    g.drawText (SynthProcessor::glideTimeToText ((float) glideTimeSlider.getValue()), glideValueArea, juce::Justification::centredRight);
+    g.drawText (SynthProcessor::glideTimeToText ((float) glideTimeSlider.getValue()), glideValueArea, juce::Justification::centredLeft);
 
     const auto ticksTop = (float) tickArea.getY();
     const auto xOf = [this] (float semitones) { return (float) slider.getX() + (float) slider.getPositionOfValue (semitones); };
