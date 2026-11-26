@@ -20,8 +20,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   its pan, unison, tune, glide and routing, from top to bottom. The window can be resized, down to 1420 by 900.
 - **Tabs** along the top, in the header between the preset and the note played, choose what the window shows:
   **Synth**, the synth itself, **Effects**, **Pitch Sets** and **Modulation**, each a screen over the synth,
-  under the header, down to the keyboard, which stays in reach to play. The chosen tab is underlined. A
-  screen's **Done**, or Escape, goes back to the Synth tab. The routing screen, from an oscillator's Routing
+  under the header, down to the keyboard, which stays in reach to play. The chosen tab is underlined. Click
+  another tab to leave a screen, or press Escape to go back to the Synth tab. The routing screen, from an oscillator's Routing
   row, belongs to the Synth tab, and goes when another tab's chosen.
 - **Choose an oscillator or LFO.** Across the top are the oscillators' cards, then the LFOs'. Three of the
   six oscillators show at a time: swipe sideways on the trackpad over the row, turn a mouse wheel, or drag the
@@ -475,8 +475,8 @@ It runs as a standalone Mac app, and as a VST3 or Audio Unit instrument in a DAW
   number, such as **CC 74**, after its name on every row, so a control an LFO moves can be seen to be on a
   knob too.
 - **Click a row** to open the control's modulation editor beside it, as right-clicking the control does,
-  or its **×** to take that link off, leaving anything else on the same control. **Done**, or Escape, or
-  choosing the menu item again, goes back to the synth. The list follows changes as they're made.
+  or its **×** to take that link off, leaving anything else on the same control. Another tab, Escape, or
+  choosing the menu item again, goes back. The list follows changes as they're made.
 
 ### MIDI learn
 

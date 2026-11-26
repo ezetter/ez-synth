@@ -10,7 +10,8 @@
 /** A screen of its own, over the window but for the keyboard, setting the effects oscillators can be sent through,
     in the order they run: the delay, its time, in milliseconds or synced to the tempo, its feedback and mix, and
     then the reverb, its pre-delay, the room's size, how long it rings, and its mix. Under each is a switch for each
-    oscillator, for whether it's sent through it, as on the routing screen. Done, or Escape, goes back to the synth.
+    oscillator, for whether it's sent through it, as on the routing screen. It's the Effects tab's; Escape goes
+    back to the synth.
 */
 class EffectsScreen final : public juce::Component
 {
@@ -33,8 +34,6 @@ public:
 
     /** The delay's choice of a time in milliseconds, 0, or synced to the tempo, 1. */
     ChoiceButtons& getDelaySyncButtons()   { return delaySync; }
-
-    juce::TextButton doneButton { "Done" };
 
     void paint (juce::Graphics&) override;
     void resized() override;

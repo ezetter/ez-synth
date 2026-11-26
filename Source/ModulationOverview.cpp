@@ -27,14 +27,6 @@ ModulationOverview::ModulationOverview (SynthProcessor& processor)
 {
     setWantsKeyboardFocus (true);
 
-    doneButton.setMouseClickGrabsKeyboardFocus (false);
-    doneButton.onClick = [this]
-    {
-        if (onClose != nullptr)
-            onClose();
-    };
-    addAndMakeVisible (doneButton);
-
     viewport.setViewedComponent (&list, false);
     viewport.setScrollBarsShown (true, false);
     viewport.setScrollBarThickness (8);
@@ -192,9 +184,7 @@ void ModulationOverview::resized()
     panelArea = getLocalBounds().reduced (24).withSizeKeepingCentre (juce::jmin (920, getWidth() - 48), getHeight() - 48);
     auto area = panelArea.reduced (24, 20);
 
-    auto header = area.removeFromTop (30);
-    doneButton.setBounds (header.removeFromRight (90));
-    titleArea = header;
+    titleArea = area.removeFromTop (30);
     subtitleArea = area.removeFromTop (24);
     area.removeFromTop (12);
 

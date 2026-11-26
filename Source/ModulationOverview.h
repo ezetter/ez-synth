@@ -4,10 +4,10 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-/** A screen of its own, over the whole window, listing everything that moves a control or is linked to one: each
+/** A screen of its own, the Modulation tab's, listing everything that moves a control or is linked to one: each
     LFO and envelope, velocity and the mod wheel, with what each moves and by how much, and the MIDI controllers
-    learned. Clicking a row opens the control's modulation editor; its cross takes the link off. Done, or Escape,
-    goes back to the synth.
+    learned. Clicking a row opens the control's modulation editor; its cross takes the link off. Escape goes back
+    to the synth.
 */
 class ModulationOverview final : public juce::Component,
                                  private juce::Timer
@@ -49,7 +49,6 @@ public:
     /** Brings the list up to date with the synth. */
     void refresh();
 
-    juce::TextButton doneButton { "Done" };
 
     void paint (juce::Graphics&) override;
     void resized() override;

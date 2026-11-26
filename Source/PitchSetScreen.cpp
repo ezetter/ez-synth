@@ -7,19 +7,11 @@ PitchSetScreen::PitchSetScreen (SynthProcessor& processor)
 {
     setWantsKeyboardFocus (true);
 
-    for (auto* button : { &doneButton, &newButton, &cancelButton })
+    for (auto* button : { &newButton, &cancelButton })
     {
         button->setMouseClickGrabsKeyboardFocus (false);
         addAndMakeVisible (*button);
     }
-
-    doneButton.onClick = [this]
-    {
-        cancelWaiting();
-
-        if (onClose != nullptr)
-            onClose();
-    };
 
     newButton.setTooltip ("Add a pitch set for a range of keys, sounding as the active one does to start with");
     newButton.onClick = [this] { startNewPitchSet(); };
@@ -183,8 +175,6 @@ void PitchSetScreen::resized()
     auto area = panelArea.reduced (24, 20);
 
     auto header = area.removeFromTop (30);
-    doneButton.setBounds (header.removeFromRight (90));
-    header.removeFromRight (10);
     newButton.setBounds (header.removeFromRight (130));
     cancelButton.setBounds (newButton.getBounds().withWidth (90).withX (newButton.getRight() - 90));
     titleArea = header;

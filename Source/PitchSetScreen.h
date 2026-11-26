@@ -8,7 +8,7 @@
     key no other takes in, and each other, with its range of keys. Clicking a pitch set makes it the active one, which
     the synth's controls show and set. A new pitch set, or a new range for one, is set by pressing its lowest key and
     then its highest, on a MIDI keyboard or the one on screen. A bar across the top shows which pitch set plays each
-    key. Done, or Escape, goes back to the synth.
+    key. It's the Pitch Sets tab's; Escape goes back to the synth.
 */
 class PitchSetScreen final : public juce::Component,
                              private juce::Timer
@@ -39,7 +39,7 @@ public:
     /** A colour for each pitch set, by where it is among them, the default grey. */
     static juce::Colour getColour (int index);
 
-    juce::TextButton doneButton { "Done" }, newButton { "New Pitch Set" }, cancelButton { "Cancel" };
+    juce::TextButton newButton { "New Pitch Set" }, cancelButton { "Cancel" };
 
     void paint (juce::Graphics&) override;
     void resized() override;

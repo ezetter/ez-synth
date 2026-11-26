@@ -746,6 +746,11 @@ void SynthEditor::showTab (Tab tab)
     // everything but the keyboard. The routing screen belongs to the synth's tab, and goes when another's chosen.
     tabs.setChosen ((int) tab);
     routingScreen.setVisible (false);
+
+    // Leaving the pitch sets, it stops waiting for keys to set one's range.
+    if (tab != Tab::pitchSets && pitchSetScreen.isVisible())
+        pitchSetScreen.cancelWaiting();
+
     effectsScreen.setVisible (tab == Tab::effects);
     pitchSetScreen.setVisible (tab == Tab::pitchSets);
     modulationOverview.setVisible (tab == Tab::modulation);

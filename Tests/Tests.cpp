@@ -5432,7 +5432,7 @@ namespace
                  && ! synth.getMidiController (modulation::filterCutoffTarget (0)).has_value() && overview.getLinks().size() == 4,
                "a link can be taken off, leaving the others on the same control");
 
-        // In the window, it's shown over the synth, and Done or Escape goes back.
+        // In the window, it's shown over the synth, and Escape or another tab goes back.
         {
             std::unique_ptr<juce::AudioProcessorEditor> editor (synth.createEditorAndMakeActive());
             auto& synthEditor = dynamic_cast<SynthEditor&> (*editor);
@@ -5467,8 +5467,8 @@ namespace
                        "Escape goes back to the synth, and its tab");
                 synthEditor.showModulationOverview (true);
                 check (synthEditor.getShownTab() == SynthEditor::Tab::modulation, "...and shown, the Modulation tab is chosen");
-                shown->doneButton.onClick();
-                check (! synthEditor.isModulationOverviewShown(), "...as Done does");
+                synthEditor.showTab (SynthEditor::Tab::synth);
+                check (! synthEditor.isModulationOverviewShown(), "...as the Synth tab does");
 
                 // The tabs along the top, Synth, Effects, Pitch Sets and Modulation, choose the screen shown.
                 check (tabs.isVisible() && tabs.getLabel (0) == "Synth" && tabs.getLabel (1) == "Effects"

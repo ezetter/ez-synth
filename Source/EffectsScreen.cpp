@@ -7,14 +7,6 @@ EffectsScreen::EffectsScreen (SynthProcessor& processor)
 {
     setWantsKeyboardFocus (true);
 
-    doneButton.setMouseClickGrabsKeyboardFocus (false);
-    doneButton.onClick = [this]
-    {
-        if (onClose != nullptr)
-            onClose();
-    };
-    addAndMakeVisible (doneButton);
-
     for (size_t effect = 0; effect < sections.size(); ++effect)
         sections[effect].effect = (int) effect;
 
@@ -132,9 +124,7 @@ void EffectsScreen::resized()
     panelArea = getLocalBounds().reduced (24).withSizeKeepingCentre (juce::jmin (760, getWidth() - 48), getHeight() - 48);
     auto area = panelArea.reduced (24, 20);
 
-    auto header = area.removeFromTop (30);
-    doneButton.setBounds (header.removeFromRight (90));
-    titleArea = header;
+    titleArea = area.removeFromTop (30);
     subtitleArea = area.removeFromTop (40);
     area.removeFromTop (12);
 
